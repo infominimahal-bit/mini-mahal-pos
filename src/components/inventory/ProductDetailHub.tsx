@@ -551,7 +551,8 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
   };
 
   return (
-    <div className="space-y-0 animate-in slide-in-from-right-4 duration-500">
+    <>
+      <div className="space-y-0 animate-in slide-in-from-right-4 duration-500">
       {/* ═══ HEADER ═══ */}
       <div className="bg-white dark:bg-surface border-b border-gray-200 dark:border-white/5 px-3 sm:px-6 py-6 rounded-t-[2.5rem] relative overflow-hidden">
         {/* Decorative Background for Mobile Premium Look */}
@@ -1601,6 +1602,8 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
           )}
         </div>
       </div>
+      </div>
+
       {
         showMediaLibrary && (
           <MediaLibrary
@@ -1632,6 +1635,6 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
         saveLabel={t('commit_changes', 'Confirm Changes')}
         unsaved={true}
       />
-    </div>
+    </>
   );
 }
