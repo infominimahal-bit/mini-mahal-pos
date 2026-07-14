@@ -170,7 +170,7 @@ export function InventoryManager() {
   const filteredProducts = useMemo(() => {
     return state.products
       .filter(product => {
-        const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        const matchesSearch = (product.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
           (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase())) ||
           (product.barcode && product.barcode.toLowerCase().includes(searchTerm.toLowerCase()));
         const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
@@ -187,8 +187,8 @@ export function InventoryManager() {
 
         switch (sortBy) {
           case 'name':
-            aValue = a.name.toLowerCase();
-            bValue = b.name.toLowerCase();
+            aValue = (a.name || '').toLowerCase();
+            bValue = (b.name || '').toLowerCase();
             break;
           case 'stock':
             aValue = a.stock;
@@ -199,8 +199,8 @@ export function InventoryManager() {
             bValue = b.price;
             break;
           default:
-            aValue = a.name.toLowerCase();
-            bValue = b.name.toLowerCase();
+            aValue = (a.name || '').toLowerCase();
+            bValue = (b.name || '').toLowerCase();
         }
 
         if (sortOrder === 'asc') {
@@ -413,7 +413,7 @@ export function InventoryManager() {
 
       // Get all existing products in local db to check for duplicates quickly (Rule F1)
       const allLocalProducts = await localDb.products.toArray();
-      const existingNames = new Set(allLocalProducts.map(p => p.name.trim().toLowerCase()));
+      const existingNames = new Set(allLocalProducts.map(p => (p.name || '').trim().toLowerCase()));
 
       const duplicates: string[] = [];
       const productsToCreate: any[] = [];
