@@ -633,6 +633,14 @@ export async function syncToCloud(options: { resetRetries?: boolean } = {}) {
                 const exists = await localDb.pendingOps.get(op.id!);
                 if (!exists) continue;
 
+                // Safety: check for corrupt settings-mismatched ops
+                if (op.entityId === SETTINGS_ID && op.entity !== 'app_settings') {
+                    console.warn(`[SyncEngine] Deleting corrupt settings-mismatched op: ${op.entity}/${op.entityId}`);
+                    await localDb.pendingOps.delete(op.id!);
+                    window.dispatchEvent(new Event('pendingops-changed'));
+                    continue;
+                }
+
                 console.log(`[POS SYNC] ${op.opType.toUpperCase()}: ${op.entity} (ID: ${op.entityId})`);
 
                 try {
