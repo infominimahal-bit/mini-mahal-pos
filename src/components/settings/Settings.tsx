@@ -51,6 +51,7 @@ import { ReceiptPrint } from '../pos/ReceiptPrint';
 import { AppSettings } from '../../types';
 import { useSync } from '../../hooks/useSync';
 import { DatabaseTools } from './DatabaseTools';
+import { ReconciliationDashboard } from './ReconciliationDashboard';
 import { HelpTooltip } from '../../shared/ui/HelpTooltip';
 
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
@@ -1181,6 +1182,7 @@ export function Settings() {
             {(activeTab === 'backup') && (
               <section className="space-y-8">
                 <DatabaseTools />
+                <ReconciliationDashboard />
               </section>
             )}
 

@@ -29,7 +29,6 @@ import { generateId, localDb, queueOp } from '../../lib/localDb';
 import { toRemoteProduct } from '../../lib/services';
 import { BundleManager } from './BundleManager';
 import { StoreSort } from './StoreSort';
-import { ReconciliationDashboard } from './ReconciliationDashboard';
 import { SharedSearchBar } from '../../shared/modules/search-and-list';
 import { Button, Badge, Pagination } from '../../shared/ui';
 
@@ -60,7 +59,6 @@ export function InventoryManager() {
     groups: 'groups',
     media: 'media',
     'store-sort': 'store_sort',
-    reconciliation: 'reconciliation',
   };
   const INTERNAL_TO_SUB_TAB_SEGMENT: Record<string, string> = {
     inventory: 'products',
@@ -70,7 +68,6 @@ export function InventoryManager() {
     groups: 'groups',
     media: 'media',
     store_sort: 'store-sort',
-    reconciliation: 'reconciliation',
   };
   const activeTab = (subTab ? SUB_TAB_SEGMENT_TO_INTERNAL[subTab] : 'inventory') as TabType;
 
@@ -677,7 +674,6 @@ export function InventoryManager() {
               { id: 'bundles', label: t("bundles_and_deals", "BUNDLES & DEALS"), icon: Gift, color: 'bg-violet-600', show: true },
               { id: 'groups', label: t("groups", "GROUPS"), icon: Layers, color: 'bg-indigo-600', show: true },
               { id: 'media', label: t("media", "MEDIA"), icon: Camera, color: 'bg-amber-600', show: true },
-              { id: 'reconciliation', label: t("reconciliation", "RECONCILIATION"), icon: Shield, color: 'bg-indigo-500', show: isAdmin },
               { id: 'store_sort', label: t("store_sort", "STORE SORT"), icon: ArrowUpDown, color: 'bg-teal-600', show: state.settings.estoreEnabled && isAdmin },
             ].filter(t => t.show).map(tab => {
               const isActive = activeTab === tab.id;
@@ -1183,8 +1179,6 @@ export function InventoryManager() {
         </div>
       ) : activeTab === 'store_sort' ? (
         <StoreSort />
-      ) : activeTab === 'reconciliation' ? (
-        <ReconciliationDashboard />
       ) : activeTab === 'suppliers' ? (
         <SupplierManager />
       ) : (

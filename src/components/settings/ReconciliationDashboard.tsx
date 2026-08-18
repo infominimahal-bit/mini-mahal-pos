@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, AlertTriangle, RefreshCw, CheckCircle } from 'lucide-react';
+import { Shield, AlertTriangle, RefreshCw, CheckCircle, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Card, Button, Badge, EmptyState } from '../../shared/ui';
 import { sonner } from '../../lib/sonner';
@@ -62,7 +62,7 @@ export function ReconciliationDashboard() {
     try {
       const { data, error } = await supabase.rpc('reconcile_now');
       if (error) throw error;
-      
+
       sonner.success(`Reconciliation complete. ${data || 0} new mismatches found.`);
       await fetchRecords();
     } catch (err) {
@@ -87,10 +87,11 @@ export function ReconciliationDashboard() {
             Monitor and resolve ledger drift across inventory and wallets.
           </p>
         </div>
-        <Button 
-          variant="primary" 
+        <Button
+          variant="primary"
           onClick={handleReconcileNow}
           disabled={isReconciling || isLoading}
+          title="Run a manual audit: compares recorded stock/wallet balances against the movement ledger and logs any new mismatches. This tool NEVER runs automatically."
           className="whitespace-nowrap"
         >
           <RefreshCw className={`w-4 h-4 mr-2 ${isReconciling ? 'animate-spin' : ''}`} />
@@ -98,15 +99,42 @@ export function ReconciliationDashboard() {
         </Button>
       </div>
 
+      {/* ── COMPLETE GUIDE ─────────────────────────────────────────────── */}
+      <Card className="p-5 bg-indigo-50/60 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30">
+        <div className="flex items-start gap-3">
+          <Info className="w-5 h-5 text-indigo-500 mt-0.5 shrink-0" />
+          <div className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
+            <p className="font-semibold text-indigo-700 dark:text-indigo-300">
+              What is this? · When to run · Why it exists
+            </p>
+            <p>
+              <strong>What:</strong> Scans your inventory ledger (<code>stock_history</code>) and wallet balances to detect{' '}
+              <em>drift</em> — when the system&apos;s recorded stock does not match the movement history. It also flags critical
+              invariant violations (e.g. negative stock, broken references).
+            </p>
+            <p>
+              <strong>When:</strong> Run it whenever stock numbers look wrong, after a physical stock count, or periodically as a
+              safety check. This is a <strong>MANUAL</strong> tool — it never runs automatically (auto-run was removed because it
+              could erase legitimate sale / return movements).
+            </p>
+            <p>
+              <strong>Why:</strong> Stock can drift from theft, damage, manual database edits, or sync anomalies. This dashboard is
+              your last line of defense: &quot;Run Reconciliation&quot; checks for new drift, and every mismatch is logged below with
+              Expected vs Actual so you can investigate and fix.
+            </p>
+          </div>
+        </div>
+      </Card>
+
       {isLoading ? (
         <SkeletonLoader count={3} />
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="p-6 border-l-4 border-l-red-500">
+            <Card className="p-6 border-l-4 border-l-red-500" title="Critical data-integrity checks that failed. Investigate immediately.">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Invariant Violations</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400" title="Critical data-integrity checks that failed. Investigate immediately.">Invariant Violations</p>
                   <h3 className="text-2xl font-bold mt-1 text-red-600 dark:text-red-400">{violations.length}</h3>
                 </div>
                 <div className="p-2 bg-red-100 dark:bg-red-500/20 rounded-lg">
@@ -114,11 +142,11 @@ export function ReconciliationDashboard() {
                 </div>
               </div>
             </Card>
-            
-            <Card className={`p-6 border-l-4 ${activeMismatches.length > 0 ? 'border-l-orange-500' : 'border-l-green-500'}`}>
+
+            <Card className={`p-6 border-l-4 ${activeMismatches.length > 0 ? 'border-l-orange-500' : 'border-l-green-500'}`} title="Stock/wallet values that don't match their ledger. 0 = healthy.">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Mismatches</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400" title="Stock/wallet values that don't match their ledger. 0 = healthy.">Active Mismatches</p>
                   <h3 className={`text-2xl font-bold mt-1 ${activeMismatches.length > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400'}`}>
                     {activeMismatches.length}
                   </h3>
@@ -159,12 +187,12 @@ export function ReconciliationDashboard() {
             <div className="bg-gray-50 dark:bg-dark-800 px-6 py-4 border-b border-gray-100 dark:border-dark-700">
               <h3 className="text-lg font-semibold">Mismatch Log</h3>
             </div>
-            
+
             {mismatches.length === 0 ? (
-              <EmptyState 
-                icon={CheckCircle} 
-                title="System Healthy" 
-                description="No ledger mismatches detected." 
+              <EmptyState
+                icon={<CheckCircle />}
+                title="System Healthy"
+                subtext="No ledger mismatches detected."
               />
             ) : (
               <div className="overflow-x-auto">
