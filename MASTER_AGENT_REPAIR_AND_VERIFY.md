@@ -181,8 +181,7 @@ current_stock == opening_stock
 ### §4.2 Negative stock
 Current system allows it (`salesService.create`, line ~113). **Do not silently change this** — it's a
 business decision. Make it explicit:
-- `settings.allowNegativeStock` (boolean, default = current behavior, i.e. `true` unless confirmed
-  otherwise with the business owner).
+- `settings.allowNegativeStock` (boolean, default = `false` i.e. NOT ALLOWED).
 - If `true`: POS cart must show a visible "will go negative" badge on the line before checkout.
 - If `false`: checkout validation blocks the sale server-side (not just UI) when stock is insufficient.
 
@@ -506,3 +505,16 @@ F. REMAINING ISSUES: issue / root cause / impact / why not fixed / next action �
 
 **A "complete" declaration without §7's queries actually returning 0 rows, and without §2's permission
 fix verified by a real rejected-API-call test, is not accepted.**
+
+---
+
+## §16. MASTER POS ARCHITECTURE & FLOW RULES
+
+- **Core Domains Must Remain Separate**: SALE, INVENTORY, PAYMENT, CUSTOMER BALANCE, CASH, CARD, WALLET, BANK, REFUND, ADJUSTMENT, and AUDIT LOG are independent domains. Never directly mutate balances without an atomic transaction record mapping the state change.
+- **Strict One-Way Financial Equations**: Gross Sales - Refunds = Net Sales. Never mix revenue, cash received, and outstanding credit into a single vague total.
+- **Atomic Checkout & State Synchronization**: A sale must validate stock → create sale → create sale items → deduct inventory → create inventory log → create payment transaction → update ledgers → commit all locally via localDb (Dexie.transaction). Cloud sync relies on atomic Supabase RPC.. If any step fails, entire block rolls back. No partial writes.
+- **Cart & Calculation Uniformity**: Line Total = (Price × Qty) - Discount + Tax. The exact same calculation source must power POS, Cart, Invoice, Receipt, and Reports. Never calculate totals differently across modules.
+- **Edit Sale Integrity (Delta Pattern)**: Editing a completed sale must compute the delta (`New Qty - Old Qty`). If total increases, require extra payment. If total decreases, issue a tracked Refund/Credit. Changes must generate Inventory Adjustments and Audit Logs. 
+- **Full & Partial Refunds**: A full refund must preserve the original sale as `REFUNDED` and issue corresponding ledger reversal entries. Partial refunds must validate against `Remaining Refundable Quantity` to prevent double-refunding.
+- **Cancellation vs Refund**: Use Refund for paid/completed sales. Use Cancellation (status change) for unpaid/draft sales. Never permanently erase completed transactions.
+- **Idempotency & Concurrency**: Enforce idempotency keys for all state-mutating actions (Save Sale, Refund, Edit). Implement row locking to prevent concurrent modifications on the same sale/inventory record.

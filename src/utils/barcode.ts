@@ -25,8 +25,7 @@ export function generateBarcodeValue(
   productNameOrId?: string | number,
   fallbackId?: string | number
 ): string {
-  let namePart = '';
-  let potentialName = '';
+  let namePart = 'PR';
 
   if (typeof productNameOrId === 'string' && productNameOrId.trim() !== '') {
     const trimmed = productNameOrId.trim();
@@ -34,34 +33,29 @@ export function generateBarcodeValue(
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed);
     const isNumeric = !isNaN(Number(trimmed));
     if (!isUuid && !isNumeric) {
-      potentialName = trimmed;
+      const words = trimmed.split(/[\s_-]+/).filter(w => w.length > 0);
+      if (words.length >= 2) {
+        // First letter of first two words (e.g. Denim Jeans -> DJ)
+        namePart = (words[0][0] + words[1][0]).toUpperCase();
+      } else if (words.length === 1 && words[0].length >= 2) {
+        // First two letters of single word (e.g. Shirt -> SH)
+        namePart = words[0].substring(0, 2).toUpperCase();
+      } else if (words.length === 1) {
+        namePart = (words[0][0] + 'X').toUpperCase();
+      }
     }
   }
 
-  if (potentialName) {
-    // Extract first 2 alphanumeric characters
-    const cleaned = potentialName.replace(/[^a-zA-Z0-9]/g, '');
-    if (cleaned.length >= 2) {
-      namePart = cleaned.substring(0, 2).toUpperCase();
-    } else if (cleaned.length === 1) {
-      namePart = (cleaned + 'X').toUpperCase();
-    } else {
-      namePart = 'PR';
-    }
-  } else {
-    namePart = 'PR';
+  // Ensure namePart only contains A-Z (fallback to PR if non-alpha)
+  namePart = namePart.replace(/[^A-Z]/g, '');
+  if (namePart.length < 2) {
+    namePart = (namePart + 'PR').substring(0, 2);
   }
 
-  // Generate a monotonic unique string based on time to prevent database UNIQUE constraint collisions
-  const uniquePart = Date.now().toString(36).toUpperCase();
+  // 6 random numbers to match user request (e.g. 123456)
+  const randomNumbers = Math.floor(100000 + Math.random() * 900000).toString();
   
-  // If we have a fallbackId (UUID), we can also mix in a tiny hash of it for extra safety
-  let hashPart = '';
-  if (typeof fallbackId === 'string' && fallbackId.length > 10) {
-    hashPart = fallbackId.substring(0, 3).toUpperCase();
-  }
-  
-  return `${namePart}${hashPart}${uniquePart}`;
+  return `${namePart}${randomNumbers}`;
 }
 
 /**
