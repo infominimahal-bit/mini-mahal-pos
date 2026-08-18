@@ -521,7 +521,7 @@ async function executeOp(op: PendingOp): Promise<void> {
                     // tombstone for cross-device sync. Stock reversal for this
                     // path was queued separately at delete time (stock_history ops).
                     const token = await signAction('delete_sale');
-                    const delBase: any = { p_sale_id: entityId, p_history: [] };
+                    const delBase: any = { p_sale_id: entityId, p_history: (op.payload && op.payload.history) || [] };
                     if (token) { delBase.p_user_id = token.p_user_id; delBase.p_role = token.p_role; delBase.p_sig = token.p_sig; }
                     const rpcRes = await supabase.rpc('delete_sale_atomic', delBase);
                     error = rpcRes.error;

@@ -2386,7 +2386,7 @@ export const salesService = {
           }
         }
       }
-      await queueOp('sales', 'delete', id, {});
+      await queueOp('sales', 'delete', id, { history: returnMovements });
     }
 
     // 1c. Reverse wallet balances for the un-refunded portion (split-aware)

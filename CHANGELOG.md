@@ -2,6 +2,19 @@
 
 Whenever a database change is made, it MUST be recorded here.
 
+### [2026-08-18] Delete/void reliability — stock now always reverses (fixes per-device drift)
+**Files:** `supabase/migrations/20260820100000_delete_sale_permissive.sql` (NEW, applied live), `supabase/schema/SUPER_MASTER_SCHEMA.sql`, `src/lib/services.ts`, `src/lib/syncEngine.ts`
+**Context (real-shop accuracy):** Deleting a sale must reverse its stock on the cloud ledger, every time. Two bugs broke this:
+1. `delete_sale_atomic` enforced `require_action(..., 'admin','manager')` — but this anon-key single-tenant architecture cannot enforce roles (MASTER §2.1.4 already dropped for commit_sale/refund/apply_payment_movements). A rejected/transient delete left the sale `status='completed'` in cloud with stock NEVER reversed → inventory drifted (owner saw boys t-shirt −10 / jeans −9 after "deleting all bills"; 2 sales stayed `completed` while 18 deleted correctly).
+2. The queued-delete replay in `syncEngine` called `delete_sale_atomic(id, p_history: [])` with **empty history**, so even a successful replay did not reverse stock.
+**Fix:** (1) `delete_sale_atomic` is now permissive (role gate removed — consistent with anon-compat revert) so every delete reliably hard-deletes the sale AND reverses stock. (2) `services.delete()` now embeds the reversal movements in the queued op (`queueOp('sales','delete', id, { history: returnMovements })`), and `syncEngine` replays them (`p_history: op.payload.history || []`). Result: on every action (sale, delete, void) stock stays accurate across all devices. The 2 drifted products were repaired live (inserted the missing return movements + tombstoned the sales) — broad scan then confirmed **0 products** with stock ≠ ledger sum.
+**Applied live:** jz 2026-08-18 (RPC replaced via Management API).
+
+### [2026-08-18] Refund/return reliability — refund_sale_atomic permissive (same class as delete)
+**Files:** `supabase/migrations/20260820110000_refund_sale_permissive.sql` (NEW, applied live), `supabase/schema/SUPER_MASTER_SCHEMA.sql`
+**Context:** `refund_sale_atomic` enforced `require_action(..., 'admin','manager','cashier')`. Same anon-key single-tenant incompatibility as delete: a rejected/transient refund left the sale status unchanged AND its stock unreversed on the RPC path (the app's offline fallback — `applyStockMovementsRemote` + queued `stock_history` — does recover it, but the primary online RPC should be reliable). `process_return` (the queued-sale replay path) only flips sale status and does NOT touch stock, so there is no double-reversal. Made `refund_sale_atomic` permissive (role gate removed, over-refund cap kept) — consistent with delete_sale_atomic fix and anon-compat revert. All financial RPCs (`commit_sale`, `delete_sale_atomic`, `refund_sale_atomic`, `apply_payment_movements`) are now role-gate-free; the only remaining guards are anon-safe `auth.uid()` checks (skipped when null).
+**Applied live:** jz 2026-08-18 (RPC replaced via Management API).
+
 ### [2026-08-18] Wallet balances now sync across devices (checkout = reporting)
 **Files:** `src/lib/cloudPull.ts`
 **Context:** Checkout reads `localDb.paymentModes.balance` for the Cash/Card/Online wallet chips. That local cache was only ever updated by the device's OWN sales (`adjustPaymentBalances`) and **never pulled from the cloud**, so every device showed its own per-device balance — while Reports/Sales tab derives the true aggregate from the synced `payment_movements` ledger. (Owner report: "har device pe apna apna aa raha h".) Cloud `payment_modes.balance` is the authoritative aggregate (maintained only by the `apply_payment_movements` RPC — `adjustPaymentBalances` never pushes `payment_modes.balance`, and SyncEngine now strips `balance` from `payment_modes` upserts to prevent drift).

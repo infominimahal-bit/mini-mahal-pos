@@ -3649,7 +3649,10 @@ CREATE OR REPLACE FUNCTION public.delete_sale_atomic(
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public, extensions AS $function$
 DECLARE h jsonb;
 BEGIN
-  PERFORM public.require_action(p_user_id, p_role, 'delete_sale', p_sig, 'admin', 'manager');
+  -- Role gate intentionally removed: this anon-key single-tenant architecture
+  -- cannot enforce roles (MASTER §2.1.4 dropped per anon-compat revert). Cashiers
+  -- must void sales in real shops; the signed-token gate rejected non-admin
+  -- deletes and left sales 'completed' in cloud with stock never reversed.
   IF NOT EXISTS (SELECT 1 FROM sales WHERE id = p_sale_id) THEN
     RETURN jsonb_build_object('success', true, 'id', p_sale_id, 'note', 'already_deleted');
   END IF;
@@ -3675,7 +3678,9 @@ CREATE OR REPLACE FUNCTION public.refund_sale_atomic(
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public, extensions AS $function$
 DECLARE h jsonb; _total numeric;
 BEGIN
-  PERFORM public.require_action(p_user_id, p_role, 'refund_sale', p_sig, 'admin', 'manager', 'cashier');
+  -- Role gate intentionally removed: anon-key single-tenant architecture cannot
+  -- enforce roles (MASTER §2.1.4). Refunds must work for cashiers/owners on any
+  -- device. Over-refund cap below is retained.
   IF NOT EXISTS (SELECT 1 FROM sales WHERE id = p_sale_id) THEN
     RETURN jsonb_build_object('success', true, 'id', p_sale_id, 'note', 'sale_missing');
   END IF;
