@@ -179,7 +179,6 @@ export function Header({
     if (can(role, 'view_discounts')) items.push({ id: 'discounts', label: t('discounts', 'Discounts'), icon: AppIcons.discounts, color: 'text-pink-500' });
     if (can(role, 'view_reports')) items.push({ id: 'reports', label: t('reports', 'Reports'), icon: AppIcons.reports, color: 'text-red-500' });
     if (can(role, 'view_suppliers')) items.push({ id: 'suppliers', label: t('suppliers', 'Suppliers'), icon: AppIcons.suppliers, color: 'text-amber-500' });
-    if (can(role, 'view_purchase_orders')) items.push({ id: 'purchase-orders', label: 'Purchase', icon: Truck, color: 'text-teal-500' });
     if (can(role, 'view_users')) items.push({ id: 'users', label: 'Users', icon: Users, color: 'text-indigo-500' });
 
     return items;

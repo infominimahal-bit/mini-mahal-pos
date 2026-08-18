@@ -175,6 +175,7 @@ async function executeOp(op: PendingOp): Promise<void> {
         purchase_order_items: 'purchase_order_items',
         supplier_transactions: 'supplier_transactions',
         payments: 'payments',
+        payment_modes: 'payment_modes',
         stock_history: 'stock_history',
         bundles: 'bundles',
         bundle_items: 'bundle_items',
@@ -334,6 +335,13 @@ async function executeOp(op: PendingOp): Promise<void> {
         if (op.entity === 'purchase_records' && opType !== 'delete') {
             if ('updatedAt' in payload) { payload.updated_at = payload.updatedAt; delete payload.updatedAt; }
             if (!payload.updated_at) { payload.updated_at = new Date().toISOString(); }
+        }
+
+        // payment_modes: `balance` is ledger-derived via the apply_payment_movements
+        // RPC (I2 wallet invariant). Never push a possibly-stale local cached balance
+        // — it would clobber the cloud-derived value. Sync name/icon/is_active only.
+        if (op.entity === 'payment_modes' && opType !== 'delete') {
+            delete payload.balance;
         }
 
         let error: any = null;

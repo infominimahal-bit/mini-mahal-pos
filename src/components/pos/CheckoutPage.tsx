@@ -590,7 +590,7 @@ export function CheckoutPage({ onClose, onComplete }: CheckoutPageProps) {
               {t("payment_method", "Payment Method")}
               <HelpTooltip content="Select how the bill is being paid." />
             </p>
-            <div className={cn("grid gap-1 sm:gap-1.5", "grid-cols-3 sm:grid-cols-5")}>
+            <div className={cn("grid gap-1 sm:gap-1.5", "grid-cols-2 sm:grid-cols-4")}>
               {payMethods.map(m => {
                 const isActive = paymentMethod === m.id;
                 return (

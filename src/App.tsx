@@ -381,7 +381,6 @@ function AppContent() {
                 <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
                 <Route path="/settings/:subTab" element={<RequireAccess action="view_settings"><Settings /></RequireAccess>} />
                 <Route path="/suppliers" element={<RequireAccess action="view_suppliers"><SupplierManager /></RequireAccess>} />
-                <Route path="/purchase-orders" element={<RequireAccess action="view_purchase_orders"><PurchaseOrderSystem /></RequireAccess>} />
                 <Route path="/dashboard" element={<RequireAccess action="view_dashboard"><DashboardManager /></RequireAccess>} />
                 <Route path="/" element={<RootRedirect />} />
                 <Route path="*" element={<Navigate to="/pos" replace />} />
