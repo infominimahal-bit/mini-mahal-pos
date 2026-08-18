@@ -2,6 +2,11 @@
 
 Whenever a database change is made, it MUST be recorded here.
 
+### [2026-08-18] Wallet balances now sync across devices (checkout = reporting)
+**Files:** `src/lib/cloudPull.ts`
+**Context:** Checkout reads `localDb.paymentModes.balance` for the Cash/Card/Online wallet chips. That local cache was only ever updated by the device's OWN sales (`adjustPaymentBalances`) and **never pulled from the cloud**, so every device showed its own per-device balance — while Reports/Sales tab derives the true aggregate from the synced `payment_movements` ledger. (Owner report: "har device pe apna apna aa raha h".) Cloud `payment_modes.balance` is the authoritative aggregate (maintained only by the `apply_payment_movements` RPC — `adjustPaymentBalances` never pushes `payment_modes.balance`, and SyncEngine now strips `balance` from `payment_modes` upserts to prevent drift).
+**Fix:** Added `payment_modes` to `cloudPull` (`PULL_DEFS` + tombstone `tableMap`) so every device pulls cloud `payment_modes` rows (balance included) on each pull cycle (15s + online/focus + realtime). Local `paymentModes.balance` now equals the cloud aggregate on all devices → checkout wallet chips match Reports/Sales tab. No schema change needed.
+
 ### [2026-08-18] payment_modes sync fix — silent drop + wallet-balance drift
 **Files:** `src/lib/syncEngine.ts`
 **Context:** `seedPaymentModes()` queues `queueOp('payment_modes', 'upsert'|'delete', ...)` but `payment_modes` was **missing from `tableMap`** in `executeOp`. Every such op hit `console.warn('[SyncEngine] No table mapping for entity: payment_modes')` and returned early — yet the queue still marked it done and logged `SUCCESS`, so payment-mode changes (name/icon/active) **never reached Supabase** (silent data loss across devices). Additionally `toRemotePaymentMode` pushed `balance`, which (with the mapping now fixed) would clobber the cloud's ledger-derived balance (`apply_payment_movements` is the only correct mutator per I2 wallet invariant) whenever `seedPaymentModes` re-ran with a stale local cache.

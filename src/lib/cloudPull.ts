@@ -139,6 +139,7 @@ async function applyTombstones(since: Date): Promise<PullEntity[]> {
       salesmen: { entity: 'salesmen', table: localDb.salesmen },
       users: { entity: 'users', table: localDb.users },
       payments: { entity: 'payments', table: localDb.payments },
+      payment_modes: { entity: 'payment_modes', table: localDb.paymentModes },
       product_addons: { entity: 'product_addons', table: localDb.productAddons },
     };
 
@@ -346,6 +347,27 @@ const PULL_DEFS: PullDef[] = [
       return rows.map(mapPayment);
     },
     write: async (rows) => { if (rows.length) await localDb.payments.bulkPut(rows as any); },
+  },
+  {
+    entity: 'payment_modes',
+    remoteTable: 'payment_modes',
+    fetch: async (since) => {
+      const rows = await fetchAllPages(() => {
+        let q = supabase.from('payment_modes').select('*');
+        if (since && since.getTime() > 0) q = q.gte('updated_at', since.toISOString());
+        return q;
+      });
+      return rows.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        icon: r.icon,
+        balance: Number(r.balance) || 0,
+        isActive: r.is_active ?? true,
+        updatedAt: r.updated_at,
+        createdAt: r.created_at,
+      }));
+    },
+    write: async (rows) => { if (rows.length) await localDb.paymentModes.bulkPut(rows as any); },
   },
   {
     entity: 'supplier_transactions',
