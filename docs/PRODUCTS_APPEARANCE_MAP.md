@@ -68,7 +68,7 @@
 | 28 | **Batch stock-in** | `src/components/inventory/BatchStockInSystem.tsx` | 62-79 (picker + defaults) |
 | 29 | **Store sort** (estore ordering) | `src/components/inventory/StoreSort.tsx` | 408-453 (sort rows, visibility toggle) |
 | 30 | **Barcode generator** | `src/components/inventory/BarcodeGenerator.tsx` | whole file (A4/80mm sheets) |
-| 31 | **Media library** (product images) | `src/components/inventory/MediaLibrary.tsx` | 109 (product name list) |
+| 31 | **Media library** (product images) | `src/shared/MediaLibrary.tsx` | 109 (product name list) |
 
 ---
 

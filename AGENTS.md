@@ -22,7 +22,7 @@ Sahi order mein build karo (dependency order):
 2. **Shared Library** (`src/shared/`) — pehle banao, baad mein sab isi se build hoga:
    - `ui/` (Button, Card, Modal, Badge, Select, DateRangePicker, Pagination, Skeleton, BottomSheet, ToggleSwitch, SegmentedControl, Avatar, EmptyState)
    - `modules/search-and-list/` (`SharedSearchBar`, `SharedProductList`, `useDragDropList`, `DragHandle`)
-   - `MediaLibrary.tsx` + `compressImage.ts`
+   - `src/shared/MediaLibrary.tsx` + `src/shared/imageCompression.ts`
 3. **Data layer** — `localDb.ts` (Dexie), `syncEngine.ts`, `supabase.ts`, `services.ts`, `stockInCommit.ts`
 4. **Context** — `SupabaseAppContext.tsx` (useApp), `AuthContext.tsx`
 5. **Layout** — `Header.tsx`, `MobileBottomNav.tsx`, `OfflineBadge.tsx`, `DialogProvider.tsx`

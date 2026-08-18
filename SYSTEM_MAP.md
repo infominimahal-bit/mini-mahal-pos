@@ -4,7 +4,7 @@
 
 ### 0. 🛡️ SYSTEM-WIDE MANDATORY RULES (ANTI-AI BREAKABLE UI)
 **CRITICAL RULE FOR ALL DEVELOPERS AND AI AGENTS:** 
-- **Use Shared Modules EVERYWHERE:** You MUST use existing shared modules (`src/shared/*` or `src/components/common/*`) for all UI elements. 
+- **Use Shared Modules EVERYWHERE:** You MUST use existing shared modules (`src/shared/*`) for all UI elements. 
 - **NO Custom Implementations:** NEVER build separate, page-specific versions of buttons, icons, popups, media selection libraries, drag-and-drop lists, search bars, etc. 
 - **Visual Consistency:** If a popup, button, or icon looks and behaves a certain way in one place, it MUST be exactly the same in all other places using the shared library.
 - **Modern Standards:** Always use the shared libraries (e.g., `<MediaLibrary>`, `<Modal>`, `<Button>`, shared drag-and-drop components) across the ENTIRE system. Do NOT inject custom SVGs or ad-hoc UI primitives.
@@ -392,8 +392,8 @@ Email/Username + Password form `:110-191`. "Forgot password?" → `resetPassword
 
 ### 0.8 Global Dialog / Modal System
 - **Command dialog** — `src/lib/dialog.tsx`: `dialog.confirm/alert/deleteConfirm/input/loading/close` (event-emitter, singleton guard prevents stacked dialogs).
-- **DialogProvider** — `src/components/common/DialogProvider.tsx`: renders modal via portal (z-[9999]), body-scroll lock.
-- **Modal primitive** — `src/components/common/Modal.tsx`: props `isOpen,onClose,title,subtitle,maxWidth('sm'|'md'|'lg'|'xl'|'max'|'full'),footer`. Backdrop click does NOT close (only X/Esc).
+- **DialogProvider** — `src/shared/ui/DialogProvider.tsx`: renders modal via portal (z-[9999]), body-scroll lock.
+- **Modal primitive** — `src/shared/ui/Modal.tsx`: props `isOpen,onClose,title,subtitle,maxWidth('sm'|'md'|'lg'|'xl'|'max'|'full'),footer`. Backdrop click does NOT close (only X/Esc).
 - **Toast** — `src/lib/sonner.ts` wraps `sonner`.
 
 ---
@@ -632,7 +632,7 @@ Toggle Fixed Bundle vs Slot-Based Combo `:542`. Fields: name, deal image (MediaL
 ### 2.5 GROUPS tab
 Category grouping table `:1084-1173` (inline).
 
-### 2.6 MEDIA tab → `MediaLibrary.tsx:231`
+### 2.6 MEDIA tab → `src/shared/MediaLibrary.tsx:231`
 Centralized image library (compression, reuse). Used standalone + inside ProductModal/ProductDetailHub/BulkEditModal/BundleManager.
 
 ### 2.7 STORE SORT → `StoreSort.tsx:1`
@@ -1155,7 +1155,7 @@ Fields: **Description***, **Amount*** (regex `^\d*\.?\d*$`, no positivity check 
 - ⚠️ Categories not managed entities; `ProductModal.handleAddCategory` only sets form value (does NOT call `categoriesService.create`); `state.categories` table largely unused by product form.
 
 #### MEDIA sub-tab
-- `MediaLibrary` standalone (compress to WebP ≤50KB via `compressImage`). Single image source for products/deals (rule 14).
+- `MediaLibrary` standalone (compress to WebP ≤50KB via shared `compressImage` (src/shared/imageCompression.ts)). Single image source for products/deals (rule 14).
 
 #### STORE SORT sub-tab (`StoreSort.tsx`)
 - Drag/drop reorder of `estoreSortOrder` (products) + `estoreCategorySortOrder` + bundle sort. Per-product `showInEstore` toggle (`productsService.update`). Gated `estoreEnabled`.

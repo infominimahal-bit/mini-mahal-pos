@@ -44,7 +44,7 @@ Import: `import { SharedSearchBar, SharedProductList, useDragDropList } from '..
 | `SharedProductList` + `SharedProductListItem` | ALL product/item listing rows + result lists | Bespoke list rows |
 | `SharedDragDropList`, `useDragDropList`, `DragHandle`, `DRAG_ROW_CLS` | ALL reorderable lists | Local `dragIndex` / `dataTransfer` / `GripVertical` implementations |
 
-**Exception:** `SearchableSelect` (`src/components/common/SearchableSelect.tsx`) is an allowed select primitive (supplier/category pickers).
+**Exception:** `SearchableSelect` (`src/shared/ui/SearchableSelect.tsx`) is an allowed select primitive (supplier/category pickers).
 
 ---
 
@@ -61,7 +61,7 @@ Import: `import { SharedSearchBar, SharedProductList, useDragDropList } from '..
 | `icons.ts` | `AppIcons` registry — THE icon source of truth | ALL icons on headers/nav/drawers/menus |
 | `imageCompression.ts` | `compressImage` (WebP, 20-50KB target) | ALL image compression |
 | `translations.ts` + `hooks/useTranslation.ts` | `t(key, fallback)` i18n | ALL UI strings |
-| `dialog.tsx` + `components/common/DialogProvider.tsx` | `sonner.confirm/alert/prompt` dialogs | Simple confirmations |
+| `dialog.tsx` + `src/shared/ui/DialogProvider.tsx` | `sonner.confirm/alert/prompt` dialogs | Simple confirmations |
 
 ---
 
@@ -84,7 +84,7 @@ Import: `import { ExportButton, exportToCSV, exportToPDF, printReport } from '..
 
 ---
 
-## 🧩 5. Sanctioned Common Components — `src/components/common/`
+## 🧩 5. Shared UI Components — `src/shared/ui/`
 
 These are app-level shared components (NOT page-local). Reuse them; never re-implement.
 
