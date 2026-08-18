@@ -291,7 +291,7 @@ The `reconcileAllStock()` function in `services.ts` and the "Reconcile" button i
 `InventoryManager.tsx` toolbar MUST always exist. They are the **MANUAL** safety net for
 detecting/fixing stock ledger drift (theft, damage, physical count gap, sync error).
 - **Function**: `reconcileAllStock(autoFix?: boolean)` in `services.ts`
-- **UI**: Purple "Reconcile" button with Shield icon in inventory toolbar (admin only)
+- **UI**: Purple "Reconcile" button with Shield icon in inventory toolbar (admin only). The **Reconciliation Dashboard** (mismatch log + "Run Reconciliation") lives under **Settings › Backup & Restore** (moved out of Inventory).
 - **Behavior**: scans all products, compares `products.stock` vs `stock_history` ledger
   total, reports mismatches, optionally auto-fixes with a corrective history entry.
 

@@ -49,7 +49,6 @@
 | `/settings` | Settings (redirect) | → `/settings/general` | All | app_settings |
 | `/settings/:subTab` | Settings sub-tabs | `Settings` | All | app_settings |
 | `/suppliers` | Suppliers | `SupplierManager` | All | suppliers, supplier_transactions, expenses, purchase_records, products |
-| `/purchase-orders` | Purchase Orders (Restock) | `PurchaseOrderSystem` | All | (see Inventory/Restock + orphaned purchase_orders) |
 | `/store` | Store front-end (public) | `EStoreApp` | Public (if `estoreEnabled`) | store_orders, products, categories, bundles, customers |
 | `/store/checkout` | Store checkout | `StoreCheckout` | Public | store_orders, customers |
 | `/store/track?id=` | Order tracker | `OrderTracker` | Public | store_orders |
@@ -331,7 +330,6 @@ All authenticated routes render inside `<Header>` + `<main>` + `<MobileBottomNav
 | `/settings` → `/settings/general` | Settings | Yes | `:381-382` |
 | `/settings/:subTab` | Settings | Yes | `:382` |
 | `/suppliers` | SupplierManager | Yes | `:383` |
-| `/purchase-orders` | PurchaseOrderSystem | Yes | `:384` |
 | `/dashboard` | DashboardManager | Yes | `:385` |
 | `/` | RootRedirect | — | restores `localStorage.pos_current_view` else `/pos` `:108-122` |
 | `*` | → `/pos` | — | `:387` |
@@ -1224,11 +1222,6 @@ Stock-in with matching supplier name → auto_purchase `supplierTransactions` bi
 
 ---
 
-### 2.8 — PURCHASE ORDERS (`/purchase-orders`)
-
-**Route:** `/purchase-orders` → `PurchaseOrderSystem` (same component as Inventory RESTOCK sub-tab).
-**Reality:** This is a **Reorder/Restock Generator**, NOT a PO document system. `purchase_orders`/`purchaseOrderItems` Dexie tables + `purchaseOrdersService` (create/getById only, no update/receive/delete) are **never called by any UI** → orphaned schema.
-
 #### What exists
 - Auto mode: deficiency-based reorder (supplier + category filters) → editable qty/cost/retail → **COMMIT & ADD TO STOCK** → `commitStockInToInventory` (writes `purchase_records` + `stock_history` + `products.stock`, optional supplier bill). **No PO record saved.**
 - Manual mode: search/add products → same commit.
@@ -1402,7 +1395,7 @@ Fields: Name*, Type (percentage/fixed/bogo/free_gift/mix_and_match), Value* (hid
   - **Barcode Seeding** → `seedMissingBarcodes()`.
   - **System Reset** (danger) → `purgeLocalData()` (wipe local + fresh sync).
   - **Electron-only** "Database Adapter" section (Supabase URL/Anon/Service + "Apply & Restart") — invisible in web build.
-- ⚠️ **No Reconcile button here** (reconcile is only in InventoryManager, F11).
+- ⚠️ **No manual "Reconcile" button here** — the manual Reconcile button is only in the Inventory toolbar (F11). The **Reconciliation Dashboard** now lives under **Settings › Backup & Restore**.
 - ⚠️ `barcodeBarWidth` + all `barcode*` settings in `formData`/`mapSettings` have **no UI control in Settings** (only used by `BarcodeGenerator`).
 
 #### ⚠️ Dead code
@@ -1704,7 +1697,7 @@ This section contains step-by-step deep architectural guides for adding, editing
 | 34 | Discounts | No promo-code entry at POS | Manual tap only. |
 | 35 | Discounts | i18n "privilege" keys | Modal titled with discount/privilege mismatch. |
 | 36 | Settings | No backup/restore/barcode-format sub-tab | Backup in Database; barcode format only in BarcodeGenerator. |
-| 37 | Settings | No Reconcile button | `reconcileAllStock` (F11) only in InventoryManager. |
+| 37 | Settings | Reconciliation Dashboard under Backup & Restore | Manual Reconcile button is only in Inventory toolbar (F11); the Reconciliation Dashboard moved here from Inventory. |
 | 38 | Settings | `barcode*` settings no UI | `barcodeBarWidth` etc. in formData but not rendered. |
 | 39 | Settings | `BackupTab.tsx` dead | Defined, never imported. |
 | 40 | Settings | `CloudSyncTab.tsx` dead import | Imported, never rendered. |

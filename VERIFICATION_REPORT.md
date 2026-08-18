@@ -12,7 +12,7 @@ against the **live database** via the Supabase Management API, not assumed.
   - `supabase/migrations/20260818070000_i5_refund_check.sql` — DB-level over-refund guard (§7 I5).
   - `supabase/migrations/20260818080000_sale_idempotency.sql` — `commit_sale` idempotency (§5.2) + NULL-reference fix.
   - `supabase/migrations/20260818090000_process_return_guard.sql` — server role guard on `process_return` (§2.1.4).
-  - `src/lib/permissions.ts`, `src/components/inventory/ReconciliationDashboard.tsx` (prior pass).
+   - `src/lib/permissions.ts`, `src/components/settings/ReconciliationDashboard.tsx` (prior pass).
   - `src/lib/services.ts` — `commitSaleAuthoritative` now sends `idempotency_key` (= sale id).
 - **Modified (prior pass):** `src/App.tsx` (real `RequireAccess`), `src/components/inventory/InventoryManager.tsx`.
 - **Live DB backup tables created (reversible, audit trail):**
