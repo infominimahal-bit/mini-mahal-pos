@@ -14,7 +14,9 @@ interface SyncQueueManagerProps {
 }
 
 export function SyncQueueManager({ onClose }: SyncQueueManagerProps) {
+    const { state } = useApp();
     const { t } = useTranslation();
+    const isAdmin = state.currentUser?.role === 'admin';
     const [ops, setOps] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -112,6 +114,7 @@ export function SyncQueueManager({ onClose }: SyncQueueManagerProps) {
     };
 
     const handleDeleteOp = async (id: string) => {
+        if (!isAdmin) { sonner.error('Only administrators can delete pending operations.'); return; }
         await localDb.pendingOps.delete(id);
         window.dispatchEvent(new Event('pendingops-changed'));
         refresh();

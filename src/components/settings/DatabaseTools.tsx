@@ -24,6 +24,8 @@ import {
 import { localDb, queueOp, purgeLocalData, SETTINGS_ID } from '../../lib/localDb';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { useApp } from '../../context/SupabaseAppContext';
+import { useAuth } from '../../context/AuthContext';
+import { can } from '../../lib/permissions';
 import { sonner } from '../../lib/sonner';
 import { Button } from '../../shared/ui';
 
@@ -88,6 +90,8 @@ const DISPATCH_MAP: Record<string, string> = {
 
 export function DatabaseTools() {
   const { state, dispatch } = useApp();
+  const { profile } = useAuth();
+  const canExportDb = can(profile?.role, 'export_database');
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedStores, setSelectedStores] = useState<Set<string>>(new Set(STORE_OPTIONS.map(s => s.key)));
@@ -115,6 +119,7 @@ export function DatabaseTools() {
 
   // ─── EXPORT ───
   const handleExport = async () => {
+    if (!canExportDb) { sonner.error('You do not have permission to export the database.'); return; }
     if (selectedStores.size === 0) {
       sonner.error('Please select at least one table to export.');
       return;
@@ -181,6 +186,7 @@ export function DatabaseTools() {
 
   // ─── IMPORT ───
   const handleImport = async () => {
+    if (!canExportDb) { sonner.error('You do not have permission to import or restore data.'); return; }
     if (!selectedFile) {
       sonner.error('Please select a backup file first.');
       return;
@@ -665,7 +671,7 @@ export function DatabaseTools() {
                 <Button
                   type="button"
                   onClick={handleExport}
-                  disabled={isExporting || selectedStores.size === 0}
+                  disabled={isExporting || selectedStores.size === 0 || !canExportDb}
                   className="w-full !py-2.5 !rounded-xl !text-[9px] !font-black !gap-1.5 !bg-blue-600 hover:!bg-blue-700 !shadow-md disabled:!opacity-40"
                 >
                   {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileJson className="h-3.5 h-3.5" />}
@@ -701,7 +707,7 @@ export function DatabaseTools() {
                 <Button
                   type="button"
                   onClick={handleImport}
-                  disabled={isImporting || !selectedFile || selectedStores.size === 0}
+                  disabled={isImporting || !selectedFile || selectedStores.size === 0 || !canExportDb}
                   className="w-full !py-2.5 !rounded-xl !text-[9px] !font-black !gap-1.5 !shadow-md hover:!bg-emerald-700 disabled:!opacity-40"
                 >
                   {isImporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 h-3.5" />}
@@ -718,6 +724,14 @@ export function DatabaseTools() {
                 Import merges records. Duplicates are auto-skipped by ID/SKU/Barcode/Invoice.
               </p>
             </div>
+            {!canExportDb && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/25 rounded-xl flex items-start gap-2">
+                <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                <p className="text-[9px] text-rose-800/80 dark:text-rose-400/60 font-bold leading-relaxed uppercase tracking-wider">
+                  Database export / import / reset is admin-only.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* System Reset */}
@@ -736,8 +750,9 @@ export function DatabaseTools() {
             <Button
               type="button"
               variant="danger"
-              onClick={handlePurgeAll}
-              className="w-full !py-2.5 !rounded-xl !text-[9px] !font-black !gap-1.5 !bg-red-600 hover:!bg-red-700 !shadow-md !hover:opacity-100"
+              onClick={() => canExportDb && handlePurgeAll()}
+              disabled={!canExportDb}
+              className="w-full !py-2.5 !rounded-xl !text-[9px] !font-black !gap-1.5 !bg-red-600 hover:!bg-red-700 !shadow-md !hover:opacity-100 disabled:!opacity-40"
             >
               Purge Local Database
             </Button>

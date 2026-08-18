@@ -3,6 +3,7 @@ import { Plus, Edit, Trash2, User, Mail, Phone, CreditCard, Eye, MessageCircle, 
 import { subDays, startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { Customer } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
+import { can } from '../../lib/permissions';
 import { CustomerModal } from './CustomerModal';
 import { CustomerDetailModal } from './CustomerDetailModal';
 import { formatAppDate, getTimezone, getStartOfDayInTimezone, getEndOfDayInTimezone, getStartOfInputDayInTimezone, getEndOfInputDayInTimezone } from '../../lib/dateUtils';
@@ -17,6 +18,7 @@ import { getEffectiveTotal } from '../reports/ReportsManager';
 export function CustomerManager() {
   const { state, dispatch } = useApp();
   const { t } = useTranslation();
+  const canManageCustomers = can(state.currentUser?.role, 'manage_customers');
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
   const [startDateInput, setStartDateInput] = useState('');
@@ -117,6 +119,7 @@ export function CustomerManager() {
   };
 
   const handleDeleteCustomer = async (customerId: string) => {
+    if (!canManageCustomers) { sonner.error('You do not have permission to delete customers.'); return; }
     const hasLinkedSales = state.sales.some(s => s.customerId === customerId);
     let proceed = false;
 
@@ -431,8 +434,9 @@ export function CustomerManager() {
                         <Button
                           variant="ghost"
                           onClick={() => handleDeleteCustomer(customer.id)}
+                          disabled={!canManageCustomers}
                           aria-label="Delete customer"
-                          className="!min-h-0 !p-2 !rounded-xl !bg-red-50 dark:!bg-red-500/10 !text-red-600 hover:!scale-110 active:!scale-95"
+                          className="!min-h-0 !p-2 !rounded-xl !bg-red-50 dark:!bg-red-500/10 !text-red-600 hover:!scale-110 active:!scale-95 disabled:!opacity-40"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>

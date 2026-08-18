@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, Edit, Trash2, Percent, Gift } from 'lucide-react';
 import { Discount } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
+import { can } from '../../lib/permissions';
 import { DiscountModal } from './DiscountModal';
 import { sonner } from '../../lib/sonner';
 import { formatAppDate } from '../../lib/dateUtils';
@@ -12,6 +13,7 @@ import { Button, Badge, EmptyState, Pagination, usePagination } from '../../shar
 export function DiscountManager() {
   const { state, dispatch } = useApp();
   const { t } = useTranslation();
+  const canManageDiscounts = can(state.currentUser?.role, 'manage_discounts');
   const [searchTerm, setSearchTerm] = useState('');
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState<Discount | null>(null);
@@ -30,6 +32,7 @@ export function DiscountManager() {
   };
 
   const handleDeleteDiscount = async (discountId: string) => {
+    if (!canManageDiscounts) { sonner.error('You do not have permission to delete discounts.'); return; }
     const result = await sonner.deleteConfirm('discount');
     if (result.isConfirmed) {
       try {
@@ -259,7 +262,8 @@ export function DiscountManager() {
                       <Button
                         variant="ghost"
                         onClick={() => handleDeleteDiscount(discount.id)}
-                        className="!min-h-0 !p-2 !rounded-lg !text-red-600 hover:!text-red-900 hover:!bg-red-50"
+                        disabled={!canManageDiscounts}
+                        className="!min-h-0 !p-2 !rounded-lg !text-red-600 hover:!text-red-900 hover:!bg-red-50 disabled:!opacity-40"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
