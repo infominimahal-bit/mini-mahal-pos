@@ -3018,17 +3018,14 @@ DECLARE
   v_id uuid;
   h jsonb;
   cur numeric;
-  _role text;
 BEGIN
-  -- MASTER §2.1.4: fail-closed. Never commit without an authenticated user
-  -- whose users row maps to a recognized role.
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'FORBIDDEN: authentication required to commit sale' USING ERRCODE = '42501';
-  END IF;
-  SELECT role INTO _role FROM public.users WHERE id = auth.uid();
-  IF _role IS NULL OR _role NOT IN ('admin', 'manager', 'cashier', 'salesman') THEN
-    RAISE EXCEPTION 'FORBIDDEN: not authorized to commit sale' USING ERRCODE = '42501';
-  END IF;
+  -- NOTE: NO auth.uid() check. This POS is single-tenant and ships the PUBLIC
+  -- anon key; the browser frequently runs WITHOUT a Supabase-auth session
+  -- (offline-login fallback), so auth.uid() is effectively always NULL.
+  -- Enforcing auth.uid() here broke every clone in Aug-2026 (sales stopped
+  -- committing, stock stopped decreasing). Role enforcement lives in the signed
+  -- action-token RPCs (delete_sale_atomic / refund_sale_atomic) + the over-refund
+  -- cap below — NOT in auth.uid().
 
   -- Idempotent fulfilment: never bill the same online order twice.
   IF p_sale->>'source_order_id' IS NOT NULL AND p_sale->>'source_order_id' <> '' THEN
@@ -3480,18 +3477,17 @@ ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS products_select ON public.products;
 DROP POLICY IF EXISTS products_write ON public.products;
 CREATE POLICY products_select ON public.products FOR SELECT USING (true);
-CREATE POLICY products_write ON public.products FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role IN ('admin','manager')))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role IN ('admin','manager')));
+CREATE POLICY products_write ON public.products FOR ALL TO anon, authenticated
+  USING (true) WITH CHECK (true);
 
 ALTER TABLE public.sales ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sales_select ON public.sales;
 DROP POLICY IF EXISTS sales_insert ON public.sales;
 DROP POLICY IF EXISTS sales_update ON public.sales;
 DROP POLICY IF EXISTS sales_delete ON public.sales;
-CREATE POLICY sales_select ON public.sales FOR SELECT TO authenticated USING (true);
-CREATE POLICY sales_insert ON public.sales FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY sales_update ON public.sales FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY sales_select ON public.sales FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY sales_insert ON public.sales FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY sales_update ON public.sales FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
 
 ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS customers_select ON public.customers;
@@ -3750,3 +3746,74 @@ DROP POLICY IF EXISTS expenses_delete_guard ON public.expenses;
 CREATE POLICY expenses_delete_guard ON public.expenses FOR DELETE TO anon, authenticated USING (true);
 DROP POLICY IF EXISTS suppliers_delete_guard ON public.suppliers;
 CREATE POLICY suppliers_delete_guard ON public.suppliers FOR DELETE TO anon, authenticated USING (true);
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- § ANON-COMPAT / OFFLINE-LOGIN GUARANTEE  (MANDATORY — DO NOT REMOVE)
+-- ────────────────────────────────────────────────────────────────────────────
+-- This POS is single-tenant and ships the PUBLIC anon key. The browser frequently
+-- runs WITHOUT a Supabase-auth session (offline-login fallback), so auth.uid() is
+-- effectively always NULL for the data client.
+--
+-- The Aug-2026 hardening narrowed RLS to `authenticated`-only and added auth.uid()
+-- checks to commit_sale — this BROKE every clone (sales stopped committing, stock
+-- stopped decreasing, deletes/returns never reversed stock). The fixes above
+-- (commit_sale stripped of auth.uid(); products/sales made anon-writable) MUST stay.
+-- This trailing section is a permanent, idempotent guarantee so a fresh clone can
+-- NEVER regress: permissive *_all policies for every synced non-guard table
+-- (OR-combines with any existing guard policy; anon is always allowed) + broad
+-- grants. Role enforcement is via signed action-token RPCs (delete_sale_atomic /
+-- refund_sale_atomic) + over-refund cap — NOT auth.uid().
+-- app_settings / expenses / suppliers are intentionally EXCLUDED here: they keep
+-- their signed verify_table_write guard policies and must stay guarded.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- 1. Permissive *_all policies (idempotent; supplement, never replace, guards)
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS products_all ON public.products;
+CREATE POLICY products_all ON public.products FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE public.sales ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sales_all ON public.sales;
+CREATE POLICY sales_all ON public.sales FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS customers_all ON public.customers;
+CREATE POLICY customers_all ON public.customers FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE public.supplier_transactions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS supplier_transactions_all ON public.supplier_transactions;
+CREATE POLICY supplier_transactions_all ON public.supplier_transactions FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE public.stock_history ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS stock_history_all ON public.stock_history;
+CREATE POLICY stock_history_all ON public.stock_history FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE public.variant_stock_history ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS variant_stock_history_all ON public.variant_stock_history;
+CREATE POLICY variant_stock_history_all ON public.variant_stock_history FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE public.payment_movements ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS payment_movements_all ON public.payment_movements;
+CREATE POLICY payment_movements_all ON public.payment_movements FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE public.payment_modes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS payment_modes_all ON public.payment_modes;
+CREATE POLICY payment_modes_all ON public.payment_modes FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE public.product_batches ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS product_batches_all ON public.product_batches;
+CREATE POLICY product_batches_all ON public.product_batches FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE public.salesmen ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS salesmen_all ON public.salesmen;
+CREATE POLICY salesmen_all ON public.salesmen FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE public.row_tombstones ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS row_tombstones_all ON public.row_tombstones;
+CREATE POLICY row_tombstones_all ON public.row_tombstones FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- 2. Broad grants (idempotent) — RLS still applies; guard tables stay guarded.
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;

@@ -1,6 +1,6 @@
 import { supabase, enableFullAuthInit } from './supabase';
 import { localDb, queueOp, PendingOp, SETTINGS_ID } from './localDb';
-import { mapProduct, mapCustomer, salesService, reconcileAllStock, seedMissingBarcodes, commitSaleAuthoritative } from './services';
+import { mapProduct, mapCustomer, salesService, seedMissingBarcodes, commitSaleAuthoritative } from './services';
 import { signAction, withActor } from './actionToken';
 
 const HEARTBEAT_INTERVAL = 30 * 1000; // 30 seconds

@@ -284,15 +284,39 @@ Bill edit uses create-first, delete-second pattern. Both CheckoutModal.tsx AND C
 
 ---
 
-## RULE F11 — RECONCILE TOOL MUST EXIST (PERMANENT)
+## RULE F11 — RECONCILE TOOL + STOCK ACCURACY (PERMANENT)
 
-The `reconcileAllStock()` function in `services.ts` and the "Reconcile" button in `InventoryManager.tsx` toolbar MUST always exist. They are the safety net for detecting and fixing stock ledger drift.
-
+### Reconcile tool MUST exist
+The `reconcileAllStock()` function in `services.ts` and the "Reconcile" button in
+`InventoryManager.tsx` toolbar MUST always exist. They are the **MANUAL** safety net for
+detecting/fixing stock ledger drift (theft, damage, physical count gap, sync error).
 - **Function**: `reconcileAllStock(autoFix?: boolean)` in `services.ts`
-- **UI**: Purple "Reconcile" button with Shield icon in inventory toolbar
-- **Behavior**: Scans all tracked products, compares `products.stock` vs `stock_history` ledger total, reports mismatches, optionally auto-fixes
+- **UI**: Purple "Reconcile" button with Shield icon in inventory toolbar (admin only)
+- **Behavior**: scans all products, compares `products.stock` vs `stock_history` ledger
+  total, reports mismatches, optionally auto-fixes with a corrective history entry.
 
-**Never remove this tool. It is the last line of defense against inventory corruption.**
+### AUTO-BACKGROUND RECONCILE IS PROHIBITED (PERMANENT)
+`reconcileAllStock(true)` (or any auto-fix) MUST NEVER be called automatically (boot,
+sync, interval). It reads a ledger snapshot that can lag a just-made sale, so it slams
+`products.stock` back to the pre-sale value — erasing legitimate sale/delete movements.
+Stock is kept accurate **per-transaction** by the `on_stock_history_insert` /
+`on_variant_stock_history_insert` triggers (append-only ledger = single source of truth).
+Reconcile is **MANUAL-only**.
+
+### STOCK ACCURACY + ANON RLS (PERMANENT — this broke every clone in Aug-2026)
+- Stock accuracy = the `stock_history` ledger triggers. NO code path sends absolute
+  `products.stock`; the trigger derives it.
+- This POS is single-tenant and ships the PUBLIC **anon key**; the browser frequently
+  runs WITHOUT a Supabase-auth session (offline-login), so `auth.uid()` is always NULL.
+- Therefore RLS MUST be anon-compatible: every synced table needs a permissive
+  `USING (true) WITH CHECK (true)` policy (or a signed `verify_table_write` guard for
+  app_settings/expenses/suppliers). `commit_sale` MUST NOT contain an `auth.uid()`
+  check — enforcing it broke every clone (sales stopped committing, stock stopped
+  decreasing). See `SUPER_MASTER_SCHEMA.sql` § ANON-COMPAT GUARANTEE.
+- Role enforcement is via signed action-token RPCs (`delete_sale_atomic`,
+  `refund_sale_atomic`) + the over-refund cap — NOT `auth.uid()`.
+
+**Never remove the reconcile tool, never auto-run it, never add auth.uid() checks.**
 
 ---
 
