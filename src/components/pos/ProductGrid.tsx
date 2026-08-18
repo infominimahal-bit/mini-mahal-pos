@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo, memo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Minus, Package, X, ChevronLeft, ChevronRight, FileText, Star, Infinity, Camera, LayoutGrid, Gift, ChevronDown, ChevronUp, Flame } from 'lucide-react';
-import { CameraScanner } from '../common/CameraScanner';
+import { CameraScanner } from '../../shared/ui/CameraScanner';
 import { Product, CartItemTopping } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { getCurrencySymbol } from '../../lib/currencies';
@@ -11,7 +11,7 @@ import { sonner } from '../../lib/sonner';
 import { useTranslation } from '../../hooks/useTranslation';
 import { ComboSelectionModal } from './ComboSelectionModal';
 import { DealSizeSelectorModal } from './DealSizeSelectorModal';
-import { SkeletonLoader } from '../common/SkeletonLoader';
+import { SkeletonLoader } from '../../shared/ui/SkeletonLoader';
 
 interface ProductGridProps {
   onAddToCart: (product: Product, weight?: number) => void;

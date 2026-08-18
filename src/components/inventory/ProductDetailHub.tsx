@@ -9,11 +9,11 @@ import {
   AlertTriangle, TrendingUp, Infinity, Camera, Library, Image as ImageIcon,
   Scan, QrCode, Database, Tag, PackagePlus
 } from 'lucide-react';
-import { SearchableSelect } from '../common/SearchableSelect';
-import { Modal } from '../common/Modal';
-import { CameraScanner } from '../common/CameraScanner';
-import { HelpTooltip } from '../common/HelpTooltip';
-import { StickyFormFooter } from '../common/StickyFormFooter';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
+import { Modal } from '../../shared/ui/Modal';
+import { CameraScanner } from '../../shared/ui/CameraScanner';
+import { HelpTooltip } from '../../shared/ui/HelpTooltip';
+import { StickyFormFooter } from '../../shared/ui/StickyFormFooter';
 import { SegmentedControl, Button, Badge, EmptyState, Select, BottomSheet, ToggleSwitch } from '../../shared/ui';
 import { useApp } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -24,13 +24,13 @@ import { productsService, purchaseRecordsService, generateId, toRemoteStockHisto
 import { commitStockInToInventory } from '../../lib/stockInCommit';
 import { localDb, queueOp } from '../../lib/localDb';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { compressImage } from '../../lib/imageCompression';
+import { compressImage } from '../../shared/imageCompression';
 import { sonner } from '../../lib/sonner';
 import { BatchStockInSystem } from './BatchStockInSystem';
 import { generateBarcodeValue } from '../../utils/barcode';
-import { BarcodePreview } from '../common/BarcodePreview';
-import { MediaLibrary } from './MediaLibrary';
-import ToppingAssignmentPanel from '../common/ToppingAssignmentPanel';
+import { BarcodePreview } from '../../shared/ui/BarcodePreview';
+import { MediaLibrary } from '../../shared/MediaLibrary';
+import ToppingAssignmentPanel from '../../shared/ui/ToppingAssignmentPanel';
 
 interface ProductDetailHubProps {
   product: Product;

@@ -9,7 +9,7 @@ import { formatCurrency } from '../../lib/currencies';
 import { calculateDiscount } from '../../lib/utils';
 import { StoreProductModal } from './StoreProductModal';
 import { StoreDealModal } from './StoreDealModal';
-import { HighlightBadge } from '../common/HighlightBadge';
+import { HighlightBadge } from '../../shared/ui/HighlightBadge';
 import { sonner } from '../../lib/sonner';
 import { useScheduleStatus } from '../../hooks/useScheduleStatus';
 

@@ -477,8 +477,8 @@ export const mapSettings = (item: any): AppSettings => {
     enableKotPrinter: s.enable_kot_printer ?? s.enableKotPrinter ?? false,
     autoSaveReceiptPng: s.auto_save_receipt_png ?? s.autoSaveReceiptPng ?? false,
 
-    // §4.2 MASTER: negative stock control (default true = current behavior)
-    allowNegativeStock: s.allow_negative_stock ?? s.allowNegativeStock ?? true,
+    // §4.2 MASTER: negative stock control (default FALSE = spec compliant, oversell blocked)
+    allowNegativeStock: s.allow_negative_stock ?? s.allowNegativeStock ?? false,
 
     createdAt: s.created_at ? new Date(s.created_at) : (s.createdAt ? new Date(s.createdAt) : new Date()),
     updatedAt: s.updated_at ? new Date(s.updated_at) : (s.updatedAt ? new Date(s.updatedAt) : new Date())
@@ -840,8 +840,62 @@ export const toRemotePurchaseRecord = (r: any) => {
 // toRemoteProductBatch removed — batch system deprecated
 
 
+// P26/P27: derive the PAYMENT_STATUS state machine from sale totals + status.
+export function derivePaymentStatus(sale: any): string {
+  const st = sale?.status;
+  if (st === 'refunded') return 'refunded';
+  if (st === 'partially_refunded') return 'partially_refunded';
+  if (st === 'draft') return 'unpaid';
+  const total = Number(sale?.total) || 0;
+  const received = Number(sale?.receivedAmount) || 0;
+  const due = total - received;
+  if (due > 0.01) return received > 0 ? 'partially_paid' : 'unpaid';
+  return 'paid';
+}
+
+// P6/P24: append an immutable customer_ledger entry (OFFLINE-FIRST compliant).
+// Writes go to local Dexie first, then queueOp so the SyncEngine replicates them —
+// never a direct supabase-js write. Returns the new running balance_after.
+export async function recordCustomerLedger(entry: {
+  customerId: string;
+  saleId?: string;
+  type: 'sale' | 'payment' | 'refund' | 'adjustment' | 'credit' | 'opening';
+  debit?: number;
+  credit?: number;
+  reference?: string;
+  note?: string;
+  createdBy?: string;
+}): Promise<number> {
+  try {
+    const prevRows = await localDb.customerLedger.where('customerId').equals(entry.customerId).toArray();
+    const prev = prevRows.length ? Number(prevRows[prevRows.length - 1].balanceAfter || 0) : 0;
+    const balanceAfter = prev + (entry.debit || 0) - (entry.credit || 0);
+    const ledgerId = generateId();
+    const row: any = {
+      id: ledgerId,
+      customerId: entry.customerId,
+      saleId: entry.saleId || null,
+      type: entry.type,
+      debit: entry.debit || 0,
+      credit: entry.credit || 0,
+      balanceAfter,
+      reference: entry.reference || null,
+      note: entry.note || null,
+      createdBy: entry.createdBy || null,
+      createdAt: new Date(),
+    };
+    await localDb.customerLedger.add(row);
+    await queueOp('customer_ledger', 'create', ledgerId, toRemoteCustomerLedger(row));
+    return balanceAfter;
+  } catch (e: any) {
+    console.error('[customer_ledger] record failed (non-fatal):', e?.message || e);
+    return 0;
+  }
+}
+
 export const toRemoteSale = (s: Partial<Sale>) => {
   const remote: any = { ...s };
+  if ('paymentStatus' in s) { remote.payment_status = s.paymentStatus; delete remote.paymentStatus; }
   if ('sourceOrderId' in s) { remote.source_order_id = s.sourceOrderId; delete remote.sourceOrderId; }
   if ('invoiceNumber' in s) { remote.invoice_number = s.invoiceNumber; delete remote.invoiceNumber; }
   if ('customerId' in s) { remote.customer_id = s.customerId; delete remote.customerId; }
@@ -882,6 +936,20 @@ export const toRemoteSale = (s: Partial<Sale>) => {
   return remote;
 };
 
+
+export const toRemoteCustomerLedger = (l: any) => ({
+  id: l.id,
+  customer_id: l.customerId,
+  sale_id: l.saleId || null,
+  type: l.type,
+  debit: l.debit || 0,
+  credit: l.credit || 0,
+  balance_after: l.balanceAfter || 0,
+  reference: l.reference || null,
+  note: l.note || null,
+  created_by: l.createdBy || null,
+  created_at: l.createdAt instanceof Date ? l.createdAt.toISOString() : l.createdAt,
+});
 
 export const toRemoteStockHistory = (h: any) => {
   const remote: any = { ...h };
@@ -1013,17 +1081,12 @@ export const seedPaymentModes = async () => {
     }
   }
   try {
-    if (typeof navigator === 'undefined' || navigator.onLine) {
-      const cloud = await localDb.paymentModes.toArray();
-      await supabase.from('payment_modes').upsert(cloud.map(toRemotePaymentMode), { onConflict: 'id', ignoreDuplicates: true });
-      const legacy = existing.filter(m => !defaultIds.has(m.id)).map((m: any) => m.id);
-      if (legacy.length) {
-        await supabase.from('payment_modes').delete().in('id', legacy);
-      }
-    } else {
-      for (const m of await localDb.paymentModes.toArray()) {
-        await queueOp('payment_modes', 'upsert', m.id, toRemotePaymentMode(m));
-      }
+    // OFFLINE-FIRST: always route via queue (SyncEngine replicates to cloud).
+    for (const m of await localDb.paymentModes.toArray()) {
+      await queueOp('payment_modes', 'upsert', m.id, toRemotePaymentMode(m));
+    }
+    for (const id of existing.filter(m => !defaultIds.has(m.id)).map((m: any) => m.id)) {
+      await queueOp('payment_modes', 'delete', id, {});
     }
   } catch (e) { console.warn('[paymentModes] cloud seed failed', e); }
 };
@@ -1059,13 +1122,7 @@ export const adjustPaymentBalances = async (moves: any[], opts?: any) => {
     reference_id: mv.referenceId || null,
     note: mv.note || null,
   }));
-  const online = typeof navigator === 'undefined' || navigator.onLine;
-  if (online) {
-    try {
-      await supabase.rpc('apply_payment_movements', { p_moves: remoteMoves as any });
-      return;
-    } catch (e) { console.warn('[paymentModes] rpc failed, queueing', e); }
-  }
+  // OFFLINE-FIRST: always route through the queue; SyncEngine replays via apply_payment_movements RPC.
   await queueOp('payment_movements', 'apply', opts?.batchId || generateId(), remoteMoves, opts);
 };
 
@@ -2069,6 +2126,7 @@ export const salesService = {
     }
 
     // 1. Local Write (Now contains precise purchaseCost per item)
+    (newSale as any).paymentStatus = derivePaymentStatus(newSale);
     await localDb.sales.add(newSale);
 
     // 2. Atomic cloud commit (online) OR legacy per-op queue fallback.
@@ -2085,6 +2143,13 @@ export const salesService = {
         cloudCommitted = true;
       } else if (commitRes) {
         cloudCommitted = true;
+      }
+      // P26/P27: persist payment_status on the cloud sale row via the sync queue
+      // (OFFLINE-FIRST compliant — never a direct supabase-js write).
+      if (cloudCommitted) {
+        try {
+          await queueOp('sales', 'update', newSale.id, { payment_status: (newSale as any).paymentStatus } as any, { batchId: id });
+        } catch (_) { /* non-fatal */ }
       }
     }
     if (!cloudCommitted) {
@@ -2106,6 +2171,19 @@ export const salesService = {
         };
         await localDb.customers.put(updatedCustomer);
         await queueOp('customers', 'update', customer.id, toRemoteCustomer(updatedCustomer), { batchId: id });
+        // P6/P24: record customer ledger (local-first, synced via queueOp) + maintain balance.
+        const balAfter = await recordCustomerLedger({
+          customerId: customer.id,
+          saleId: newSale.id,
+          type: 'sale',
+          debit: newSale.total,
+          reference: newSale.invoiceNumber,
+          note: 'Sale',
+        });
+        if (balAfter) {
+          await localDb.customers.update(customer.id, { balance: balAfter });
+          await queueOp('customers', 'update', customer.id, toRemoteCustomer({ ...customer, balance: balAfter, updatedAt: now }), { batchId: id });
+        }
       }
     }
 
@@ -2295,6 +2373,9 @@ export const salesService = {
     if (onlineDel) {
       deleteCommitted = await deleteSaleAtomic(id, returnMovements);
     }
+    if (deleteCommitted) {
+      // Sale hard-deleted via delete_sale_atomic (row_tombstone). payment_status is moot.
+    }
     if (!deleteCommitted) {
       // Fallback: reverse stock via RPC-or-queue, then queue the sale hard-delete.
       if (returnMovements.length > 0) {
@@ -2330,6 +2411,20 @@ export const salesService = {
         };
         await localDb.customers.put(updatedCustomer);
         await queueOp('customers', 'update', customer.id, toRemoteCustomer(updatedCustomer));
+        // P3/GAP3: reverse the original ledger debit so the ledger net is correct
+        // (credit the un-refunded remainder; the refunded portion was already credited on refund).
+        const balAfter = await recordCustomerLedger({
+          customerId: customer.id,
+          saleId: id,
+          type: 'refund',
+          credit: remainingTotal,
+          reference: sale.invoiceNumber,
+          note: 'Sale deleted/reversed',
+        });
+        if (balAfter) {
+          await localDb.customers.update(customer.id, { balance: balAfter });
+          await queueOp('customers', 'update', customer.id, toRemoteCustomer({ ...customer, balance: balAfter, updatedAt: now }));
+        }
       }
     }
 
@@ -2447,6 +2542,13 @@ export const salesService = {
     }) : (request?.items || []);
 
     const totalRefundAmount = isFullRefund ? sale.total : (request?.totalRefundAmount || 0);
+
+    // R3 FIX: block over-refund BEFORE any local mutation so a repeated/partial
+    // double-refund request can never restore stock or reverse payment twice.
+    // (The cloud RPC also guards this, but local-first restore must be pre-checked.)
+    if ((sale.refundedAmount || 0) + totalRefundAmount > (sale.total || 0) + 0.01) {
+      throw new Error('Refund amount exceeds remaining sale total — blocked to prevent double refund');
+    }
 
     // 1. Reverse Stock Locally & Update Sale Items
     for (const reqItem of itemsToReverse) {
@@ -2610,6 +2712,7 @@ export const salesService = {
       refundedAmount: newRefundedAmount,
       taxAmount: newTaxAmount,
       status: finalStatus as any,
+      paymentStatus: finalStatus,
       updatedAt: now
     };
 
@@ -2620,6 +2723,23 @@ export const salesService = {
     let returnsCommitted = false;
     if (onlineRet) {
       returnsCommitted = await refundSaleAtomic(id, returnMovements, finalStatus, newRefundedAmount);
+    }
+    if (returnsCommitted) {
+      try { await queueOp('sales', 'update', id, { payment_status: finalStatus } as any, { batchId: id }); } catch (_) { /* non-fatal */ }
+    }
+    // P6/P24: record refund on the customer ledger (credit reduces what they owe).
+    // Recorded REGARDLESS of online/offline (offline-first: localDb + queueOp), and the
+    // credit is the INCREMENTAL amount of THIS refund, not the cumulative total (GAP 4).
+    const custId = (sale as any).customerId;
+    if (custId) {
+      await recordCustomerLedger({
+        customerId: custId,
+        saleId: id,
+        type: 'refund',
+        credit: totalRefundAmount,
+        reference: (sale as any).invoiceNumber,
+        note: 'Refund',
+      });
     }
     if (!returnsCommitted) {
       if (returnMovements.length > 0) {
@@ -2645,8 +2765,11 @@ export const salesService = {
     if (sale.customerId && totalRefundAmount > 0) {
       const customer = await localDb.customers.get(sale.customerId);
       if (customer) {
+        const ledgerRows = await localDb.customerLedger.where('customerId').equals(customer.id).toArray();
+        const balAfter = ledgerRows.length ? Number((ledgerRows[ledgerRows.length - 1] as any).balanceAfter || 0) : (customer.balance || 0);
         const updatedCustomer = {
           ...customer,
+          balance: balAfter,
           totalPurchases: Math.max(0, (customer.totalPurchases || 0) - totalRefundAmount),
           updatedAt: now
         };
@@ -2721,10 +2844,10 @@ export const salesService = {
         .filter(sale => !sale.invoiceNumber?.startsWith('DRAFT-'))
         .map(toRemoteSale);
 
-      if (remoteChunk.length > 0) {
-        // Bulk upsert to Supabase to avoid 5000+ pending ops crashing the sync engine
-        const { error } = await supabase.from('sales').upsert(remoteChunk, { onConflict: 'id' });
-        if (error) console.error('Bulk sync failed for chunk:', error);
+      // OFFLINE-FIRST: queue each patched sale (SyncEngine replicates). Avoids a direct
+      // supabase upsert that bypasses the queue and can crash the sync engine with 5000+ ops.
+      for (const s of remoteChunk) {
+        await queueOp('sales', 'update', (s as any).id, s);
       }
 
       if (onProgress) {
@@ -3709,8 +3832,9 @@ export const seedMissingBarcodes = async (): Promise<{ count: number; updated: s
   const updatedNames: string[] = [];
   for (const prod of products) {
     const val = prod.barcode || generateBarcodeValue(prod.name || prod.id);
-    await supabase.from('products').update(await withActor({ barcode_value: val }, 'products')).eq('id', prod.id);
+    // OFFLINE-FIRST: update local + queue (never direct supabase write).
     await localDb.products.where('id').equals(prod.id).modify({ barcodeValue: val, barcode: val });
+    await queueOp('products', 'update', prod.id, { barcode_value: val, barcode: val } as any);
     updatedNames.push(prod.name);
   }
 
@@ -4049,84 +4173,42 @@ export const bundlesService = {
       })));
     }
 
-    // 2. Try cloud sync (best-effort)
-    try {
-      const { error } = await supabase.from('bundles').insert({
-        id,
-        name: data.name.trim(),
-        description: data.description || '',
-        discount_value: data.discountValue,
-        discount_type: data.discountType,
-        schedule_type: data.scheduleType || 'always',
-        start_date: data.startDate || null,
-        end_date: data.endDate || null,
-        repeat_days: data.repeatDays || null,
-        start_time: data.startTime || null,
-        end_time: data.endTime || null,
-        hide_item_prices: data.hideItemPrices || false,
-        is_combo: data.isCombo || false,
-        deal_category: data.dealCategory || 'pizza',
-        override_price: data.overridePrice || null,
-        badge_enabled: data.badgeEnabled || false,
-        badge_text: data.badgeText || null,
-        badge_icon: data.badgeIcon || null,
-        badge_bg_color: data.badgeBgColor || null,
-        badge_text_color: data.badgeTextColor || null,
-        extra_toppings: data.extraToppings || [],
-        active: true,
-        created_at: now,
-        updated_at: now,
-      });
-      if (error) throw error;
-
-      if (itemRows.length > 0) {
-        const { error: itemError } = await supabase.from('bundle_items').insert(itemRows);
-        if (itemError) throw itemError;
-      }
-      if (slotRows.length > 0) {
-        const { error: slotError } = await supabase.from('bundle_slots').insert(slotRows);
-        if (slotError) throw slotError;
-        if (optionRows.length > 0) {
-          const { error: optError } = await supabase.from('bundle_slot_options').insert(optionRows);
-          if (optError) throw optError;
-        }
-      }
-    } catch (e: any) {
-      // 3. Network failed — queue sync op
-      console.warn('[bundlesService.create] Cloud save failed, queuing for sync:', e.message);
-      if (_isNetworkError(e)) {
-        await queueOp('bundles', 'create', id, {
-          id,
-          name: data.name.trim(),
-          description: data.description || '',
-          discount_value: data.discountValue,
-          discount_type: data.discountType,
-          schedule_type: data.scheduleType || 'always',
-          start_date: data.startDate || null,
-          end_date: data.endDate || null,
-          repeat_days: data.repeatDays || null,
-          start_time: data.startTime || null,
-          end_time: data.endTime || null,
-          hide_item_prices: data.hideItemPrices || false,
-          is_combo: data.isCombo || false,
-          deal_category: data.dealCategory || 'pizza',
-          override_price: data.overridePrice || null,
-          badge_enabled: data.badgeEnabled || false,
-          badge_text: data.badgeText || null,
-          badge_icon: data.badgeIcon || null,
-          badge_bg_color: data.badgeBgColor || null,
-          badge_text_color: data.badgeTextColor || null,
-          extra_toppings: data.extraToppings || [],
-          active: true,
-          created_at: now,
-          updated_at: now,
-        });
-        for (const item of itemRows) await queueOp('bundle_items', 'create', item.id, item);
-        for (const slot of slotRows) await queueOp('bundle_slots', 'create', slot.id, slot);
-        for (const opt of optionRows) await queueOp('bundle_slot_options', 'create', opt.id, opt);
-      } else {
-        throw e; // Re-throw real errors
-      }
+    // OFFLINE-FIRST: queue all bundle writes; SyncEngine replicates to cloud (never direct supabase write).
+    const bundleRemote = {
+      id,
+      name: data.name.trim(),
+      description: data.description || '',
+      discount_value: data.discountValue,
+      discount_type: data.discountType,
+      schedule_type: data.scheduleType || 'always',
+      start_date: data.startDate || null,
+      end_date: data.endDate || null,
+      repeat_days: data.repeatDays || null,
+      start_time: data.startTime || null,
+      end_time: data.endTime || null,
+      hide_item_prices: data.hideItemPrices || false,
+      is_combo: data.isCombo || false,
+      deal_category: data.dealCategory || 'pizza',
+      override_price: data.overridePrice || null,
+      badge_enabled: data.badgeEnabled || false,
+      badge_text: data.badgeText || null,
+      badge_icon: data.badgeIcon || null,
+      badge_bg_color: data.badgeBgColor || null,
+      badge_text_color: data.badgeTextColor || null,
+      extra_toppings: data.extraToppings || [],
+      active: true,
+      created_at: now,
+      updated_at: now,
+    };
+    await queueOp('bundles', 'create', id, bundleRemote);
+    for (const r of itemRows) {
+      await queueOp('bundle_items', 'create', r.id, { id: r.id, bundle_id: r.bundleId, product_id: r.productId, quantity: r.quantity, created_at: now });
+    }
+    for (const r of slotRows) {
+      await queueOp('bundle_slots', 'create', r.id, { id: r.id, bundle_id: r.bundleId, name: r.name, required_quantity: r.requiredQuantity, order_index: r.orderIndex, created_at: now });
+    }
+    for (const r of optionRows) {
+      await queueOp('bundle_slot_options', 'create', r.id, { id: r.id, slot_id: r.slotId, product_id: r.productId, sort_order: r.sortOrder ?? 0, created_at: now });
     }
 
     return {
@@ -4222,6 +4304,10 @@ export const bundlesService = {
 
     await localDb.bundles.where('id').equals(bundleId).modify(localUpdates);
 
+    const oldItemIds: string[] = [];
+    const oldSlotIds: string[] = [];
+    const oldOptionIds: string[] = [];
+
     // Replace items locally
     const itemRows = data.items ? data.items.map(item => ({
       id: generateId(),
@@ -4231,6 +4317,7 @@ export const bundlesService = {
     })) : undefined;
 
     if (itemRows !== undefined) {
+      oldItemIds.push(...(await localDb.bundleItems.where('bundleId').equals(bundleId).toArray()).map(r => r.id));
       await localDb.bundleItems.where('bundleId').equals(bundleId).delete();
       if (itemRows.length > 0) await localDb.bundleItems.bulkPut(itemRows);
     }
@@ -4260,11 +4347,14 @@ export const bundlesService = {
         });
       });
 
-      await localDb.bundleSlots.where('bundleId').equals(bundleId).delete();
       const oldSlots = await localDb.bundleSlots.where('bundleId').equals(bundleId).toArray();
       for (const oldSlot of oldSlots) {
+        oldSlotIds.push(oldSlot.id);
+        const opts = await localDb.bundleSlotOptions.where('slotId').equals(oldSlot.id).toArray();
+        oldOptionIds.push(...opts.map(o => o.id));
         await localDb.bundleSlotOptions.where('slotId').equals(oldSlot.id).delete();
       }
+      await localDb.bundleSlots.where('bundleId').equals(bundleId).delete();
 
       if (slotRows.length > 0) {
         await localDb.bundleSlots.bulkPut(slotRows);
@@ -4272,74 +4362,25 @@ export const bundlesService = {
       }
     }
 
-    // Try cloud sync (best-effort)
-    try {
-      if (Object.keys(updates).length > 1) {
-        const { error } = await supabase.from('bundles').update(updates).eq('id', bundleId);
-        if (error) throw error;
+    // OFFLINE-FIRST: queue parent update + child deletes (by specific old id) + inserts.
+    // Deleting specific old ids then inserting new ids is queue-safe (no overlap, order-independent).
+    if (Object.keys(updates).length > 1) {
+      await queueOp('bundles', 'update', bundleId, updates);
+    }
+    if (itemRows !== undefined) {
+      for (const oldId of oldItemIds) await queueOp('bundle_items', 'delete', oldId, {});
+      for (const item of itemRows) {
+        await queueOp('bundle_items', 'create', item.id, { id: item.id, bundle_id: bundleId, product_id: item.productId, quantity: item.quantity, created_at: now });
       }
-
-      if (itemRows !== undefined) {
-        const { error: delError } = await supabase.from('bundle_items').delete().eq('bundle_id', bundleId);
-        if (delError) throw delError;
-        if (itemRows.length > 0) {
-          const insertItemRows = itemRows.map(r => ({
-            id: r.id, bundle_id: r.bundleId, product_id: r.productId, quantity: r.quantity, created_at: now
-          }));
-          const { error: insErr } = await supabase.from('bundle_items').insert(insertItemRows);
-          if (insErr) throw insErr;
-        }
+    }
+    if (slotRows !== undefined && optionRows !== undefined) {
+      for (const oldId of oldSlotIds) await queueOp('bundle_slots', 'delete', oldId, {});
+      for (const oldId of oldOptionIds) await queueOp('bundle_slot_options', 'delete', oldId, {});
+      for (const slot of slotRows) {
+        await queueOp('bundle_slots', 'create', slot.id, { id: slot.id, bundle_id: bundleId, name: slot.name, required_quantity: slot.requiredQuantity, order_index: slot.orderIndex, created_at: now });
       }
-
-      if (slotRows !== undefined && optionRows !== undefined) {
-        const { error: delSlotsError } = await supabase.from('bundle_slots').delete().eq('bundle_id', bundleId);
-        if (delSlotsError) throw delSlotsError;
-
-        if (slotRows.length > 0) {
-          const insertSlotRows = slotRows.map(r => ({
-            id: r.id, bundle_id: r.bundleId, name: r.name, required_quantity: r.requiredQuantity, order_index: r.orderIndex, created_at: now
-          }));
-          const { error: insSlotsErr } = await supabase.from('bundle_slots').insert(insertSlotRows);
-          if (insSlotsErr) throw insSlotsErr;
-
-          if (optionRows.length > 0) {
-            const insertOptRows = optionRows.map(r => ({
-              id: r.id, slot_id: r.slotId, product_id: r.productId, sort_order: r.sortOrder ?? 0, created_at: now
-            }));
-            const { error: insOptsErr } = await supabase.from('bundle_slot_options').insert(insertOptRows);
-            if (insOptsErr) throw insOptsErr;
-          }
-        }
-      }
-    } catch (e: any) {
-      console.warn('[bundlesService.update] Cloud save failed, queuing for sync:', e.message);
-      if (_isNetworkError(e)) {
-        if (Object.keys(updates).length > 1) {
-          await queueOp('bundles', 'update', bundleId, updates);
-        }
-
-        if (itemRows !== undefined) {
-          console.warn('Nested arrays (items) update offline may cause duplicates upon sync if not carefully handled.');
-          for (const item of itemRows) {
-            await queueOp('bundle_items', 'create', item.id, {
-              id: item.id, bundle_id: bundleId, product_id: item.productId, quantity: item.quantity, created_at: now
-            });
-          }
-        }
-        if (slotRows !== undefined && optionRows !== undefined) {
-          for (const slot of slotRows) {
-            await queueOp('bundle_slots', 'create', slot.id, {
-              id: slot.id, bundle_id: bundleId, name: slot.name, required_quantity: slot.requiredQuantity, order_index: slot.orderIndex, created_at: now
-            });
-          }
-          for (const opt of optionRows) {
-            await queueOp('bundle_slot_options', 'create', opt.id, {
-              id: opt.id, slot_id: opt.slotId, product_id: opt.productId, sort_order: opt.sortOrder ?? 0, created_at: now
-            });
-          }
-        }
-      } else {
-        throw e;
+      for (const opt of optionRows) {
+        await queueOp('bundle_slot_options', 'create', opt.id, { id: opt.id, slot_id: opt.slotId, product_id: opt.productId, sort_order: opt.sortOrder ?? 0, created_at: now });
       }
     }
   },
@@ -4355,20 +4396,8 @@ export const bundlesService = {
     await localDb.bundleSlots.where('bundleId').equals(bundleId).delete();
     await localDb.bundles.delete(bundleId);
 
-    // Try cloud sync
-    try {
-      const { error: itemsError } = await supabase.from('bundle_items').delete().eq('bundle_id', bundleId);
-      if (itemsError) throw itemsError;
-      const { error } = await supabase.from('bundles').delete().eq('id', bundleId);
-      if (error) throw error;
-    } catch (e: any) {
-      console.warn('[bundlesService.delete] Cloud delete failed, queuing for sync:', e.message);
-      if (_isNetworkError(e)) {
-        await queueOp('bundles', 'delete', bundleId, {});
-      } else {
-        throw e;
-      }
-    }
+    // OFFLINE-FIRST: queue the delete; SyncEngine replicates to cloud (never direct supabase write).
+    await queueOp('bundles', 'delete', bundleId, {});
   },
 
   /**
@@ -4478,32 +4507,24 @@ export const toppingsService = {
   },
 
   async create(topping: Partial<Topping>): Promise<Topping> {
-    const { data, error } = await supabase
-      .from('toppings')
-      .insert(toRemoteTopping(topping))
-      .select()
-      .single();
-    if (error) throw error;
-    return mapTopping(data);
+    const id = (topping as any).id || generateId();
+    const remote = { ...toRemoteTopping(topping), id };
+    // OFFLINE-FIRST: persist locally + queue (never direct supabase write).
+    await localDb.toppings.put({ ...(topping as any), id } as any);
+    await queueOp('toppings', 'create', id, remote);
+    return mapTopping(remote as any);
   },
 
   async update(id: string, topping: Partial<Topping>): Promise<Topping> {
-    const { data, error } = await supabase
-      .from('toppings')
-      .update(toRemoteTopping(topping))
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return mapTopping(data);
+    const remote = toRemoteTopping(topping);
+    await localDb.toppings.update(id, topping as any);
+    await queueOp('toppings', 'update', id, remote);
+    return mapTopping({ ...remote, id } as any);
   },
 
   async remove(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('toppings')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
+    await localDb.toppings.delete(id);
+    await queueOp('toppings', 'delete', id, {});
   },
 };
 
@@ -4522,17 +4543,13 @@ export const productToppingsService = {
   },
 
   async setByProduct(productId: string, toppingIds: string[]): Promise<void> {
-    const { error: delErr } = await supabase
-      .from('product_toppings')
-      .delete()
-      .eq('product_id', productId);
-    if (delErr) throw delErr;
+    // OFFLINE-FIRST: queue the delete (by product_id) + re-insert join rows (never direct supabase write).
+    await queueOp('product_toppings', 'delete', productId, {});
     if (toppingIds.length === 0) return;
-    const rows = toppingIds.map(toppingId => ({ product_id: productId, topping_id: toppingId }));
-    const { error: insErr } = await supabase
-      .from('product_toppings')
-      .insert(rows);
-    if (insErr) throw insErr;
+    for (const toppingId of toppingIds) {
+      const row = { product_id: productId, topping_id: toppingId };
+      await queueOp('product_toppings', 'create', `${productId}:${toppingId}`, row);
+    }
   },
 };
 

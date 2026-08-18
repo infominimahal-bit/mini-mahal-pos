@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/SupabaseAppContext';
-import { TouchKeyboard } from '../components/common/TouchKeyboard';
+import { TouchKeyboard } from '../shared/ui/TouchKeyboard';
 
 interface TouchKeyboardContextType {
   isKeyboardOpen: boolean;

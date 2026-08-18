@@ -11,8 +11,8 @@ import { salesService, productsService, customersService, getAmountByMethod, nor
 import { sonner } from '../../lib/sonner';
 import { useTranslation } from '../../hooks/useTranslation';
 import { getDealCountBreakdown } from '../../lib/utils';
-import { SearchableSelect } from '../common/SearchableSelect';
-import { Modal } from '../common/Modal';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
+import { Modal } from '../../shared/ui/Modal';
 import { TransactionDetailModal } from './TransactionDetailModal';
 import RefundSaleModal from './RefundSaleModal';
 import { RefundRequest } from '../../types';

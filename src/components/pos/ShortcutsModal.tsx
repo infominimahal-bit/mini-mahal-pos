@@ -1,5 +1,5 @@
 import { Keyboard, Search, ShoppingBag, RefreshCw, FileText, Trash2, CreditCard, Check, X, Layers } from 'lucide-react';
-import { Modal } from '../common/Modal';
+import { Modal } from '../../shared/ui/Modal';
 import { useTranslation } from '../../hooks/useTranslation';
 
 interface ShortcutsModalProps {

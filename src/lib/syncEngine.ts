@@ -141,6 +141,23 @@ async function executeOp(op: PendingOp): Promise<void> {
       return;
     }
 
+    // product_toppings has no single `id` PK for deletes (keyed by product_id),
+    // so handle it explicitly (delete by product_id, upsert the join rows).
+    if (op.entity === 'product_toppings') {
+      try {
+        if (op.opType === 'delete') {
+          await supabase.from('product_toppings').delete().eq('product_id', op.entityId);
+        } else {
+          await supabase.from('product_toppings').upsert(op.payload);
+        }
+        await localDb.pendingOps.delete(op.id!);
+      } catch (e) {
+        console.warn('[SyncEngine] product_toppings op failed', e);
+        throw e;
+      }
+      return;
+    }
+
     const tableMap: Record<string, string> = {
         products: 'products',
         customers: 'customers',
@@ -166,7 +183,10 @@ async function executeOp(op: PendingOp): Promise<void> {
         variant_stock_history: 'variant_stock_history',
         product_addons: 'product_addons',
         store_orders: 'store_orders',
-        salesmen: 'salesmen'
+        salesmen: 'salesmen',
+        customer_ledger: 'customer_ledger',
+        toppings: 'toppings',
+        product_toppings: 'product_toppings'
     };
 
     const table = tableMap[op.entity];

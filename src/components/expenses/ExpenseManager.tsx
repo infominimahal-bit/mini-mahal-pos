@@ -14,7 +14,7 @@ import { formatAppDate, formatAppTime, formatAppDateTime, getTimezone, getStartO
 import { expensesService, suppliersService, normalizePaymentMethod } from '../../lib/services';
 import { Expense, EXPENSE_CATEGORIES } from '../../types';
 import { ExpenseModal } from './ExpenseModal';
-import { SearchableSelect } from '../common/SearchableSelect';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { sonner } from '../../lib/sonner';
 import { formatCurrency } from '../../lib/currencies';
 import { useTranslation } from '../../hooks/useTranslation';

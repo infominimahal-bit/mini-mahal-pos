@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User, Lock, Shield, Crown, Loader2, Camera, Save, Tag, CreditCard, Package, Edit, Trash2, Database, ClipboardList, History, Wallet, Users, BarChart3 } from 'lucide-react';
-import { SearchableSelect } from '../common/SearchableSelect';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { User as UserType } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -8,10 +8,10 @@ import { usersService } from '../../lib/services';
 import { supabase, adminUserAction } from '../../lib/supabase';
 import { sonner } from '../../lib/sonner';
 import { hashPasswordString } from '../../context/AuthContext';
-import { Modal } from '../common/Modal';
+import { Modal } from '../../shared/ui/Modal';
 import { cn } from '../../lib/utils';
 import { useTranslation } from '../../hooks/useTranslation';
-import { MediaLibrary } from '../inventory/MediaLibrary';
+import { MediaLibrary } from '../../shared/MediaLibrary';
 import { Button, ToggleSwitch } from '../../shared/ui';
 
 interface UserModalProps {

@@ -11,7 +11,7 @@ import { salesService, productsService, customersService, getAmountByMethod } fr
 import { sonner } from '../../lib/sonner';
 import { useTranslation } from '../../hooks/useTranslation';
 import { getDealCountBreakdown, cn } from '../../lib/utils';
-import { Modal } from '../common/Modal';
+import { Modal } from '../../shared/ui/Modal';
 import { Badge, Button } from '../../shared/ui';
 import RefundSaleModal from './RefundSaleModal';
 

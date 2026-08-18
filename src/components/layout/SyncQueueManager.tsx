@@ -3,7 +3,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { localDb } from '../../lib/localDb';
 import { retrySyncAll, clearStuckOps, syncNow } from '../../lib/syncEngine';
 import { useApp } from '../../context/SupabaseAppContext';
-import { Modal } from '../common/Modal';
+import { Modal } from '../../shared/ui/Modal';
 import { cn } from '../../lib/utils';
 import { useTranslation } from '../../hooks/useTranslation';
 import { dialog } from '../../lib/dialog';

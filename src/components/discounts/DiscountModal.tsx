@@ -4,7 +4,7 @@ import { Discount, DiscountCondition } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { sonner } from '../../lib/sonner';
 import { formatCurrency } from '../../lib/currencies';
-import { Modal } from '../common/Modal';
+import { Modal } from '../../shared/ui/Modal';
 import { cn } from '../../lib/utils';
 import { useTranslation } from '../../hooks/useTranslation';
 import { MixAndMatchBuilder } from './MixAndMatchBuilder';

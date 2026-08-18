@@ -11,7 +11,7 @@ import { bundlesService } from '../../lib/services';
 import { sonner } from '../../lib/sonner';
 import { formatCurrency } from '../../lib/currencies';
 import { useTranslation } from '../../hooks/useTranslation';
-import { MediaLibrary } from './MediaLibrary';
+import { MediaLibrary } from '../../shared/MediaLibrary';
 import { useDragDropList, DragHandle, SharedSearchBar, SharedProductList } from '../../shared/modules/search-and-list';
 import { Button, Badge, EmptyState } from '../../shared/ui';
 

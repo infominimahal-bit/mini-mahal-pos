@@ -3,7 +3,7 @@ import {
   Loader2, Plus, ChevronLeft, ArrowUpRight, TrendingUp, Building2, CheckCircle2, X,
   ShoppingCart, Calendar, Info, Package, Save, Trash2, RefreshCw
 } from 'lucide-react';
-import { SearchableSelect } from '../common/SearchableSelect';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { Button, ToggleSwitch } from '../../shared/ui';
 import { useApp } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -15,7 +15,7 @@ import { sonner } from '../../lib/sonner';
 import { Product } from '../../types';
 import { formatCurrency, getCurrencySymbol } from '../../lib/currencies';
 import { commitStockInToInventory } from '../../lib/stockInCommit';
-import { Modal } from '../common/Modal';
+import { Modal } from '../../shared/ui/Modal';
 import { cn } from '../../lib/utils';
 import { useTranslation } from '../../hooks/useTranslation';
 

@@ -3,7 +3,7 @@ import JsBarcode from 'jsbarcode';
 import { QRCodeSVG } from 'qrcode.react';
 import { useReactToPrint } from 'react-to-print';
 import { Printer, Minus, Plus, Save, X, ZoomIn, ZoomOut, Maximize2, Layout } from 'lucide-react';
-import { SearchableSelect } from '../common/SearchableSelect';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { sonner } from '../../lib/sonner';
 import { settingsService } from '../../lib/services';
 import { Product, AppSettings } from '../../types';

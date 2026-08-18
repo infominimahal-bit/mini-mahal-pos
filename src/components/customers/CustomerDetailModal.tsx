@@ -4,7 +4,7 @@ import { Customer, Sale } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { formatCurrency } from '../../lib/currencies';
 import { formatAppDateTime } from '../../lib/dateUtils';
-import { Modal } from '../common/Modal';
+import { Modal } from '../../shared/ui/Modal';
 import { cn } from '../../lib/utils';
 import { useTranslation } from '../../hooks/useTranslation';
 import { TransactionDetailModal } from '../transactions/TransactionDetailModal';

@@ -539,7 +539,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       }
       const sale = action.payload;
       let updatedCustomers = state.customers;
-      const updatedProducts = [...state.products];
+
 
       // If it's a customer sale, update their stats locally in memory
       if (sale.customerId) {
@@ -556,36 +556,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
         });
       }
 
-      // Update inventory locally immediately for UI.
-      // Estore fulfillment sales are skipped here: commit_sale already deducted stock
-      // on the cloud (single ledger), and the realtime 'products' UPDATE will overwrite
-      // local stock with the authoritative cloud value. Deducting again locally would
-      // double-count in memory before realtime corrects it. (place_estore_order does NOT
-      // reserve stock at placement — that was removed — so the skip is purely to avoid
-      // a transient local double-count, not because of a prior reservation.)
-      if (sale.status === 'completed') {
-        const isReturn = sale.total < 0 || sale.id.startsWith('RET-') || sale.notes?.includes('RETURN');
-        const isEstoreFulfillment = !!sale.sourceOrderId;
-
-        if (!isEstoreFulfillment) {
-        sale.items.forEach(item => {
-          const productIdx = updatedProducts.findIndex(p => p.id === item.product.id);
-          if (productIdx >= 0 && updatedProducts[productIdx].trackInventory !== false) {
-            const qtyToDeduct = item.weight || item.quantity;
-            const updatedProduct = { ...updatedProducts[productIdx] };
-            // Allow negative stock — never floor at 0 (server + local bookkeeping must stay identical)
-            updatedProduct.stock = (updatedProduct.stock || 0) - qtyToDeduct;
-            updatedProducts[productIdx] = updatedProduct;
-          }
-        });
-        }
-      }
-
       return {
         ...state,
         sales: [...state.sales, sale],
         customers: updatedCustomers,
-        products: updatedProducts,
+        products: state.products,
       };
     }
     case 'UPDATE_SALE': {

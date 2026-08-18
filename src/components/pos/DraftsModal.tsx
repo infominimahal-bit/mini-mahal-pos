@@ -5,7 +5,7 @@ import { salesService } from '../../lib/services';
 import { useApp } from '../../context/SupabaseAppContext';
 import { useTranslation } from '../../hooks/useTranslation';
 
-import { Modal } from '../common/Modal';
+import { Modal } from '../../shared/ui/Modal';
 
 interface DraftsModalProps {
     isOpen: boolean;

@@ -1,19 +1,19 @@
 import { X, Plus, Loader2, Wand2, Star, Camera, Save, Tag, User, Upload, Package, Database } from 'lucide-react';
-import { compressImage } from '../../lib/imageCompression';
+import { compressImage } from '../../shared/imageCompression';
 import { Product, ProductBatch, ProductVariant, ProductModifier, VariantData, ProductAddon } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
-import { MediaLibrary } from './MediaLibrary';
-import { CameraScanner } from '../common/CameraScanner';
-import { SearchableSelect } from '../common/SearchableSelect';
+import { MediaLibrary } from '../../shared/MediaLibrary';
+import { CameraScanner } from '../../shared/ui/CameraScanner';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { SegmentedControl, Button, Select } from '../../shared/ui';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { sonner } from '../../lib/sonner';
-import { Modal } from '../common/Modal';
-import { HelpTooltip } from '../common/HelpTooltip';
+import { Modal } from '../../shared/ui/Modal';
+import { HelpTooltip } from '../../shared/ui/HelpTooltip';
 import { cn } from '../../lib/utils';
 import { useTranslation } from '../../hooks/useTranslation';
 import { generateBarcodeValue } from '../../utils/barcode';
-import { BarcodePreview } from '../common/BarcodePreview';
+import { BarcodePreview } from '../../shared/ui/BarcodePreview';
 
 interface ProductModalProps {
   isOpen: boolean;

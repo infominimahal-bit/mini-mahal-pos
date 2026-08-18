@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal } from '../common/Modal';
+import { Modal } from '../../shared/ui/Modal';
 import { Bundle } from '../../types';
 import { formatCurrency } from '../../lib/currencies';
 import { ChevronRight, Flame, Timer } from 'lucide-react';

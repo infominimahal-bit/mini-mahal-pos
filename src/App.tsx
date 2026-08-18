@@ -22,13 +22,13 @@ const DashboardManager = lazy(() => import('./components/dashboard/DashboardMana
 const EStoreApp = lazy(() => import('./components/estore/EStoreApp').then(m => ({ default: m.EStoreApp })));
 const OnlineOrdersPage = lazy(() => import('./components/orders/OnlineOrdersPage').then(m => ({ default: m.OnlineOrdersPage })));
 import { playPageSound } from './lib/sounds';
-import { SkeletonLoader } from './components/common/SkeletonLoader';
+import { SkeletonLoader } from './shared/ui/SkeletonLoader';
 import { TouchKeyboardProvider, useTouchKeyboard } from './providers/TouchKeyboardProvider';
 import { startSyncEngine } from './lib/syncEngine';
 import { updateDynamicManifest } from './lib/dynamicManifest';
 import { MobileBottomNav } from './components/layout/MobileBottomNav';
 import { Toaster } from 'sonner';
-import { DialogProvider } from './components/common/DialogProvider';
+import { DialogProvider } from './shared/ui/DialogProvider';
 import { useTranslation } from './hooks/useTranslation';
 import { can, type Permission } from './lib/permissions';
 import { OfflineBanner } from './components/OfflineBadge';

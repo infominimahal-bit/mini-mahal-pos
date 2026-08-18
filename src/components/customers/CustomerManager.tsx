@@ -8,7 +8,7 @@ import { CustomerDetailModal } from './CustomerDetailModal';
 import { formatAppDate, getTimezone, getStartOfDayInTimezone, getEndOfDayInTimezone, getStartOfInputDayInTimezone, getEndOfInputDayInTimezone } from '../../lib/dateUtils';
 import { sonner } from '../../lib/sonner';
 import { formatCurrency } from '../../lib/currencies';
-import { SearchableSelect } from '../common/SearchableSelect';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { useTranslation } from '../../hooks/useTranslation';
 import { SharedSearchBar } from '../../shared/modules/search-and-list';
 import { Badge, Button, EmptyState, Pagination } from '../../shared/ui';

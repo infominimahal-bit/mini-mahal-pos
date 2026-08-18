@@ -4,10 +4,10 @@ import { productsService } from '../../lib/services';
 import { useApp } from '../../context/SupabaseAppContext';
 import { Product } from '../../types';
 import { sonner } from '../../lib/sonner';
-import { SearchableSelect } from '../common/SearchableSelect';
-import { MediaLibrary } from './MediaLibrary';
-import { compressImage } from '../../lib/imageCompression';
-import { Modal } from '../common/Modal';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
+import { MediaLibrary } from '../../shared/MediaLibrary';
+import { compressImage } from '../../shared/imageCompression';
+import { Modal } from '../../shared/ui/Modal';
 import { useTranslation } from '../../hooks/useTranslation';
 import { Button } from '../../shared/ui';
 

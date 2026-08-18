@@ -5,7 +5,7 @@ import { formatCurrency } from '../../lib/currencies';
 import { calculateDiscount } from '../../lib/utils';
 import { bundlesService } from '../../lib/services';
 import { sonner } from '../../lib/sonner';
-import ExtraToppingSelector from '../common/ExtraToppingSelector';
+import ExtraToppingSelector from '../../shared/ui/ExtraToppingSelector';
 import { Button } from '../../shared/ui';
 
 const Dealtimer = ({ bundle }: { bundle: Bundle }) => {

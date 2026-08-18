@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { DiscountCondition } from '../../types';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useApp } from '../../context/SupabaseAppContext';
-import { HelpTooltip } from '../common/HelpTooltip';
+import { HelpTooltip } from '../../shared/ui/HelpTooltip';
 import { SharedSearchBar, SharedProductList } from '../../shared/modules/search-and-list';
 import { SharedItem } from '../../shared/modules/search-and-list';
 import { Select } from '../../shared/ui';

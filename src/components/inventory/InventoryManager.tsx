@@ -9,14 +9,14 @@ import { ProductModal } from './ProductModal';
 import { ProductDetailHub } from './ProductDetailHub';
 import { BarcodeGenerator, clearPersistedBarcodeState } from './BarcodeGenerator';
 import { BulkEditModal } from './BulkEditModal';
-import { MediaLibrary } from './MediaLibrary'; // Import MediaLibrary as a standalone tab component if needed
+import { MediaLibrary } from '../../shared/MediaLibrary'; // Import MediaLibrary as a standalone tab component if needed
 import { PurchaseHistory } from './PurchaseHistory';
 import { AuditTimeline } from './AuditTimeline';
 import { ReceiptPrint } from '../pos/ReceiptPrint';
 import { PurchaseOrderSystem } from './PurchaseOrderSystem';
-import { CameraScanner } from '../common/CameraScanner';
-import { BarcodePreview } from '../common/BarcodePreview';
-import { SkeletonLoader } from '../common/SkeletonLoader';
+import { CameraScanner } from '../../shared/ui/CameraScanner';
+import { BarcodePreview } from '../../shared/ui/BarcodePreview';
+import { SkeletonLoader } from '../../shared/ui/SkeletonLoader';
 
 import { SupplierManager } from './suppliers/SupplierManager';
 import { sonner } from '../../lib/sonner';
@@ -24,7 +24,7 @@ import { productsService } from '../../lib/services';
 import { formatCurrency } from '../../lib/currencies';
 import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 import { useTranslation } from '../../hooks/useTranslation';
-import { SearchableSelect } from '../common/SearchableSelect';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { generateId, localDb, queueOp } from '../../lib/localDb';
 import { toRemoteProduct } from '../../lib/services';
 import { BundleManager } from './BundleManager';

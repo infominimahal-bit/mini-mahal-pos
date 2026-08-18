@@ -3,8 +3,8 @@ import { X, CheckCircle, Package, Minus, Plus } from 'lucide-react';
 import { Bundle, Product, CartItemTopping } from '../../types';
 import { formatCurrency } from '../../lib/currencies';
 import { useTranslation } from '../../hooks/useTranslation';
-import { Modal } from '../common/Modal';
-import ExtraToppingSelector from '../common/ExtraToppingSelector';
+import { Modal } from '../../shared/ui/Modal';
+import ExtraToppingSelector from '../../shared/ui/ExtraToppingSelector';
 
 interface ComboSelectionModalProps {
   bundle: Bundle;

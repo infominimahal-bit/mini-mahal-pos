@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Image as ImageIcon } from 'lucide-react';
-import { MediaLibrary } from '../inventory/MediaLibrary';
+import { MediaLibrary } from '../../shared/MediaLibrary';
 import { Button } from '../../shared/ui';
 
 interface LogoUploadProps {

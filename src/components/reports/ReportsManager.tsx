@@ -17,13 +17,13 @@ import {
   customersService,
   getAmountByMethod
 } from '../../lib/services';
-import { SearchableSelect } from '../common/SearchableSelect';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { SalesReport } from './tabs/SalesReport';
 import { ExpensesReport } from './tabs/ExpensesReport';
 import { CustomersReport } from './tabs/CustomersReport';
 import { FinancialReport } from './tabs/FinancialReport';
 import { InventoryReport } from './tabs/InventoryReport';
-import { SkeletonLoader } from '../common/SkeletonLoader';
+import { SkeletonLoader } from '../../shared/ui/SkeletonLoader';
 import { SuppliersReport } from './tabs/SuppliersReport';
 import { SalesmenReport } from './tabs/SalesmenReport';
 import { DateRangePicker, Button } from '../../shared/ui';

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { X, Zap, ZapOff, Camera, Loader2, RefreshCw, Smartphone, AlertTriangle } from 'lucide-react';
-import { Modal } from './Modal';
+import { Modal } from '../../shared/ui/Modal';
 
 interface CameraScannerProps {
   onScan: (decodedText: string) => void;

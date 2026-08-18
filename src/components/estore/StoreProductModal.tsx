@@ -4,7 +4,7 @@ import { X, Plus, Minus } from 'lucide-react';
 import { Button } from '../../shared/ui';
 import { formatCurrency } from '../../lib/currencies';
 import { productToppingsService } from '../../lib/services';
-import ExtraToppingSelector from '../common/ExtraToppingSelector';
+import ExtraToppingSelector from '../../shared/ui/ExtraToppingSelector';
 
 interface StoreProductModalProps {
   product: Product;

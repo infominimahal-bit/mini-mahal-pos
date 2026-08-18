@@ -10,14 +10,14 @@ import { salesService, storeOrdersService, generateId, toRemoteSale, customersSe
 import { localDb, queueOp } from '../../lib/localDb';
 import { sonner } from '../../lib/sonner';
 import { formatCurrency } from '../../lib/currencies';
-import { Modal } from '../common/Modal';
-import { HelpTooltip } from '../common/HelpTooltip';
+import { Modal } from '../../shared/ui/Modal';
+import { HelpTooltip } from '../../shared/ui/HelpTooltip';
 import { cn } from '../../lib/utils';
 import { CompactItemRow } from './CompactItemRow';
 import { ShortcutsModal } from './ShortcutsModal';
 import { useTranslation } from '../../hooks/useTranslation';
 import { usePOSKeyboard } from '../../hooks/usePOSKeyboard';
-import { SearchableSelect } from '../common/SearchableSelect';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 
 interface CheckoutPageProps {
   onClose: () => void;
@@ -91,6 +91,7 @@ export function CheckoutPage({ onClose, onComplete }: CheckoutPageProps) {
   const [amountPaid, setAmountPaid] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const processingLock = useRef(false);
+  const editNewIdRef = useRef<{ oldId: string; newId: string } | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [saleNotes, setSaleNotes] = useState('');
@@ -290,6 +291,21 @@ export function CheckoutPage({ onClose, onComplete }: CheckoutPageProps) {
     processingLock.current = true;
     setIsProcessing(true);
     try {
+      // ── SAVE-TIME OVERSELL GUARD (P3/P35) ──
+      if (!state.settings.allowNegativeStock) {
+        for (const item of checkoutCartItems) {
+          if (item.product?.trackInventory && item.quantity > 0) {
+            const live = state.products.find(p => p.id === item.product?.id);
+            const avail = live ? live.stock : (item.product?.stock ?? 0);
+            if (item.quantity > avail) {
+              throw new Error(
+                `Cannot save: ${item.product?.name} has only ${avail} in stock but cart has ${item.quantity}.`
+              );
+            }
+          }
+        }
+      }
+
       const selectedSalesman = salesmanId ? 
         (state.salesmen.find(s => s.id === salesmanId)?.name || state.users.find(u => u.id === salesmanId)?.name)
         : undefined;
@@ -341,50 +357,39 @@ export function CheckoutPage({ onClose, onComplete }: CheckoutPageProps) {
 
       if (state.editingSaleId) {
         const oldSaleId = state.editingSaleId;
+        // P36 ATOMIC EDIT: create the edited sale FIRST (fresh, stable id reused on
+        // retry via editNewIdRef). The OLD sale is reversed ONLY after the new sale
+        // succeeds. This guarantees the original bill is never lost — if create fails,
+        // the old sale stays intact and a retry is safe.
+        if (editNewIdRef.current?.oldId !== state.editingSaleId) {
+          editNewIdRef.current = { oldId: state.editingSaleId, newId: sale.id };
+        }
+        sale.id = editNewIdRef.current.newId;
         try {
-          // Phase 1: Create the NEW sale first (deducts stock)
           savedSale = await salesService.create(sale);
           await adjustPaymentBalances(buildSalePaymentMoves(sale));
-
-          // Phase 2: Try to delete the OLD sale (restores stock)
-          try {
-            await salesService.delete(oldSaleId, profile?.name || 'Admin');
-            dispatch({ type: 'DELETE_SALE', payload: oldSaleId });
-          } catch (deleteError) {
-            console.error('BILL EDIT CONFLICT: New sale created but old sale delete failed', { oldSaleId, newSaleId: savedSale.id, deleteError });
-            // Restore stock for the new sale since old sale wasn't deleted,
-            // preventing double-decrement
-            try {
-              await salesService.delete(savedSale.id, profile?.name || 'Admin');
-            } catch (rollbackError) {
-              console.error('Failed to rollback new sale stock after edit failure:', rollbackError);
-            }
-            try {
-              const existingOld = await localDb.sales.get(oldSaleId);
-              if (existingOld) {
-                const voidedSale = {
-                  ...existingOld,
-                  status: 'cancelled' as const,
-                  notes: (existingOld.notes ? existingOld.notes + ' ' : '') + `[VOID] Edit failed — old sale preserved`,
-                  updatedAt: new Date()
-                };
-                await localDb.sales.put(voidedSale);
-                await queueOp('sales', 'update', oldSaleId, toRemoteSale(voidedSale));
-                const updatedSales = state.sales.map(s => s.id === oldSaleId ? voidedSale : s);
-                dispatch({ type: 'SET_SALES', payload: updatedSales });
-              }
-            } catch (statusError) {
-              console.error('Failed to mark old sale during conflict:', statusError);
-            }
-            sonner.error(
-              '⚠️ Bill Edit Failed',
-              'The new bill could not be saved. The old bill has been preserved.'
-            );
-          }
-          dispatch({ type: 'SET_EDITING_SALE_ID', payload: null });
         } catch (error) {
-          throw error;
+          // Create failed → original bill fully intact. Release lock so user can retry.
+          processingLock.current = false;
+          setIsProcessing(false);
+          console.error('BILL EDIT FAILED', error);
+          sonner.error(
+            '⚠️ Bill Edit Failed',
+            'The original bill is intact. Please retry saving the edited bill.'
+          );
+          return;
         }
+        // Create succeeded → now reverse the original bill (best-effort, idempotent).
+        try {
+          await salesService.delete(oldSaleId, profile?.name || 'Admin');
+          dispatch({ type: 'DELETE_SALE', payload: oldSaleId });
+        } catch (error) {
+          console.error('OLD BILL REVERSE FAILED (queued for retry via SyncEngine)', error);
+          // Queue the delete so the SyncEngine reliably retries it (reverses stock + tombstones).
+          try { await queueOp('sales', 'delete', oldSaleId, {}, { batchId: sale.id }); } catch (_) {}
+        }
+        dispatch({ type: 'SET_EDITING_SALE_ID', payload: null });
+        editNewIdRef.current = null;
       } else {
         savedSale = await salesService.create(sale);
         await adjustPaymentBalances(buildSalePaymentMoves(sale));

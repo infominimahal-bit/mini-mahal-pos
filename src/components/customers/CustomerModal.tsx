@@ -3,7 +3,7 @@ import { X, User, Phone, Mail, MapPin, Hash, Plus, Trash2, ShieldCheck, Sparkles
 import { Customer } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { sonner } from '../../lib/sonner';
-import { Modal } from '../common/Modal';
+import { Modal } from '../../shared/ui/Modal';
 import { cn } from '../../lib/utils';
 import { useTranslation } from '../../hooks/useTranslation';
 import { Button, Select } from '../../shared/ui';

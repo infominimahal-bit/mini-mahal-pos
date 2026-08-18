@@ -3,7 +3,7 @@ import { Shield, AlertTriangle, RefreshCw, CheckCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Card, Button, Badge, EmptyState } from '../../shared/ui';
 import { sonner } from '../../lib/sonner';
-import { SkeletonLoader } from '../common/SkeletonLoader';
+import { SkeletonLoader } from '../../shared/ui/SkeletonLoader';
 
 interface Mismatch {
   id: string;

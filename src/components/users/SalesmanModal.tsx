@@ -4,7 +4,7 @@ import { Salesman } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { salesmenService } from '../../lib/services';
 import { sonner } from '../../lib/sonner';
-import { Modal } from '../common/Modal';
+import { Modal } from '../../shared/ui/Modal';
 import { useTranslation } from '../../hooks/useTranslation';
 import { Button, ToggleSwitch } from '../../shared/ui';
 

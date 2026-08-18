@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { localDb, queueOp } from '../../lib/localDb';
 import { AppSettings } from '../../types';
 import { CheckCircle, Clock, ChefHat, Truck, Package, XCircle, Receipt, MapPin, Phone } from 'lucide-react';
 import { formatCurrency } from '../../lib/currencies';
@@ -77,9 +78,10 @@ export function OrderTracker({ orderId, settings }: OrderTrackerProps) {
         setTimeLeft(0);
         const currentStatus = orderData.status || 'pending';
         if (['pending', 'accepted', 'preparing', 'ready', 'out_for_delivery'].includes(currentStatus)) {
-          supabase.from('store_orders').update({ status: 'delivered' }).eq('id', orderData.id).then(() => {
-            setOrder((prev: any) => prev ? { ...prev, status: 'delivered' } : null);
-          });
+          // OFFLINE-FIRST: update local + queue the status change (never direct supabase write).
+          localDb.storeOrders.update(orderData.id, { status: 'delivered' } as any).catch(() => {});
+          queueOp('store_orders', 'update', orderData.id, { status: 'delivered' } as any).catch(() => {});
+          setOrder((prev: any) => prev ? { ...prev, status: 'delivered' } : null);
         }
       } else {
         setTimeLeft(remaining);

@@ -3,8 +3,8 @@ import { CreditCard, ShoppingBag, RefreshCw, Save, Building2 } from 'lucide-reac
 import { format } from 'date-fns';
 import { Expense, EXPENSE_CATEGORIES } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
-import { Modal } from '../common/Modal';
-import { SearchableSelect } from '../common/SearchableSelect';
+import { Modal } from '../../shared/ui/Modal';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { cn } from '../../lib/utils';
 import { useTranslation } from '../../hooks/useTranslation';
 import { sonner } from '../../lib/sonner';

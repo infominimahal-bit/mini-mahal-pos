@@ -51,10 +51,10 @@ import { ReceiptPrint } from '../pos/ReceiptPrint';
 import { AppSettings } from '../../types';
 import { useSync } from '../../hooks/useSync';
 import { DatabaseTools } from './DatabaseTools';
-import { HelpTooltip } from '../common/HelpTooltip';
+import { HelpTooltip } from '../../shared/ui/HelpTooltip';
 
-import { SearchableSelect } from '../common/SearchableSelect';
-import { StickyFormFooter } from '../common/StickyFormFooter';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
+import { StickyFormFooter } from '../../shared/ui/StickyFormFooter';
 import { CURRENCIES } from '../../lib/currencies';
 import { localDb } from '../../lib/localDb';
 import { useSoundFeedback } from '../../hooks/useSoundFeedback';
@@ -262,7 +262,7 @@ export function Settings() {
     theme: (state.settings as any)?.theme || 'dark',
     interfaceMode: (state.settings as any)?.interfaceMode || 'touch',
     enableExtraCharges: state.settings?.enableExtraCharges ?? false,
-    allowNegativeStock: state.settings?.allowNegativeStock ?? true,
+    allowNegativeStock: state.settings?.allowNegativeStock ?? false,
     defaultSaleType: state.settings?.defaultSaleType || 'retail',
     barcodeBarWidth: state.settings?.barcodeBarWidth ?? 0.8
   });
@@ -364,7 +364,7 @@ export function Settings() {
       interfaceMode: (state.settings as any)?.interfaceMode || 'touch',
       enableSplitPayment: state.settings?.enableSplitPayment ?? false,
       enableExtraCharges: state.settings?.enableExtraCharges ?? false,
-      allowNegativeStock: state.settings?.allowNegativeStock ?? true,
+    allowNegativeStock: state.settings?.allowNegativeStock ?? false,
       defaultSaleType: state.settings?.defaultSaleType || 'retail',
       barcodeBarWidth: state.settings?.barcodeBarWidth ?? 0.8
     }));
@@ -1166,7 +1166,7 @@ export function Settings() {
                           <ToggleSwitch
                             size="sm"
                             color="bg-amber-500"
-                            checked={formData.allowNegativeStock ?? true}
+                            checked={formData.allowNegativeStock ?? false}
                             onChange={(v) => handleInstantUpdate('allowNegativeStock', v)}
                           />
                         </label>

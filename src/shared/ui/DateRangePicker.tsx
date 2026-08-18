@@ -1,5 +1,5 @@
 import React from 'react';
-import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { SearchableSelect } from './SearchableSelect';
 import { cn } from '../../lib/utils';
 
 /**

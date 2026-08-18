@@ -179,8 +179,16 @@ export function POSTerminal() {
     // Check stock limit for increasing quantity or new item
     if (product.trackInventory && !isReturnMode) {
       if (product.stock <= 0) {
+        if (!state.settings.allowNegativeStock) {
+          sonner.error(`Out of stock! ${product.name} has 0 in stock — cannot add.`);
+          return;
+        }
         sonner.warning(`Out of stock! Added ${product.name}, but verify stock.`);
       } else if (newQuantity > product.stock) {
+        if (!state.settings.allowNegativeStock) {
+          sonner.error(`Stock limit exceeded for ${product.name} — only ${product.stock} in stock. Cannot add ${newQuantity}.`);
+          return;
+        }
         sonner.warning(`Stock limit exceeded for ${product.name} — only ${product.stock} in stock`);
       }
     }

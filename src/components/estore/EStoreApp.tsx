@@ -10,7 +10,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ShoppingBag, Phone, Clock } from 'lucide-react';
 import { formatTime12h } from '../../lib/timeFormat';
 import { sonner } from '../../lib/sonner';
-import { SkeletonLoader } from '../common/SkeletonLoader';
+import { SkeletonLoader } from '../../shared/ui/SkeletonLoader';
 import { updateDynamicManifest } from '../../lib/dynamicManifest';
 
 function TrackPage({ settings }: { settings: AppSettings | null }) {

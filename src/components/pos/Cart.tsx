@@ -15,8 +15,8 @@ import { useAuth } from '../../context/AuthContext';
 import { formatCurrency, getCurrencySymbol } from '../../lib/currencies';
 import { getDealCountBreakdown } from '../../lib/utils';
 import { useCartCalculations } from '../../hooks/useCartCalculations';
-import { Modal } from '../common/Modal';
-import { HelpTooltip } from '../common/HelpTooltip';
+import { Modal } from '../../shared/ui/Modal';
+import { HelpTooltip } from '../../shared/ui/HelpTooltip';
 
 interface CartProps {
   onCheckout: () => void;

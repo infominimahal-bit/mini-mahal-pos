@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { PackageOpen, TrendingDown, Building2, ChevronLeft, ChevronRight, Trash2, Filter, CheckCircle2 } from 'lucide-react';
-import { CameraScanner } from '../common/CameraScanner';
+import { CameraScanner } from '../../shared/ui/CameraScanner';
 import { useApp } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
 import { commitStockInToInventory } from '../../lib/stockInCommit';
 import { sonner } from '../../lib/sonner';
 import { formatCurrency, getCurrencySymbol } from '../../lib/currencies';
-import { SearchableSelect } from '../common/SearchableSelect';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { useTranslation } from '../../hooks/useTranslation';
 import { SharedSearchBar, SharedProductList } from '../../shared/modules/search-and-list';
 import { SharedItem } from '../../shared/modules/search-and-list';

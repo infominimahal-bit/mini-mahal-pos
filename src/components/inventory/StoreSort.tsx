@@ -8,9 +8,9 @@ import { Product, Bundle, Category } from '../../types';
 import { productsService, bundlesService, categoriesService } from '../../lib/services';
 import { sonner } from '../../lib/sonner';
 import { formatCurrency } from '../../lib/currencies';
-import { compressImage } from '../../lib/imageCompression';
-import { HelpTooltip } from '../common/HelpTooltip';
-import { MediaLibrary } from './MediaLibrary';
+import { compressImage } from '../../shared/imageCompression';
+import { HelpTooltip } from '../../shared/ui/HelpTooltip';
+import { MediaLibrary } from '../../shared/MediaLibrary';
 import { SharedSearchBar, useDragDropList, DragHandle } from '../../shared/modules/search-and-list';
 import { Badge, Button, EmptyState, Select } from '../../shared/ui';
 

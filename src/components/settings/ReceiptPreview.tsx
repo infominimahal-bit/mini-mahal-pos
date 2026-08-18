@@ -3,7 +3,7 @@ import { formatAppDate } from '../../lib/dateUtils';
 import { AppSettings } from '../../types';
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useRef, useState } from 'react';
-import { BarcodePreview } from '../common/BarcodePreview';
+import { BarcodePreview } from '../../shared/ui/BarcodePreview';
 
 interface ReceiptPreviewProps { settings: AppSettings; }
 

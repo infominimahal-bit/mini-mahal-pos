@@ -8,7 +8,7 @@ import { formatCurrency } from '../../../lib/currencies';
 import { useApp } from '../../../context/SupabaseAppContext';
 import { sonner } from '../../../lib/sonner';
 import { X } from 'lucide-react';
-import { Modal } from '../../common/Modal';
+import { Modal } from '../../../shared/ui/Modal';
 import { Button, ToggleSwitch, Badge, EmptyState, Pagination, usePagination, Select } from '../../../shared/ui';
 import { useTranslation } from '../../../hooks/useTranslation';
 

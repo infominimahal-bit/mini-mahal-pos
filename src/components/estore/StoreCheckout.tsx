@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { localDb, queueOp } from '../../lib/localDb';
 import { AppSettings, CartItem, StoreOrder } from '../../types';
 import { toRemoteStoreOrder } from '../../lib/services';
 import { formatCurrency } from '../../lib/currencies';
@@ -311,9 +312,11 @@ export function StoreCheckout({ settings, cart, onClearCart, onUpdateCart }: Sto
 
       const remoteData = toRemoteStoreOrder(orderData);
 
-      // Call the RPC to reserve stock automatically and securely
-      const { data, error } = await supabase.rpc('place_estore_order', { order_data: remoteData });
-      if (error) throw error;
+      // OFFLINE-FIRST: persist the order locally, then queue it so the SyncEngine
+      // replicates it to Supabase (never a direct supabase-js write). place_estore_order
+      // only inserts the order row (no stock effect), so a plain queueOp create is equivalent.
+      await localDb.storeOrders.put(orderData as any);
+      await queueOp('store_orders', 'create', orderData.id!, remoteData);
 
       setOrderId(generatedInvoice);
       localStorage.setItem('active_estore_order', generatedInvoice);

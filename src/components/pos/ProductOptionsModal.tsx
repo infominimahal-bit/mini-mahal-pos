@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Product, ProductVariant, CartAddonItem, ProductAddon } from '../../types';
 import { X, Check, Plus, Minus } from 'lucide-react';
-import { Modal } from '../common/Modal';
+import { Modal } from '../../shared/ui/Modal';
 import { formatCurrency } from '../../lib/currencies';
 import { useApp } from '../../context/SupabaseAppContext';
 import { useTranslation } from '../../hooks/useTranslation';

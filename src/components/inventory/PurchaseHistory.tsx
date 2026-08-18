@@ -7,7 +7,7 @@ import {
 import { useApp } from '../../context/SupabaseAppContext';
 import { PurchaseRecord, Product } from '../../types';
 import { purchaseRecordsService, productsService } from '../../lib/services';
-import { SearchableSelect } from '../common/SearchableSelect';
+import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { Button, Badge, DateRangePicker, EmptyState, Pagination } from '../../shared/ui';
 import { ExportButton } from '../../shared/export';
 import { sonner } from '../../lib/sonner';

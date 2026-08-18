@@ -3044,18 +3044,31 @@ BEGIN
     END IF;
   END IF;
 
-  -- Oversell guard: lock the product row for THIS transaction and re-read the
-  -- committed stock (lock_product_stock, SECURITY DEFINER). A concurrent
-  -- second terminal blocks on the lock and then fails cleanly.
-  FOR h IN SELECT * FROM jsonb_array_elements(p_history)
-  LOOP
-    IF (h->>'change_qty')::int < 0 AND (h->>'variant_id' IS NULL OR (h->>'variant_id') = '') THEN
-      cur := public.lock_product_stock((h->>'product_id')::uuid);
-      IF cur IS NOT NULL AND cur >= 0 AND (cur + (h->>'change_qty')::int) < 0 THEN
-        RAISE EXCEPTION 'OVERSELL: product % has stock % but this sale needs %', (h->>'product_id')::uuid, cur, abs((h->>'change_qty')::int) USING ERRCODE = 'P0003';
+  -- OVERSELL GUARD (P3/P35): never drive product.stock negative unless
+  -- app_settings.allow_negative_stock is ON. Variant movements are excluded
+  -- (their stock lives in variant_data; variant oversell is guarded client-side).
+  DECLARE
+    v_allow_neg boolean := false;
+  BEGIN
+    SELECT COALESCE(allow_negative_stock, false) INTO v_allow_neg FROM app_settings LIMIT 1;
+    IF NOT v_allow_neg THEN
+      PERFORM (
+        WITH agg AS (
+          SELECT (h->>'product_id')::uuid AS pid, SUM((h->>'change_qty')::int) AS delta
+          FROM jsonb_array_elements(p_history) h
+          WHERE h->>'variant_id' IS NULL OR h->>'variant_id' = ''
+          GROUP BY pid
+        )
+        SELECT 1 FROM agg
+        JOIN products p ON p.id = agg.pid
+        WHERE (p.stock + agg.delta) < 0
+        LIMIT 1
+      );
+      IF FOUND THEN
+        RAISE EXCEPTION 'OVERSELL: stock would go negative for a product (allow_negative_stock=false)';
       END IF;
     END IF;
-  END LOOP;
+  END;
 
   INSERT INTO sales (
     id, invoice_number, customer_id, customer_name, customer_phone,
@@ -3153,64 +3166,11 @@ $$;
 GRANT EXECUTE ON FUNCTION commit_sale(jsonb, jsonb) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION apply_stock_movements(jsonb) TO anon, authenticated, service_role;
 
--- ── 8. ATOMIC DELETE + REFUND (2026-08-16 / soft-delete 2026-08-18) ──
--- Sale delete must reverse stock AND mark the sale deleted in ONE transaction
--- so cloud can never diverge. MASTER §0.6: the historical row is NEVER
--- destroyed — delete_sale_atomic soft-deletes (status='deleted', deleted_at)
--- and records a tombstone so every other device removes the row locally.
-CREATE OR REPLACE FUNCTION delete_sale_atomic(p_sale_id uuid, p_history jsonb)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
-DECLARE
-  h jsonb;
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM sales WHERE id = p_sale_id AND deleted_at IS NULL) THEN
-    RETURN jsonb_build_object('success', true, 'id', p_sale_id, 'note', 'already_deleted');
-  END IF;
-  FOR h IN SELECT * FROM jsonb_array_elements(p_history)
-  LOOP
-    IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
-      INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
-      ON CONFLICT (id) DO NOTHING;
-    ELSE
-      INSERT INTO stock_history (id, product_id, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
-      ON CONFLICT (id) DO NOTHING;
-    END IF;
-  END LOOP;
-  UPDATE sales SET status = 'deleted', deleted_at = now(), updated_at = now() WHERE id = p_sale_id;
-  INSERT INTO row_tombstones (table_name, ref_id, deleted_at)
-  VALUES ('sales', p_sale_id, now())
-  ON CONFLICT (table_name, ref_id) DO UPDATE SET deleted_at = EXCLUDED.deleted_at;
-  RETURN jsonb_build_object('success', true, 'id', p_sale_id);
-END; $$;
-
-CREATE OR REPLACE FUNCTION refund_sale_atomic(p_sale_id uuid, p_history jsonb, p_status text, p_refunded_amount numeric)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
-DECLARE
-  h jsonb;
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM sales WHERE id = p_sale_id) THEN
-    RETURN jsonb_build_object('success', true, 'id', p_sale_id, 'note', 'sale_missing');
-  END IF;
-  FOR h IN SELECT * FROM jsonb_array_elements(p_history)
-  LOOP
-    IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
-      INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
-      ON CONFLICT (id) DO NOTHING;
-    ELSE
-      INSERT INTO stock_history (id, product_id, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
-      ON CONFLICT (id) DO NOTHING;
-    END IF;
-  END LOOP;
-  UPDATE sales SET status = p_status, refunded_amount = p_refunded_amount, updated_at = now() WHERE id = p_sale_id;
-  RETURN jsonb_build_object('success', true, 'id', p_sale_id);
-END; $$;
-
-GRANT EXECUTE ON FUNCTION delete_sale_atomic(uuid, jsonb) TO anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION refund_sale_atomic(uuid, jsonb, text, numeric) TO anon, authenticated, service_role;
+-- ── 8. ATOMIC DELETE + REFUND ──
+-- Canonical, signed definitions live in §rpc_role_guards (delete_sale_atomic 5-arg,
+-- refund_sale_atomic 7-arg) — HARD DELETE + row_tombstone per MASTER §0.6. The
+-- stale soft-delete (status='deleted', deleted_at) overloads were removed; do NOT
+-- re-add them (they directly violate the hard-delete + tombstone rule).
 
 -- ════════════════════════════════════════════════════════════════
 -- 26. PAYMENT MODES / WALLETS  (Per-method running balances)
@@ -3332,91 +3292,9 @@ DROP TRIGGER IF EXISTS trg_guard_store_order_insert ON store_orders;
 CREATE TRIGGER trg_guard_store_order_insert
 BEFORE INSERT ON store_orders
 FOR EACH ROW EXECUTE FUNCTION guard_store_order_insert();-- ============================================================================
--- rpc_role_guards (MASTER §2.1.4 / §2.1.5)
--- These RPCs are SECURITY DEFINER; auth.uid() still reflects the calling user.
---   delete_sale_atomic : admin | manager only
---   refund_sale_atomic : admin | manager | cashier  (salesman excluded)
--- Idempotency (ON CONFLICT DO NOTHING, EXISTS guards) is preserved.
--- ============================================================================
-
-CREATE OR REPLACE FUNCTION delete_sale_atomic(p_sale_id uuid, p_history jsonb)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
-DECLARE
-  h jsonb;
-  _role text;
-BEGIN
-  SELECT role INTO _role FROM public.users WHERE id = auth.uid();
-  IF _role IS NULL OR _role NOT IN ('admin', 'manager') THEN
-    RAISE EXCEPTION 'FORBIDDEN: delete_sale requires admin or manager' USING ERRCODE = '42501';
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM sales WHERE id = p_sale_id AND deleted_at IS NULL) THEN
-    RETURN jsonb_build_object('success', true, 'id', p_sale_id, 'note', 'already_deleted');
-  END IF;
-
-  FOR h IN SELECT * FROM jsonb_array_elements(p_history)
-  LOOP
-    IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
-      INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
-      ON CONFLICT (id) DO NOTHING;
-    ELSE
-      INSERT INTO stock_history (id, product_id, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
-      ON CONFLICT (id) DO NOTHING;
-    END IF;
-  END LOOP;
-
-  -- MASTER §0.6 soft delete: NEVER destroy the historical row.
-  UPDATE sales SET status = 'deleted', deleted_at = now(), updated_at = now() WHERE id = p_sale_id;
-  INSERT INTO row_tombstones (table_name, ref_id, deleted_at)
-  VALUES ('sales', p_sale_id, now())
-  ON CONFLICT (table_name, ref_id) DO UPDATE SET deleted_at = EXCLUDED.deleted_at;
-  RETURN jsonb_build_object('success', true, 'id', p_sale_id);
-END; $$;
-
-CREATE OR REPLACE FUNCTION refund_sale_atomic(p_sale_id uuid, p_history jsonb, p_status text, p_refunded_amount numeric)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
-DECLARE
-  h jsonb;
-  _role text;
-  _total numeric;
-BEGIN
-  SELECT role INTO _role FROM public.users WHERE id = auth.uid();
-  IF _role IS NULL OR _role NOT IN ('admin', 'manager', 'cashier') THEN
-    RAISE EXCEPTION 'FORBIDDEN: refund requires cashier or higher' USING ERRCODE = '42501';
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM sales WHERE id = p_sale_id) THEN
-    RETURN jsonb_build_object('success', true, 'id', p_sale_id, 'note', 'sale_missing');
-  END IF;
-
-  -- Universal over-refund guard (MASTER §2.1.5 / §7 I5): no role may refund more
-  -- than the original sale total. p_refunded_amount is the NEW cumulative total.
-  SELECT total INTO _total FROM sales WHERE id = p_sale_id;
-  IF _total IS NOT NULL AND p_refunded_amount > _total + 0.001 THEN
-    RAISE EXCEPTION 'FORBIDDEN: refund amount exceeds sale total' USING ERRCODE = '42501';
-  END IF;
-
-  FOR h IN SELECT * FROM jsonb_array_elements(p_history)
-  LOOP
-    IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
-      INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
-      ON CONFLICT (id) DO NOTHING;
-    ELSE
-      INSERT INTO stock_history (id, product_id, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
-      ON CONFLICT (id) DO NOTHING;
-    END IF;
-  END LOOP;
-
-  UPDATE sales SET status = p_status, refunded_amount = p_refunded_amount, updated_at = now() WHERE id = p_sale_id;
-  RETURN jsonb_build_object('success', true, 'id', p_sale_id);
-END; $$;
-
-GRANT EXECUTE ON FUNCTION delete_sale_atomic(uuid, jsonb) TO anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION refund_sale_atomic(uuid, jsonb, text, numeric) TO anon, authenticated, service_role;
+-- rpc_role_guards: canonical signed delete_sale_atomic (5-arg) and refund_sale_atomic
+-- (7-arg) are defined further below (hard delete + row_tombstone per MASTER §0.6).
+-- The soft-delete (status='deleted') overloads were removed — do not re-add.
 -- ============================================================================
 -- reconciliation (MASTER §4.3 / §7)
 -- Provides the acceptance-test machinery for invariants I1, I2, I4, I5, I6.
@@ -3776,7 +3654,7 @@ CREATE OR REPLACE FUNCTION public.delete_sale_atomic(
 DECLARE h jsonb;
 BEGIN
   PERFORM public.require_action(p_user_id, p_role, 'delete_sale', p_sig, 'admin', 'manager');
-  IF NOT EXISTS (SELECT 1 FROM sales WHERE id = p_sale_id AND deleted_at IS NULL) THEN
+  IF NOT EXISTS (SELECT 1 FROM sales WHERE id = p_sale_id) THEN
     RETURN jsonb_build_object('success', true, 'id', p_sale_id, 'note', 'already_deleted');
   END IF;
   FOR h IN SELECT * FROM jsonb_array_elements(p_history) LOOP
@@ -3788,8 +3666,9 @@ BEGIN
       VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
     END IF;
   END LOOP;
-  UPDATE sales SET status = 'deleted', deleted_at = now(), updated_at = now() WHERE id = p_sale_id;
-  INSERT INTO row_tombstones (table_name, ref_id, deleted_at) VALUES ('sales', p_sale_id, now()) ON CONFLICT (table_name, ref_id) DO UPDATE SET deleted_at = EXCLUDED.deleted_at;
+  -- HARD DELETE: the record_tombstone_sales AFTER DELETE trigger writes the tombstone
+  -- (per master guide: deletions use hard deletes + row_tombstone; never status='deleted').
+  DELETE FROM sales WHERE id = p_sale_id;
   RETURN jsonb_build_object('success', true, 'id', p_sale_id);
 END;
 $function$;

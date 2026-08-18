@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Sale, RefundRequest } from '../../types';
-import { Modal } from '../common/Modal';
+import { Modal } from '../../shared/ui/Modal';
 import { RotateCcw, Minus, Plus, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '../../lib/currencies';
 import { useApp } from '../../context/SupabaseAppContext';

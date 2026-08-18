@@ -47,7 +47,10 @@ export type PendingOpEntity =
   | 'variant_stock_history'
   | 'product_addons'
   | 'store_orders'
-  | 'salesmen';
+  | 'salesmen'
+  | 'customer_ledger'
+  | 'toppings'
+  | 'product_toppings';
 
 export type PendingOpType = 'create' | 'update' | 'delete' | 'upsert';
 
@@ -185,6 +188,10 @@ export class PosDB extends Dexie {
 
     this.version(21).stores({
       pendingOps: '++id, [entity+entityId], status, createdAt, batchId'
+    });
+
+    this.version(22).stores({
+      customer_ledger: 'id, customerId, saleId, type, createdAt'
     });
 
     this.version(18).stores({

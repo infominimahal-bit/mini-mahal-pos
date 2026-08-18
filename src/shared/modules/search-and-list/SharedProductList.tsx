@@ -1,7 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import { SkeletonLoader } from '../../../components/common/SkeletonLoader';
+import { SkeletonLoader } from '../../ui/SkeletonLoader';
 import { SharedProductListProps } from './types';
 import { SharedProductListItem } from './SharedProductListItem';
 import { useDragDropList } from './SharedDragDropList';
