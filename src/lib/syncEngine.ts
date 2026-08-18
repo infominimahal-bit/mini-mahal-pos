@@ -437,6 +437,15 @@ async function executeOp(op: PendingOp): Promise<void> {
                 if (!error && result.data && result.data.success === false) {
                     error = new Error(result.data.error || 'Unknown process_return RPC error');
                 }
+            } else if (op.entity === 'sales' && opType === 'update') {
+                // Non-refund sale updates (payment_status, status, edits). Must use an
+                // explicit WHERE clause — PostgREST rejects the upsert-backed update on
+                // `sales` with "UPDATE requires a WHERE clause". (Refund path above uses
+                // the process_return RPC.)
+                const guarded = await withActor({ ...payload, id: entityId }, 'sales');
+                delete (guarded as any).id;
+                const result = await supabase.from('sales').update(guarded as any).eq('id', entityId);
+                error = result.error;
             } else if (op.entity === 'purchase_records' && opType === 'create') {
                 // BYPASS process_stock_in RPC — the RPC contains a hardcoded reference to
                 // 'supplier_id' column which does not exist in the remote schema.
