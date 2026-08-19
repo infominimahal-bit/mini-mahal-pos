@@ -388,7 +388,8 @@
   }
 
   .modal {
-    @apply bg-white dark:bg-surface shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] border dark:border-white/5 transition-all duration-300;
+    @apply bg-white dark:bg-surface border dark:border-white/5 transition-all duration-300;
+    box-shadow: 0 32px 64px -12px rgba(0, 0, 0, 0.5);
     width: 360px;
     max-width: 360px !important;
     max-height: 90dvh;
