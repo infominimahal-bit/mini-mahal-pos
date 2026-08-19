@@ -313,6 +313,7 @@ function AppContent() {
         closeButton
         duration={3000}
         theme={state.settings.theme === 'auto' ? 'system' : state.settings.theme as any}
+        style={{ zIndex: 999999 }}
         toastOptions={{
           className: 'touch-none',
           style: {
