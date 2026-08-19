@@ -2,6 +2,13 @@
 
 Whenever a database change is made, it MUST be recorded here.
 
+### [2026-08-19] Fix: delete-sale idempotent reversal — negative-total (return-type) sales never restored stock
+**Files:** `src/lib/services.ts` (`deleteSale`)
+**Bug:** `deleteSale` stock-reversal gate was `sale.status === 'completed' || 'partially_refunded' || 'cancelled'`, which **excluded `refunded` sales**. A return-type sale (negative total, e.g. `INV-001048` −10 pcs) deducted stock on `createSale` (uses `Math.abs`, always −) but was then skipped on delete → stock stayed deducted. Result: deleting ALL sales left jeans stock at 90 instead of 100.
+**Fix:** gate is now `if (!isDraftSale)` (covers `refunded` + any status) and the reversal is **idempotent** — it only restores the *un-returned* portion: `qty = max(0, grossQty − Σ existing 'return' entries for this sale+product)`, where `grossQty = Math.abs(weight||quantity)`. Re-runs are safe (no double-restock). Variant/add-on blocks reuse the same `qty`/`itemQtyMag`.
+**Live reconciliation:** jeans `f27282bf-...-134d` stock set to **100** in cloud; inserted idempotent `stock_history` `return` (+10) correction referencing `INV-001048` (`d969ba3e-...-ebd3`) so the ledger reconciles. (Cloud `products.stock` updated directly; the `stock_history` insert trigger auto-applied the +10 then overridden to exactly 100.)
+**Verified:** `npx tsc --noEmit` clean.
+
 ### [2026-08-19] Whole-system leakage audit — supply / discount / expense / wallet / settings / barcode
 **Files:** `src/lib/calculateCart.ts`, `src/lib/services.ts`, `src/components/inventory/PurchaseHistory.tsx`, `src/components/inventory/ProductDetailHub.tsx`, `src/components/inventory/InventoryManager.tsx`, `src/components/inventory/BarcodeGenerator.tsx`, `src/components/expenses/ExpenseManager.tsx`
 **Bugs fixed (found by 4 parallel subsystem audits):**

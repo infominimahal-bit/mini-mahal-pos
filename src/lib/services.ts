@@ -2245,6 +2245,13 @@ export const salesService = {
     const sale = await localDb.sales.get(id);
     if (!sale) return [];
 
+    // Pre-fetch this sale's stock history so we can make the reversal IDEMPOTENT:
+    // only restore the portion of each item that has NOT already been returned
+    // (via refund or a prior delete). Prevents double stock restoration for
+    // refunded/partially-refunded sales, while still fixing anomalies where a sale
+    // (e.g. a negative-total return sale) was never reversed at all.
+    const saleHistory = await localDb.stockHistory.where('referenceId').equals(id).toArray();
+
     const now = new Date();
     // When this delete is the "reverse original bill" half of a TWO-PHASE EDIT,
     // tag the restored-stock movements so the product history can show them as
@@ -2262,12 +2269,18 @@ export const salesService = {
     // DRAFT RULE: pending drafts never deducted stock either — deleting a draft must
     // NOT restore anything (that would create a phantom +Q in the ledger).
     const isDraftSale = sale.status === 'pending' || !!sale.notes?.includes('DRAFT_SALE');
-    if (!isDraftSale && (sale.status === 'completed' || sale.status === 'partially_refunded' || sale.status === 'cancelled')) {
+    if (!isDraftSale) {
       for (const item of sale.items) {
         const product = await localDb.products.get(item.product.id);
         if (product && product.trackInventory) {
-          const itemQtyMag = Math.abs(Number(item.weight || item.quantity) || 0);
-          const qty = Math.max(0, itemQtyMag - (Number(item.refundedQuantity) || 0));
+          // IDEMPOTENT REVERSAL: only restore what hasn't already been returned.
+          // `reversedQty` = sum of existing 'return' entries for this sale+product.
+          const grossQty = Math.abs(Number(item.weight || item.quantity) || 0);
+          const reversedQty = saleHistory
+            .filter(h => h.productId === product.id && h.type === 'return')
+            .reduce((s, h) => s + Math.abs(Number(h.changeQty) || 0), 0);
+          const qty = Math.max(0, grossQty - reversedQty);
+          const itemQtyMag = qty;
           if (qty <= 0) continue;
           const newStock = (product.stock || 0) + qty;
 
