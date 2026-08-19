@@ -2,6 +2,16 @@
 
 Whenever a database change is made, it MUST be recorded here.
 
+### [2026-08-18] ALL-actions inventory + balance accuracy — magnitude guards (no sign flips)
+**Files:** `src/lib/services.ts`
+**Context (master directive — "all actions inventory + balance accuracy"):** After the negative-quantity inventory bug (INV-001030/001032/001035 had `total:-5000` and flipped a −5 OUT into a +5 IN, corrupting stock), the fix must be defensive on EVERY stock-affecting path so no future action can flip a sign. Applied `Math.abs(Number(...)||0)` magnitude safety to ALL stock movements and wallet/payment deltas:
+- Sale create (deduction) — `qty = Math.abs(item.weight||item.quantity)`.
+- Sale delete reversal — `itemQtyMag = abs(itemQty)`, `qty = max(0, itemQtyMag - refunded)`.
+- Refund/return (simple + variant + add-on) — `qty = abs(reqItem.qty)` for stock restoration and `refundedQuantity`.
+- Wallet/payment balances — `buildSalePaymentMoves` (forward) + `buildReversePaymentMoves` (reverse) now use `Math.abs` so a negative sale total cannot corrupt a wallet balance (forward credits |total|, reverse debits |total| → stays balanced).
+**Verification:** Live jz DB broad scan returned **0 products with stock ≠ ledger sum** (only 2 products, both `stock=ledger=90`). tsc clean. NOTE: `Math.abs` guards protect inventory+balance from sign flips, but a negative-quantity item STILL yields a negative sale revenue total — a separate cart/stepper guard (reject negative qty at sale creation) is recommended to also fix revenue; not yet added.
+**Deploy status:** Code committed+pushed but the Vercel token is invalid (`invalidToken:true`) so the live app still runs OLD code until a fresh deploy — data repaired directly on cloud, app refresh pulls corrected rows.
+
 ### [2026-08-18] Delete/void reliability — stock now always reverses (fixes per-device drift)
 **Files:** `supabase/migrations/20260820100000_delete_sale_permissive.sql` (NEW, applied live), `supabase/schema/SUPER_MASTER_SCHEMA.sql`, `src/lib/services.ts`, `src/lib/syncEngine.ts`
 **Context (real-shop accuracy):** Deleting a sale must reverse its stock on the cloud ledger, every time. Two bugs broke this:
