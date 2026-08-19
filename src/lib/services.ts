@@ -928,6 +928,7 @@ export const toRemoteSale = (s: Partial<Sale>) => {
   if ('salesmanId' in s) { remote.salesman_id = s.salesmanId; delete remote.salesmanId; }
   if ('salesmanName' in s) { remote.salesman_name = s.salesmanName; delete remote.salesmanName; }
   if ('cashierRole' in s) { remote.cashier_role = s.cashierRole; delete remote.cashierRole; }
+  if (s.editedFromInvoice !== undefined) { remote.edited_from_invoice = s.editedFromInvoice; delete remote.editedFromInvoice; }
   if ('createdAt' in s) { remote.created_at = s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt; delete remote.createdAt; }
   if ('updatedAt' in s) { remote.updated_at = s.updatedAt instanceof Date ? s.updatedAt.toISOString() : s.updatedAt; delete remote.updatedAt; }
   if ('timestamp' in s) {
@@ -1945,7 +1946,7 @@ export const salesService = {
             changeQty: -qty,
             type: 'sale' as const,
             referenceId: id,
-            note: `Sale ${sale.invoiceNumber}`,
+            note: `Sale ${sale.invoiceNumber}${sale.editedFromInvoice ? ' (Edit #' + sale.editedFromInvoice + ')' : ''}`,
             balanceAfter: newStock,
             cashierName: sale.cashier || 'System',
             createdAt: now,
@@ -1957,7 +1958,7 @@ export const salesService = {
             product_id: product.id,
             change_qty: -qty,
             type: 'sale',
-            note: `Sale ${sale.invoiceNumber}`,
+            note: `Sale ${sale.invoiceNumber}${sale.editedFromInvoice ? ' (Edit #' + sale.editedFromInvoice + ')' : ''}`,
             variant_id: '',
             variant_label: '',
             cashier_name: sale.cashier || 'System',
@@ -1992,7 +1993,7 @@ export const salesService = {
                 changeQty: -qty,
                 type: 'sale',
                 referenceId: id,
-                note: `Sale ${sale.invoiceNumber}`,
+                note: `Sale ${sale.invoiceNumber}${sale.editedFromInvoice ? ' (Edit #' + sale.editedFromInvoice + ')' : ''}`,
                 balanceAfter: newVariantStock,
                 cashierName: sale.cashier || 'System',
                 createdAt: now,
@@ -2003,7 +2004,7 @@ export const salesService = {
                 product_id: product.id,
                 change_qty: -qty,
                 type: 'sale',
-                note: `Sale ${sale.invoiceNumber}`,
+                note: `Sale ${sale.invoiceNumber}${sale.editedFromInvoice ? ' (Edit #' + sale.editedFromInvoice + ')' : ''}`,
                 variant_id: item.selectedVariantId,
                 variant_label: item.selectedVariantLabel || variant.cardTitle || variant.option1,
                 cashier_name: sale.cashier || 'System',
@@ -2207,11 +2208,15 @@ export const salesService = {
     return updated;
   },
 
-  async delete(id: string, currentCashierName?: string): Promise<Product[]> {
+  async delete(id: string, currentCashierName?: string, editInfo?: { newInvoice?: string }): Promise<Product[]> {
     const sale = await localDb.sales.get(id);
     if (!sale) return [];
 
     const now = new Date();
+    // When this delete is the "reverse original bill" half of a TWO-PHASE EDIT,
+    // tag the restored-stock movements so the product history can show them as
+    // an "edit" (not a plain delete) and link back to the corrected invoice.
+    const editTag = editInfo && editInfo.newInvoice ? ` (Edit → #${editInfo.newInvoice})` : '';
     const affectedProducts: Product[] = [];
 
     // Phase 1: collect reverse-stock movements so they commit atomically via
@@ -2254,7 +2259,7 @@ export const salesService = {
             changeQty: qty,
             type: 'return' as const,
             referenceId: id,
-            note: `Sale #${sale.invoiceNumber} Deleted`,
+            note: `Sale #${sale.invoiceNumber} Deleted${editTag}`,
             balanceAfter: newStock,
             cashierName: currentCashierName || sale.cashier || 'System',
             createdAt: now
@@ -2265,7 +2270,7 @@ export const salesService = {
             product_id: product.id,
             change_qty: qty,
             type: 'return',
-            note: `Sale #${sale.invoiceNumber} Deleted`,
+            note: `Sale #${sale.invoiceNumber} Deleted${editTag}`,
             variant_id: '',
             variant_label: '',
             cashier_name: currentCashierName || sale.cashier || 'System',
@@ -2293,7 +2298,7 @@ export const salesService = {
                 changeQty: qty,
                 type: 'return',
                 referenceId: id,
-                note: `Sale #${sale.invoiceNumber} Deleted (Variant)`,
+                note: `Sale #${sale.invoiceNumber} Deleted (Variant)${editTag}`,
                 balanceAfter: newVariantStock,
                 cashierName: currentCashierName || sale.cashier || 'System',
                 createdAt: now,
@@ -2304,7 +2309,7 @@ export const salesService = {
                 product_id: product.id,
                 change_qty: qty,
                 type: 'return',
-                note: `Sale #${sale.invoiceNumber} Deleted (Variant)`,
+                note: `Sale #${sale.invoiceNumber} Deleted (Variant)${editTag}`,
                 variant_id: item.selectedVariantId,
                 variant_label: item.selectedVariantLabel || variant.cardTitle || variant.option1,
                 cashier_name: currentCashierName || sale.cashier || 'System',
@@ -2344,7 +2349,7 @@ export const salesService = {
                 changeQty: addonQty,
                 type: 'return' as const,
                 referenceId: id,
-                note: `Sale #${sale.invoiceNumber} Deleted (Add-on)`,
+                 note: `Sale #${sale.invoiceNumber} Deleted (Add-on)${editTag}`,
                 balanceAfter: newAddonStock,
                 cashierName: currentCashierName || sale.cashier || 'System',
                 createdAt: now
@@ -2355,7 +2360,7 @@ export const salesService = {
                 product_id: addonProduct.id,
                 change_qty: addonQty,
                 type: 'return',
-                note: `Sale #${sale.invoiceNumber} Deleted (Add-on)`,
+                 note: `Sale #${sale.invoiceNumber} Deleted (Add-on)${editTag}`,
                 variant_id: '',
                 variant_label: '',
                 cashier_name: currentCashierName || sale.cashier || 'System',

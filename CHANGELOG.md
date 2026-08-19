@@ -26,6 +26,16 @@ Whenever a database change is made, it MUST be recorded here.
 **Offline:** enforcement works offline because `profile` + derived permission flags are cached in localStorage/localDb (RBAC is client-side, the only viable layer for anon-key single-tenant).
 **Known limitation (documented):** True SERVER-SIDE RPC guards (`require_action`) were removed for `delete_sale_atomic`/`refund_sale_atomic` because they are architecturally incompatible with the anon-key deployment — they reject every call (no valid signed token) and, worse, left sales `completed` with stock unreversed (the drift we fixed earlier). Server-side authz requires real authenticated users, which is a larger migration out of scope here. Client-side RBAC + single-tenant isolation is the current enforcement boundary.
 
+### [2026-08-18] Bill-edit traceability — link old→new invoice + "Sale Edited" label in product IN/OUT history
+**Design decision:** Edit keeps the CURRENT two-phase behaviour (reverse original sale + create a NEW corrected invoice). Finalized invoices are immutable; an edit = void original + reissue corrected. This is tax/FBR-compliant and keeps a clean audit trail (the original invoice is preserved as tombstoned with its stock reversal recorded). So we did NOT change it to edit-in-place; instead we made the edit clearly traceable.
+**Changes:**
+- New column `sales.edited_from_invoice` (migration `20260820130000_add_edited_from_invoice.sql`, applied live; added to `SUPER_MASTER_SCHEMA.sql`).
+- `Sale.editedFromInvoice?` field + `toRemoteSale` mapping so the corrected sale links to the original invoice (synced).
+- `CheckoutPage` edit flow: sets `sale.editedFromInvoice = old invoice` and passes `{ newInvoice }` to `salesService.delete`.
+- `salesService.delete`: tags the restored-stock movements with ` (Edit → #NEW)`; `salesService.create`: tags new-sale movements with ` (Edit #OLD)`. Product IN/OUT history now labels these **"Sale Edited"** (purple, IN/OUT by sign) via `ProductDetailHub`.
+- `TransactionDetailModal` (eye-icon): shows a purple banner — **"Edited from #INV-XX"** (click opens the original) on the corrected bill, or **"This bill was edited → #INV-YY"** (click opens the correction) on the original.
+- Verified: the edit already created correct IN/OUT records (proven by product-history screenshot: `Sale Deleted +10 IN` + `POS Sale +20 OUT` at the same timestamp). Now they are explicitly marked as an edit.
+
 ### [2026-08-18] Wallet balances now sync across devices (checkout = reporting)
 **Files:** `src/lib/cloudPull.ts`
 **Context:** Checkout reads `localDb.paymentModes.balance` for the Cash/Card/Online wallet chips. That local cache was only ever updated by the device's OWN sales (`adjustPaymentBalances`) and **never pulled from the cloud**, so every device showed its own per-device balance — while Reports/Sales tab derives the true aggregate from the synced `payment_movements` ledger. (Owner report: "har device pe apna apna aa raha h".) Cloud `payment_modes.balance` is the authoritative aggregate (maintained only by the `apply_payment_movements` RPC — `adjustPaymentBalances` never pushes `payment_modes.balance`, and SyncEngine now strips `balance` from `payment_modes` upserts to prevent drift).

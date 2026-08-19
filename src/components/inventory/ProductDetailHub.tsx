@@ -550,7 +550,12 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
       let bg = isOut ? 'bg-red-500/10' : 'bg-primary/10';
       let icon = isOut ? ArrowUpRight : ArrowDownLeft;
 
-      if (h.type === 'sale') {
+      if (note.includes('edit')) {
+        label = 'Sale Edited';
+        color = 'text-purple-500 font-black';
+        bg = 'bg-purple-500/10';
+        icon = isOut ? ArrowUpRight : ArrowDownLeft;
+      } else if (h.type === 'sale') {
         label = 'POS Sale';
         color = 'text-red-500';
         bg = 'bg-red-500/10';

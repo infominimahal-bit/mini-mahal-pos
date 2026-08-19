@@ -623,6 +623,7 @@ CREATE TABLE IF NOT EXISTS sales (
     card_details        JSONB,
     status              TEXT DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'refunded', 'partially_refunded', 'credit', 'draft', 'deleted', 'cancelled')),
     cashier             TEXT,
+    edited_from_invoice TEXT DEFAULT NULL,
     cashier_role        TEXT,
     receipt_number      TEXT,
     notes               TEXT,

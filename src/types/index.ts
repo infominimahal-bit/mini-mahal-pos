@@ -323,6 +323,7 @@ export interface Sale {
   id: string;
   sourceOrderId?: string;
   invoiceNumber: string;
+  editedFromInvoice?: string | null;
   customerId?: string;
   customerName?: string;
   customerPhone?: string;

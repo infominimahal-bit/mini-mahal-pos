@@ -35,6 +35,13 @@ export function TransactionDetailModal({ transaction, allTransactions, onNavigat
   // Role logic removed — single-tenant POS: authenticated user has full access
   const isAdmin = true;
 
+  // EDIT TRACEABILITY: an edited (corrected) sale carries `editedFromInvoice`
+  // pointing at the original invoice it replaced; the original instead has a
+  // newer sale whose `editedFromInvoice` equals this invoice.
+  const editFromInvoice = transaction.editedFromInvoice ?? null;
+  const oldSale = editFromInvoice ? (state.sales || []).find(s => s.invoiceNumber === editFromInvoice) ?? null : null;
+  const replacedSale = !editFromInvoice ? (state.sales || []).find(s => s.editedFromInvoice === transaction.invoiceNumber) ?? null : null;
+
   const currentIndex = allTransactions.findIndex(tx => tx.id === transaction.id);
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < allTransactions.length - 1;
@@ -358,6 +365,29 @@ export function TransactionDetailModal({ transaction, allTransactions, onNavigat
               </div>
             )}
           </div>
+
+          {editFromInvoice && (
+            <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20">
+              <Edit className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+              {oldSale ? (
+                <button onClick={() => onNavigate(oldSale)} className="text-[10px] font-black text-purple-700 dark:text-purple-300 uppercase tracking-wide hover:underline">
+                  {t('edited_from', 'Edited from')} #{editFromInvoice}
+                </button>
+              ) : (
+                <span className="text-[10px] font-black text-purple-700 dark:text-purple-300 uppercase tracking-wide">
+                  {t('edited_from', 'Edited from')} #{editFromInvoice}
+                </span>
+              )}
+            </div>
+          )}
+          {!editFromInvoice && replacedSale && (
+            <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20">
+              <Edit className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+              <button onClick={() => onNavigate(replacedSale)} className="text-[10px] font-black text-purple-700 dark:text-purple-300 uppercase tracking-wide hover:underline">
+                {t('edited_to', 'This bill was edited →')} #{replacedSale.invoiceNumber}
+              </button>
+            </div>
+          )}
 
           <div className="border border-gray-200 dark:border-white/5 rounded-[2rem] overflow-x-auto custom-scrollbar">
             <table className="min-w-full divide-y divide-gray-100 dark:divide-white/5">

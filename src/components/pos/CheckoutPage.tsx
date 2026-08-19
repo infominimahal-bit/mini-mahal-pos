@@ -6,8 +6,9 @@ import { useCartCalculations } from '../../hooks/useCartCalculations';
 import { useAuth } from '../../context/AuthContext';
 import { KOTPrint } from './KOTPrint';
 import { ReceiptPrint } from './ReceiptPrint';
-import { salesService, storeOrdersService, generateId, toRemoteSale, customersService, adjustPaymentBalances, buildSalePaymentMoves } from '../../lib/services';
+import { salesService, storeOrdersService, generateId, toRemoteSale, customersService, adjustPaymentBalances, buildSalePaymentMoves, getAmountByMethod } from '../../lib/services';
 import { localDb, queueOp } from '../../lib/localDb';
+import { getStartOfDayInTimezone, getEndOfDayInTimezone } from '../../lib/dateUtils';
 import { sonner } from '../../lib/sonner';
 import { formatCurrency } from '../../lib/currencies';
 import { Modal } from '../../shared/ui/Modal';
@@ -24,35 +25,93 @@ interface CheckoutPageProps {
   onComplete: (sale: Sale) => void;
 }
 
-// Live per-method wallet balances (cash / card / online) — module-level so it
-// is NOT re-created on every parent render (nested def caused remount flicker).
-function WalletStrip({ currency }: { currency: string }) {
+// Live per-method today's cash flow (cash / card / online)
+// Replaces absolute balance to match TransactionsManager 'Today' filter.
+function WalletStrip({ currency, timezone }: { currency: string, timezone?: string }) {
   const [modes, setModes] = useState<any[]>([]);
   useEffect(() => {
     let alive = true;
     const load = async () => {
+      // 1. Get mode structures
       const m = await localDb.paymentModes.toArray();
       const order = ['cash', 'card', 'online'];
       m.sort((a: any, b: any) => order.indexOf(a.id) - order.indexOf(b.id));
-      if (alive) setModes(m);
+
+      // 2. Fetch today's sales
+      const tz = timezone || 'Asia/Karachi';
+      const start = getStartOfDayInTimezone(new Date(), tz);
+      const end = getEndOfDayInTimezone(new Date(), tz);
+      const todaySales = await localDb.sales
+        .where('createdAt')
+        .between(start.toISOString(), end.toISOString())
+        .toArray();
+
+      // 3. Compute totals
+      const totals = { cash: 0, card: 0, online: 0 };
+      todaySales.forEach(t => {
+        const addToWallet = (method: 'cash' | 'card' | 'online', amt: number) => {
+          totals[method] = Math.round((totals[method] + amt) * 100) / 100;
+        };
+
+        if (t.status !== 'pending') {
+          addToWallet('cash', getAmountByMethod(t, 'cash'));
+          addToWallet('card', getAmountByMethod(t, 'card'));
+          addToWallet('online', getAmountByMethod(t, 'online'));
+        }
+
+        if (t.status === 'refunded') {
+          addToWallet('cash', -getAmountByMethod(t, 'cash'));
+          addToWallet('card', -getAmountByMethod(t, 'card'));
+          addToWallet('online', -getAmountByMethod(t, 'online'));
+        } else if (t.status === 'partially_refunded') {
+          const refundedAmt = t.refundedAmount || 0;
+          addToWallet('cash', -(t.paymentMethod === 'split'
+            ? refundedAmt * (getAmountByMethod(t, 'cash') / (t.total || 1))
+            : (t.paymentMethod === 'cash' || !t.paymentMethod ? refundedAmt : 0)));
+          addToWallet('card', -(t.paymentMethod === 'split'
+            ? refundedAmt * (getAmountByMethod(t, 'card') / (t.total || 1))
+            : (t.paymentMethod === 'card' ? refundedAmt : 0)));
+          addToWallet('online', -(t.paymentMethod === 'split'
+            ? refundedAmt * (getAmountByMethod(t, 'online') / (t.total || 1))
+            : (t.paymentMethod === 'online' ? refundedAmt : 0)));
+        }
+      });
+
+      // 4. Merge
+      const finalModes = m.map(mode => ({
+        ...mode,
+        balance: totals[mode.id as 'cash' | 'card' | 'online'] || 0
+      }));
+
+      if (alive) setModes(finalModes);
     };
     load();
     const subs: any[] = [];
     try {
-      subs.push(localDb.paymentModes.hook('updating').subscribe(() => load()));
-      subs.push(localDb.paymentModes.hook('creating').subscribe(() => load()));
+      subs.push(localDb.sales.hook('creating').subscribe(() => load()));
+      subs.push(localDb.sales.hook('updating').subscribe(() => load()));
+      subs.push(localDb.sales.hook('deleting').subscribe(() => load()));
     } catch { /* hooks unsupported */ }
     return () => { alive = false; subs.forEach(s => s?.unsubscribe?.()); };
-  }, []);
+  }, [timezone]);
+  
   if (!modes.length) return null;
   return (
-    <div className="grid grid-cols-3 gap-1.5 mb-3">
-      {modes.map((md: any) => (
-        <div key={md.id} className="p-2 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/10">
-          <p className="text-[7px] font-black uppercase tracking-widest text-gray-500 truncate">{md.name}</p>
-          <p className="text-[11px] font-black text-gray-900 dark:text-white tabular-nums">{formatCurrency(md.balance || 0, currency)}</p>
-        </div>
-      ))}
+    <div className="mb-3">
+      <div className="flex items-center gap-1.5 mb-2">
+        <p className="text-[8px] sm:text-[9px] font-black text-gray-600 uppercase tracking-widest flex items-center">
+          Today's Drawer
+          <HelpTooltip content="Shows total collected today for each method (Cash Flow). This is not the all-time absolute balance." />
+        </p>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5">
+        {modes.map((md: any) => (
+          <div key={md.id} className="p-2 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/10 relative group">
+            <p className="text-[7px] font-black uppercase tracking-widest text-gray-500 truncate">{md.name}</p>
+            <p className="text-[11px] font-black text-gray-900 dark:text-white tabular-nums">{formatCurrency(md.balance || 0, currency)}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -365,6 +424,9 @@ export function CheckoutPage({ onClose, onComplete }: CheckoutPageProps) {
           editNewIdRef.current = { oldId: state.editingSaleId, newId: sale.id };
         }
         sale.id = editNewIdRef.current.newId;
+        // Link the corrected sale back to the original invoice it replaces, so the
+        // UI can show "Edited from #X" and the product history labels the movements as an edit.
+        sale.editedFromInvoice = (editingSale as any)?.invoiceNumber ?? undefined;
         try {
           savedSale = await salesService.create(sale);
           await adjustPaymentBalances(buildSalePaymentMoves(sale));
@@ -381,7 +443,7 @@ export function CheckoutPage({ onClose, onComplete }: CheckoutPageProps) {
         }
         // Create succeeded → now reverse the original bill (best-effort, idempotent).
         try {
-          await salesService.delete(oldSaleId, profile?.name || 'Admin');
+          await salesService.delete(oldSaleId, profile?.name || 'Admin', { newInvoice: sale.invoiceNumber });
           dispatch({ type: 'DELETE_SALE', payload: oldSaleId });
         } catch (error) {
           console.error('OLD BILL REVERSE FAILED (queued for retry via SyncEngine)', error);
@@ -583,7 +645,7 @@ export function CheckoutPage({ onClose, onComplete }: CheckoutPageProps) {
             </div>
           )}
           {/* Payment Method */}
-          <WalletStrip currency={state.settings.currency} />
+          <WalletStrip currency={state.settings.currency} timezone={state.settings.timezone} />
 
           <div>
             <p className="text-[8px] sm:text-[9px] font-black text-gray-600 uppercase tracking-widest mb-1.5 sm:mb-2 flex items-center">
