@@ -170,19 +170,19 @@ v12.2/
 
 ## 🗄 Database Schema
 
-### All Tables (21)
+### All Tables (23)
 
 | # | Table | Purpose | Key Columns |
 |---|-------|---------|-------------|
 | 1 | `app_settings` | Singleton config (1 row) | `id`, `store_name`, `tax_rate`, `currency`, `enable_kot_printer`, etc. |
 | 2 | `categories` | Product categories | `id`, `name`, `description`, `active` |
-| 3 | `customers` | Customer CRM | `id`, `name`, `phone`, `credit_limit`, `credit_used` |
+| 3 | `customers` | Customer CRM | `id`, `name`, `phone`, `credit_limit`, `credit_used`, `balance` |
 | 4 | `suppliers` | Supplier management | `id`, `name`, `phone`, `opening_balance` |
 | 5 | `products` | Inventory master | `id`, `name`, `sku`, `barcode`, `price`, `cost`, `stock`, `variant_data`, `modifiers` |
 | 6 | `product_batches` | FIFO batch tracking | `id`, `product_id`, `batch_number`, `qty_remaining`, `cost_price`, `expiry_date` |
 | 7 | `discounts` | Discount campaigns | `id`, `name`, `type`, `value`, `conditions`, `free_gift_products` |
 | 8 | `users` | Extended auth users | `id`, `username`, `email`, `role`, `permissions` |
-| 9 | `sales` | POS invoices | `id`, `invoice_number`, `customer_id`, `items`, `total`, `split_payments`, `extra_charges` |
+| 9 | `sales` | POS invoices | `id`, `invoice_number`, `customer_id`, `items`, `total`, `split_payments`, `extra_charges`, `status`, `payment_status`, `edited_from_invoice` |
 | 10 | `sales_tabs` | Multi-tab cashier | `id`, `user_id`, `name`, `cart` |
 | 11 | `expenses` | Operating costs | `id`, `description`, `amount`, `category` |
 | 12 | `purchase_records` | Inventory ledger | `id`, `type`, `product_id`, `quantity`, `cost_price` |
@@ -195,6 +195,8 @@ v12.2/
 | 19 | `bundle_items` | Items in bundle | `id`, `bundle_id`, `product_id`, `quantity` |
 | 20 | `bundle_slots` | Bundle slots | `id`, `bundle_id`, `label` |
 | 21 | `bundle_slot_options` | Slot product options | `id`, `slot_id`, `product_id` |
+| 22 | `customer_ledger` | Per-customer running-balance ledger (P6/P24) | `id`, `customer_id`, `type`, `debit`, `credit`, `balance_after` |
+| 23 | `salesmen` | Salesman/commission tracking | `id`, `name`, `targets`, `commission` |
 
 ### Key Indexes
 
@@ -209,7 +211,7 @@ v12.2/
 | `product_batches` | `idx_product_batches_product_id` | Batch lookup |
 | `product_batches` | `idx_product_batches_expiry` | Expiry tracking |
 
-### Functions (12)
+### Functions (16)
 
 | Function | Purpose |
 |----------|---------|
@@ -225,16 +227,20 @@ v12.2/
 | `get_email_by_username(p_username)` | Login helper |
 | `resolve_login_email(p_identifier)` | Login resolver |
 | `generate_po_number()` | Auto-generate PO number |
+| `commit_sale(sale_data JSONB)` | Atomic sale + inventory deduction (anon-key compatible) |
+| `apply_payment_movements(sale JSONB, ratio NUMERIC)` | Wallet/payment balance moves (anon-key compatible) |
+| `delete_sale_atomic(p_sale_id, p_history, ...)` | Hard-delete sale + reverse stock (role-gate-free) |
+| `refund_sale_atomic(p_sale_id, p_history, ...)` | Refund sale + reverse stock (role-gate-free, over-refund cap) |
 
 ### Realtime Publication (21 tables)
 
 ```sql
 ALTER PUBLICATION supabase_realtime SET TABLE
   app_settings, bundles, bundle_items, bundle_slots, bundle_slot_options,
-  categories, customers, discounts, expenses, payments,
-  product_batches, products, purchase_order_items, purchase_orders,
-  purchase_records, sales, sales_tabs, stock_history,
-  supplier_transactions, suppliers, users;
+  categories, customers, customer_ledger, discounts, expenses, payments,
+  product_addons, products, purchase_order_items, purchase_orders,
+  purchase_records, sales, sales_tabs, salesmen, stock_history,
+  supplier_transactions, suppliers, users, variant_stock_history;
 ```
 
 ### Seed Data
@@ -524,10 +530,10 @@ curl -X POST "https://api.supabase.com/v1/projects/$SUPABASE_REF/database/query"
 ```
 
 Ye 1 command sab kuch create karti hai:
-- ✅ 21 tables (all columns, constraints, defaults)
+- ✅ 24 tables (all columns, constraints, defaults)
 - ✅ All indexes
-- ✅ All 13 functions (incl. `on_stock_history_insert` + `on_variant_stock_history_insert` stock triggers + `get_next_invoice_number()` RPC)
-- ✅ Realtime publication (21 tables)
+- ✅ All 16 functions (incl. `on_stock_history_insert` + `on_variant_stock_history_insert` stock triggers + `get_next_invoice_number()` RPC + financial-integrity RPCs: `commit_sale`, `apply_payment_movements`, `delete_sale_atomic`, `refund_sale_atomic`)
+- ✅ Realtime publication (24 tables)
 - ✅ GRANT ALL to anon + authenticated
 - ✅ Seed data (app_settings row)
 
@@ -694,7 +700,7 @@ curl -s -X POST "https://api.supabase.com/v1/projects/$SUPABASE_REF/database/que
   -d '{"query": "SELECT tablename FROM pg_publication_tables WHERE pubname = '\''supabase_realtime'\'' ORDER BY tablename"}'
 ```
 
-**Expected: 21 tables** — app_settings, bundles, bundle_items, bundle_slots, bundle_slot_options, categories, customers, discounts, expenses, payments, product_batches, products, purchase_order_items, purchase_orders, purchase_records, sales, sales_tabs, stock_history, supplier_transactions, suppliers, users
+**Expected: 24 tables** — app_settings, bundles, bundle_items, bundle_slots, bundle_slot_options, categories, customers, customer_ledger, discounts, expenses, payments, product_addons, products, purchase_order_items, purchase_orders, purchase_records, sales, sales_tabs, salesmen, stock_history, supplier_transactions, suppliers, users, variant_stock_history
 
 ### Check 3: Functions
 
@@ -705,7 +711,7 @@ curl -s -X POST "https://api.supabase.com/v1/projects/$SUPABASE_REF/database/que
   -d '{"query": "SELECT proname FROM pg_proc WHERE pronamespace = '\''public'\''::regnamespace ORDER BY proname"}'
 ```
 
-**Expected (12):** audit_missing_purchase_cost, audit_stock_integrity, auto_generate_invoice_number, generate_invoice_number, generate_po_number, get_email_by_username, get_my_workspace_id, handle_new_user, process_return, process_sale, resolve_login_email, update_customer_stats
+**Expected (16):** apply_payment_movements, audit_missing_purchase_cost, audit_stock_integrity, auto_generate_invoice_number, commit_sale, delete_sale_atomic, generate_invoice_number, generate_po_number, get_email_by_username, get_my_workspace_id, get_next_invoice_number, handle_new_user, process_return, process_sale, refund_sale_atomic, resolve_login_email, update_customer_stats
 
 ### Check 4: Grants
 

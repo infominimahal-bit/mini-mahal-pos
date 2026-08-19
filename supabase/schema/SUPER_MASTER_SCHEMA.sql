@@ -421,6 +421,7 @@ CREATE TABLE IF NOT EXISTS customers (
     credit_limit            DECIMAL(10,2) DEFAULT 0.00,
     credit_used             DECIMAL(10,2) DEFAULT 0.00,
     total_purchases         DECIMAL(12,2) DEFAULT 0.00,
+    balance                 DECIMAL(12,2) DEFAULT 0,
     last_purchase           TIMESTAMPTZ,
     preferred_categories    JSONB DEFAULT '[]'::jsonb,
     notes                   TEXT,
@@ -429,6 +430,36 @@ CREATE TABLE IF NOT EXISTS customers (
 );
 
 ALTER TABLE customers REPLICA IDENTITY FULL;
+
+-- ============================================================================
+-- customer_ledger — per-customer transaction ledger (running balance)
+-- P6/P24: balances derived from immutable entries, never direct overwrites.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS customer_ledger (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id   uuid REFERENCES customers(id) ON DELETE CASCADE,
+  sale_id       uuid,
+  type          text NOT NULL,
+  debit         numeric(12,2) DEFAULT 0,
+  credit        numeric(12,2) DEFAULT 0,
+  balance_after numeric(12,2) DEFAULT 0,
+  reference     text,
+  note          text,
+  created_by    uuid,
+  created_at    timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_customer_ledger_customer ON customer_ledger(customer_id);
+CREATE INDEX IF NOT EXISTS idx_customer_ledger_sale ON customer_ledger(sale_id);
+
+GRANT ALL ON TABLE customer_ledger TO anon, authenticated, service_role;
+GRANT ALL ON TABLE customers TO anon, authenticated, service_role;
+
+ALTER TABLE customer_ledger ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS customer_ledger_select ON customer_ledger;
+DROP POLICY IF EXISTS customer_ledger_write ON customer_ledger;
+CREATE POLICY customer_ledger_select ON customer_ledger FOR SELECT USING (true);
+CREATE POLICY customer_ledger_write ON customer_ledger FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 
 -- ════════════════════════════════════════════════════════════════
@@ -622,6 +653,7 @@ CREATE TABLE IF NOT EXISTS sales (
     payment_method      TEXT CHECK (payment_method IN ('cash', 'card', 'digital', 'credit', 'cheque', 'split', 'online')),
     card_details        JSONB,
     status              TEXT DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'refunded', 'partially_refunded', 'credit', 'draft', 'deleted', 'cancelled')),
+    payment_status      TEXT DEFAULT 'paid',
     cashier             TEXT,
     edited_from_invoice TEXT DEFAULT NULL,
     cashier_role        TEXT,
@@ -2109,6 +2141,7 @@ BEGIN
       bundle_slot_options,
       categories,
       customers,
+      customer_ledger,
       discounts,
       expenses,
       payments,
@@ -3644,7 +3677,8 @@ END;
 $function$;
 GRANT EXECUTE ON FUNCTION verify_table_write(uuid, text, text, text, text[]) TO anon, authenticated, service_role;
 
--- Guard delete_sale_atomic (admin|manager) and refund_sale_atomic (admin|manager|cashier).
+-- delete_sale_atomic / refund_sale_atomic are ROLE-GATE-FREE (anon-key single-tenant
+-- compatible, MASTER §2.1.4). Over-refund cap retained in refund_sale_atomic.
 CREATE OR REPLACE FUNCTION public.delete_sale_atomic(
   p_sale_id uuid, p_history jsonb, p_user_id uuid DEFAULT NULL, p_role text DEFAULT NULL, p_sig text DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public, extensions AS $function$
