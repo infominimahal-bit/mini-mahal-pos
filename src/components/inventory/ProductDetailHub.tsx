@@ -195,27 +195,44 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
 
   // ─── KPIs ───
   const totalPurchased = productPurchases.reduce((s, r) => s + (r.quantity || 0), 0);
-  // Sold Qty = net units sold, derived from the AUTHORITATIVE stock ledger
-  // (sales/stock_out = OUT, returns/deletes/refunds = IN). Reading from
-  // `sales.items` is unreliable: edit/delete/refund reversals store NEGATIVE
-  // quantities and deleted sales are filtered out of `productSales`, so the
-  // ledger is the single source of truth that reconciles with `product.stock`.
-  const totalSoldUnits = productStockHistory.reduce((s, h) => {
-    const qty = Math.abs(Number(h.changeQty) || 0);
-    if (h.type === 'sale') return s + qty;
-    if (h.type === 'return') return s - qty;
-    return s;
-  }, 0);
-  const totalRevenue = productSales.reduce((s, sale) => {
-    return s + (sale.items || []).filter(i => i.product?.id === product.id)
-      .reduce((a, i) => {
-        const base = i.weight ? Number(i.weight) : (Number(i.quantity) || 0);
-        const net = Math.max(0, base - (Number(i.refundedQuantity) || 0));
-        const ratio = base > 0 ? net / base : 0;
-        return a + (Number(i.subtotal) || 0) * ratio;
-      }, 0);
-  }, 0);
-  const totalCOGS = totalSoldUnits * (product.cost || 0);
+  // ALL product KPIs (Sold Qty, Revenue, COGS, Margin) derive from the
+  // AUTHORITATIVE stock ledger so they reconcile with `product.stock`.
+  // `sales.items` is untrustworthy: edit/delete/refund reversals store
+  // NEGATIVE quantities and deleted sales are filtered out of `productSales`,
+  // so quantities/values read from `sales` can never reconcile. Quantities
+  // come from the ledger; per-unit value comes from the referenced sale's item.
+  const saleById = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const s of (state.sales || [])) m.set(s.id, s);
+    return m;
+  }, [state.sales]);
+
+  const ledgerKpis = useMemo(() => {
+    let sold = 0, revenue = 0, cogs = 0;
+    const unitCost = product.cost || 0;
+    for (const h of productStockHistory) {
+      const qty = Math.abs(Number(h.changeQty) || 0);
+      if (!qty) continue;
+      const sale = saleById.get(h.referenceId || '');
+      const item = sale?.items?.find((i: any) => i.product?.id === product.id);
+      const itemQty = item ? Math.abs(Number(item.weight ? item.weight : item.quantity) || 0) : 0;
+      const scale = itemQty > 0 ? qty / itemQty : 1;
+      if (h.type === 'sale') {
+        sold += qty;
+        if (item) revenue += (Number(item.subtotal) || 0) * scale;
+        cogs += unitCost * qty;
+      } else if (h.type === 'return') {
+        sold -= qty;
+        if (item) revenue -= (Number(item.subtotal) || 0) * scale;
+        cogs -= unitCost * qty;
+      }
+    }
+    return { sold, revenue, cogs };
+  }, [productStockHistory, saleById, product.id, product.cost]);
+
+  const totalSoldUnits = ledgerKpis.sold;
+  const totalRevenue = ledgerKpis.revenue;
+  const totalCOGS = ledgerKpis.cogs;
   const grossProfit = totalRevenue - totalCOGS;
   const profitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 

@@ -99,25 +99,39 @@ export default function InventoryReportManager({
       );
     }
 
-    // Net-sold per product from the AUTHORITATIVE stock ledger. `sales.items`
-    // is unreliable here: edit/delete/refund reversals store negative quantities
-    // and deleted sales are excluded, breaking reconciliation with stock. The
-    // ledger captures every movement (sale=OUT, return=IN), so Sold Qty is
-    // derived from it to guarantee Stock + SoldQty = InitialStock.
+    // All product KPIs (Sold Qty, Revenue, COGS) derive from the AUTHORITATIVE
+    // stock ledger so they reconcile with stock. `sales.items` is untrustworthy:
+    // edit/delete/refund reversals store negative quantities and deleted sales
+    // are filtered out, so values read from `sales` cannot reconcile. Quantities
+    // come from the ledger; per-unit value from the referenced sale's item.
     const reportEnd = new Date(endDate);
     if (reportEnd.getHours() === 0 && reportEnd.getMinutes() === 0) reportEnd.setHours(23, 59, 59, 999);
     const reportStartMs = startDate.getTime();
     const reportEndMs = reportEnd.getTime();
-    const soldQtyByProduct = new Map<string, number>();
+
+    const saleById = new Map<string, any>();
+    for (const s of (state.sales || [])) saleById.set(s.id, s);
+    const productCostById = new Map<string, number>();
+    for (const p of state.products) productCostById.set(p.id, p.cost || 0);
+
+    const kpiByProduct = new Map<string, { sold: number; revenue: number; cogs: number }>();
     for (const h of (state.stockHistory || [])) {
       const hTs = new Date(h.createdAt).getTime();
       if (hTs < reportStartMs || hTs > reportEndMs) continue;
       if (!h.productId) continue;
       const qty = Math.abs(Number(h.changeQty) || 0);
-      let cur = soldQtyByProduct.get(h.productId) || 0;
-      if (h.type === 'sale') cur += qty;
-      else if (h.type === 'return') cur -= qty;
-      soldQtyByProduct.set(h.productId, cur);
+      if (!qty) continue;
+      if (h.type !== 'sale' && h.type !== 'return') continue;
+      const sale = saleById.get(h.referenceId || '');
+      const item = sale?.items?.find((i: any) => i.product?.id === h.productId);
+      const itemQty = item ? Math.abs(Number(item.weight ? item.weight : item.quantity) || 0) : 0;
+      const scale = itemQty > 0 ? qty / itemQty : 1;
+      const revenue = item ? (Number(item.subtotal) || 0) * scale : 0;
+      const cogs = (productCostById.get(h.productId) || 0) * qty;
+      let cur = kpiByProduct.get(h.productId) || { sold: 0, revenue: 0, cogs: 0 };
+      if (h.type === 'sale') { cur.sold += qty; cur.revenue += revenue; cur.cogs += cogs; }
+      else { cur.sold -= qty; cur.revenue -= revenue; cur.cogs -= cogs; }
+      kpiByProduct.set(h.productId, cur);
     }
 
     const stats = productsToProcess.map(product => {
@@ -158,30 +172,10 @@ export default function InventoryReportManager({
         return isOfficial && inDateRange && storeMatch;
       });
 
-      const soldQty = soldQtyByProduct.get(product.id) || 0;
-
-      const revenue = filteredSales.reduce((sum, sale) => {
-        return sum + (sale.items || [])
-          .filter(item => {
-            const itemProdId = item.product?.id || (item as any).productId;
-            return itemProdId === product.id;
-          })
-          .reduce((s, item) => s + getItemRevenue(item, sale), 0);
-      }, 0);
-
-      const cogs = filteredSales.reduce((sum, sale) => {
-        return sum + (sale.items || [])
-          .filter(item => {
-            const itemProdId = item.product?.id || (item as any).productId;
-            return itemProdId === product.id;
-          })
-          .reduce((s, item) => {
-            const baseQty = item.weight ? Number(item.weight) : (Number(item.quantity) || 0);
-            const net = netItemQty(item);
-            const ratio = baseQty > 0 ? net / baseQty : 0;
-            return s + getItemCOGS(item).cost * ratio;
-          }, 0);
-      }, 0);
+      const kpi = kpiByProduct.get(product.id) || { sold: 0, revenue: 0, cogs: 0 };
+      const soldQty = kpi.sold;
+      const revenue = kpi.revenue;
+      const cogs = kpi.cogs;
 
       const grossProfit = revenue - cogs;
 

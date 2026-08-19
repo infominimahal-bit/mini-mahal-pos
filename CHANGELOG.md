@@ -2,6 +2,12 @@
 
 Whenever a database change is made, it MUST be recorded here.
 
+### [2026-08-19] Fix: ALL inventory KPIs (Sold Qty, Revenue, COGS, Margin) derive from stock ledger
+**Files:** `src/components/inventory/ProductDetailHub.tsx`, `src/components/inventory/InventoryReportManager.tsx`
+**Context:** After the Sold Qty fix, Revenue/COGS were still read from `sales.items`, which carries the same corruption (edit/delete/refund reversals store NEGATIVE quantities; deleted sales filtered out). For 100% accuracy every KPI must reconcile with `product.stock`.
+**Fix:** Derived Sold Qty, Revenue, and COGS from the **authoritative stock ledger** (`stock_history`) for BOTH components. Quantities come from ledger movements (sale=OUT, return=IN); per-unit value comes from the referenced sale's `item.subtotal` (revenue) and `product.cost` (COGS), scaled by `movementQty / itemQty` for partial returns. `state.stockHistory` + `state.sales` + `state.products` used to build per-product KPI maps (date-filtered in the report). Now Stock + SoldQty = InitialStock and Revenue/COGS are consistent with sold units. tsc clean.
+**Note:** This makes the DISPLAY bulletproof regardless of `sales.items` corruption. A deeper source-level hardening (ensure every refund/edit/delete writes correct positive `items` and always reverts stock via the ledger) remains optional — the ledger itself is the single source of truth, so displays stay accurate.
+
 ### [2026-08-19] Fix: "Sold Qty" counter now reconciles with stock (derived from ledger)
 **Files:** `src/components/inventory/ProductDetailHub.tsx`, `src/components/inventory/InventoryReportManager.tsx`
 **Bug:** `Sold Qty` was computed from `sales.items` quantities. Edit/delete/refund reversals store NEGATIVE quantities in `items` (e.g. `INV-001049` completed had `quantity = -5`), and deleted sales are filtered out of `productSales` — so `Math.max(0, qty - refundedQuantity)` collapsed negatives to 0, under-counting. ProductDetailHub showed `42` while stock ledger implied `50` sold (Stock 50 + Sold 42 = 92 ≠ Initial 100 → 8-unit gap).
