@@ -424,6 +424,13 @@ Drafts (`status:'pending'` / `DRAFT_SALE` note) are saved CARTS, not revenue.
 - **Requirement:** Session expiry MUST be exactly 24 hours (`pos_session_start`). Unnecessary logouts caused by network issues or temporary server unavailability are STRICTLY BANNED.
 - **Implementation:** Check the difference in hours between `Date.now()` and `pos_session_start`. If `>= 24`, explicitly remove the session and sign out. When refreshing the token via Supabase, you MUST check if the error is a network error (`Failed to fetch`, offline, etc). If it is a network error, **do not sign out**. Fallback to the cached `pos_offline_profile` and allow the system to recover gracefully when the network returns.
 
+
+## RULE F27 — UNIVERSAL TIME FORMATTING (12-HOUR AM/PM) (PERMANENT)
+
+- **Problem:** Native `toLocaleTimeString()` uses system-dependent 24-hour or 12-hour formats. The user explicitly wants a strict **12-hour AM/PM** local time across ALL screens.
+- **Rule:** NEVER use raw `Date.toLocaleTimeString()` or `Date.toLocaleDateString()` anywhere in the application.
+- **Solution:** You MUST always use `formatAppTime`, `formatAppDate`, or `formatAppDateTime` imported from `src/lib/dateUtils.ts`. These helpers enforce `hour12: true` and honor the shop's timezone (`state.settings.timezone`).
+
 ---
 
 # 🗄️ DATABASE MIGRATION RULES (THE GOLDEN RULE)

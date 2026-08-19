@@ -1,3 +1,5 @@
+import { formatAppTime } from './dateUtils';
+
 export function formatRelativeTime(date: Date | null): string {
   if (!date) return 'Never';
   
@@ -13,5 +15,5 @@ export function formatRelativeTime(date: Date | null): string {
   const diffInHours = Math.floor(diffInMinutes / 60);
   if (diffInHours < 24) return `${diffInHours}h ago`;
   
-  return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return formatAppTime(date);
 }

@@ -1,5 +1,5 @@
 import { formatCurrency } from '../../lib/currencies';
-import { formatAppDate } from '../../lib/dateUtils';
+import { formatAppDate, formatAppTime } from '../../lib/dateUtils';
 import { AppSettings } from '../../types';
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useRef, useState } from 'react';
@@ -152,7 +152,7 @@ export function ReceiptPreview({ settings }: ReceiptPreviewProps) {
   const renderMetaContent = () => (
     <>
       <TwoCol left={`INV#: ${settings.invoicePrefix || 'INV'}-001234`} right={`DATE: ${formatAppDate(new Date().toISOString(), settings.country).replace(/,/g, '')}`} />
-      <TwoCol left={`TIME: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`} right={`OP: ADMIN`} />
+      <TwoCol left={`TIME: ${formatAppTime(new Date(), settings.timezone)}`} right={`OP: ADMIN`} />
       {settings.receiptShowCustomerName && <TwoCol left="CUST: WALKIN CUSTOMER" right={settings.receiptShowCustomerPhone ? "PH: +92 300 0000000" : ""} />}
     </>
   );
@@ -291,7 +291,7 @@ export function ReceiptPreview({ settings }: ReceiptPreviewProps) {
   const metaBlock = (
     <>
       <TwoCol left={`INV#: ${settings.invoicePrefix || 'INV'}-001234`} right={`DATE: ${formatAppDate(new Date().toISOString(), settings.country).replace(/,/g, '')}`} />
-      <TwoCol left={`TIME: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`} right={`OP: ADMIN`} />
+      <TwoCol left={`TIME: ${formatAppTime(new Date(), settings.timezone)}`} right={`OP: ADMIN`} />
       {settings.receiptShowCustomerName && <TwoCol left="CUST: WALKIN CUSTOMER" right={settings.receiptShowCustomerPhone ? "PH: +92 300 0000000" : ""} />}
       {deliveryBlock}
     </>

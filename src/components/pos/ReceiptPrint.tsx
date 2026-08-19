@@ -5,7 +5,7 @@ import { MessageCircle, Printer, X, ShieldAlert, Check, Share2 } from 'lucide-re
 import { formatCurrency } from '../../lib/currencies';
 import { getDealCountBreakdown } from '../../lib/utils';
 import { getCountryByCode } from '../../lib/countries';
-import { formatAppDate, formatAppDateTime } from '../../lib/dateUtils';
+import { formatAppDate, formatAppDateTime, formatAppTime } from '../../lib/dateUtils';
 import { sonner } from '../../lib/sonner';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -708,7 +708,7 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
   const renderMetaSection = () => (
     <>
       <TwoCol left={`INV#: ${(sale.invoiceNumber || sale.receiptNumber || sale.id.slice(-6).toUpperCase()).replace(settings.invoicePrefix || 'INV', '')}`} right={`DATE: ${formatAppDate(sale.timestamp, settings.country).replace(/,/g, '')}`} />
-      <TwoCol left={`TIME: ${new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`} right={`OP: ${sale.cashier?.split(' ')[0] || profile?.name?.split(' ')[0] || 'SYS'}`} />
+      <TwoCol left={`TIME: ${formatAppTime(sale.timestamp, settings.timezone)}`} right={`OP: ${sale.cashier?.split(' ')[0] || profile?.name?.split(' ')[0] || 'SYS'}`} />
       {sale.salesmanName && <TwoCol left={`SM: ${sale.salesmanName}`} right="" />}
       {sale.dcNumber && <TwoCol left={`DC#: ${sale.dcNumber}`} right="" />}
       {settings.receiptShowTax && settings.taxId && <TwoCol left={`TAX/NTN ID: ${settings.taxId}`} right="" />}
@@ -1400,7 +1400,7 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
             right={`DATE: ${formatAppDate(sale.timestamp, settings.country).replace(/,/g, '')}`}
           />
           <TwoCol
-            left={`TIME: ${new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+            left={`TIME: ${formatAppTime(sale.timestamp, settings.timezone)}`}
             right={`OP: ${sale.cashier?.split(' ')[0] || profile?.name?.split(' ')[0] || 'SYS'}`}
           />
 

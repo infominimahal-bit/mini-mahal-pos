@@ -37,7 +37,10 @@ import {
   Navigation,
   Info,
   LocateFixed,
+  Upload,
+  X,
 } from 'lucide-react';
+import { formatAppTime } from '../../lib/dateUtils';
 import { useNavigate, useParams } from 'react-router-dom';
 import { formatRelativeTime } from '../../lib/timeUtils';
 import { supabase } from '../../lib/supabase';
@@ -109,7 +112,7 @@ export function Settings() {
       const isToday = date.toDateString() === now.toDateString();
       const isYesterday = new Date(now.setDate(now.getDate() - 1)).toDateString() === date.toDateString();
 
-      const timeStr = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+      const timeStr = formatAppTime(date, state.settings.timezone);
 
       if (isToday) return `Today ${timeStr}`;
       if (isYesterday) return `Yesterday ${timeStr}`;

@@ -1175,7 +1175,11 @@ function BundleGrid({ onAddToCart, currency, isTouchMode, isReturnMode, gridCols
         <p className="text-[11px] text-gray-400 mt-1 mb-4">{t('no_bundles_desc_pos', 'Go to Inventory → Bundles to create combo deals')}</p>
         <button
           type="button"
-          onClick={() => navigate('/inventory/bundles')}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.location.href = '/inventory/bundles';
+          }}
           className="bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all active:scale-95 shadow-lg shadow-violet-500/20"
         >
           {t('create_deal_now_btn', 'Create Deal Now')}
@@ -1208,8 +1212,10 @@ function BundleGrid({ onAddToCart, currency, isTouchMode, isReturnMode, gridCols
         </div>
         <button
           type="button"
-          onClick={() => {
-            window.dispatchEvent(new CustomEvent('navigate', { detail: 'inventory/bundles' }));
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.location.href = '/inventory/bundles';
           }}
           className="bg-violet-600 hover:bg-violet-700 text-white text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg transition-all active:scale-95 shadow-sm shrink-0"
         >

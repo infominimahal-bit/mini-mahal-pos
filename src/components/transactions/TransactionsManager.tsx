@@ -176,18 +176,18 @@ export function TransactionsManager() {
 
 
 
-  // Base filtering (date) — timezone-aware using configured country timezone
-  const dateFiltered = useMemo(() => {
+  // Date range calculation (used by dateFiltered and walletTotals)
+  const { startTs, endTs } = useMemo(() => {
     const now = new Date();
-    let startTs: number;
-    let endTs: number;
+    let start: number;
+    let end: number;
 
     if (dateFilter === 'custom') {
-      startTs = startDateInput ? getStartOfInputDayInTimezone(startDateInput, timezone).getTime() : 0;
-      endTs = endDateInput ? getEndOfInputDayInTimezone(endDateInput, timezone).getTime() : Infinity;
+      start = startDateInput ? getStartOfInputDayInTimezone(startDateInput, timezone).getTime() : 0;
+      end = endDateInput ? getEndOfInputDayInTimezone(endDateInput, timezone).getTime() : Infinity;
     } else if (dateFilter === 'all') {
-      startTs = new Date(Date.UTC(2000, 0, 1)).getTime();
-      endTs = Infinity;
+      start = new Date(Date.UTC(2000, 0, 1)).getTime();
+      end = Infinity;
     } else {
       const dateMap: Record<string, () => { start: Date; end: Date }> = {
         'today': () => ({ start: getStartOfDayInTimezone(now, timezone), end: getEndOfDayInTimezone(now, timezone) }),
@@ -212,16 +212,20 @@ export function TransactionsManager() {
         },
       };
       const range = dateMap[dateFilter]?.() || dateMap['today']();
-      startTs = range.start.getTime();
-      endTs = range.end.getTime();
+      start = range.start.getTime();
+      end = range.end.getTime();
     }
+    return { startTs: start, endTs: end };
+  }, [dateFilter, startDateInput, endDateInput, timezone]);
 
+  // Base filtering (date)
+  const dateFiltered = useMemo(() => {
     return state.sales.filter(sale => {
       if (isDraftSale(sale)) return false;
       const saleTs = new Date(sale.timestamp).getTime();
       return saleTs >= startTs && saleTs <= endTs;
     });
-  }, [state.sales, dateFilter, startDateInput, endDateInput, timezone]);
+  }, [state.sales, startTs, endTs]);
 
   const cashiersList = useMemo(() => {
     const userNames = state.users.map(u => u.name).filter(c => c && c.toUpperCase() !== 'UNKNOWN');
@@ -333,8 +337,31 @@ export function TransactionsManager() {
       }
     });
 
+    // Subtract Expenses (Rule F16 / Parity with ReportsManager)
+    state.expenses?.forEach(e => {
+      const eTs = new Date(e.createdAt).getTime();
+      if (eTs >= startTs && eTs <= endTs) {
+        if (e.paymentMethod === 'cash') addToWallet('cash', -Number(e.amount));
+        if (e.paymentMethod === 'card') addToWallet('card', -Number(e.amount));
+        if (e.paymentMethod === 'online') addToWallet('online', -Number(e.amount));
+      }
+    });
+
+    // Subtract Supplier Payments (Rule F16 / Parity with ReportsManager)
+    state.payments?.forEach(p => {
+      // Exclude payout items since they are already captured as expense or refund logic elsewhere
+      if (p.direction === 'out') {
+        const pTs = new Date(p.createdAt).getTime();
+        if (pTs >= startTs && pTs <= endTs) {
+          if (p.paymentMethod === 'cash') addToWallet('cash', -Number(p.amount));
+          if (p.paymentMethod === 'card') addToWallet('card', -Number(p.amount));
+          if (p.paymentMethod === 'online') addToWallet('online', -Number(p.amount));
+        }
+      }
+    });
+
     return totals;
-  }, [filteredTransactions]);
+  }, [filteredTransactions, state.expenses, state.payments, startTs, endTs]);
 
   const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE);
   const paginatedTransactions = filteredTransactions.slice(
@@ -425,7 +452,7 @@ export function TransactionsManager() {
 
     return {
       date: formatAppDate(dateObj, state.settings.country),
-      time: dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: formatAppTime(dateObj, state.settings.timezone),
       invoiceNumber: sale.invoiceNumber || '',
       receiptNumber: sale.receiptNumber || '',
       customerName,
@@ -548,12 +575,12 @@ export function TransactionsManager() {
 
       {/* Wallet Breakdown Section */}
       <div className="bg-white/50 dark:bg-black/20 p-4 rounded-[1.75rem] border border-gray-200/50 dark:border-white/5 shadow-xl space-y-3">
-        <h3 className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
+        <div className="flex items-center gap-1.5 px-1 py-1 mb-2 text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-gray-700 dark:text-gray-300">
           <Wallet className="h-3.5 w-3.5 text-[#10B981]" />
           <span>{t("wallets_summary", "WALLETS & CASH FLOW BREAKDOWN")}</span>
-        </h3>
+        </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Cash Wallet Card */}
           <div className="relative overflow-hidden bg-white dark:bg-[#1C1C1C] border border-gray-200 dark:border-white/5 rounded-2xl p-4 flex items-center justify-between transition-all hover:scale-[1.02] hover:border-primary/30 dark:hover:border-primary/30 shadow-sm">
             <div className="flex flex-col">
@@ -600,11 +627,13 @@ export function TransactionsManager() {
       {/* Filters */}
       <div className="bg-white/50 dark:bg-black/20 p-3 lg:p-4 rounded-[1.75rem] border border-gray-200/50 dark:border-white/5 shadow-xl">
         <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center">
-          <SharedSearchBar
-            value={searchTerm}
-            onChange={val => { setSearchTerm(val); setCurrentPage(1); }}
-            placeholder={t("search_sales_placeholder", "Search sales...")}
-          />
+          <div title={t("search_tooltip", "Searches all-time records in cloud, ignoring date filters")}>
+            <SharedSearchBar
+              value={searchTerm}
+              onChange={val => { setSearchTerm(val); setCurrentPage(1); }}
+              placeholder={t("search_sales_placeholder", "Search sales...")}
+            />
+          </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <div className="grid grid-cols-2 lg:flex items-center gap-2 w-full lg:w-auto">

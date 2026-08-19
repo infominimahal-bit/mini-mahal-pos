@@ -8,6 +8,7 @@ import { sonner } from '../../lib/sonner';
 import { useNavigate } from 'react-router-dom';
 import { SharedSearchBar } from '../../shared/modules/search-and-list';
 import { Button, EmptyState } from '../../shared/ui';
+import { formatAppTime } from '../../lib/dateUtils';
 
 // ─── Module-level component (prevents blink from re-mounting on parent re-render) ───
 const OrderTimer = ({ order, settings, onExpire }: { order: StoreOrder, settings: any, onExpire?: (orderId: string) => void }) => {
@@ -445,7 +446,7 @@ export function OnlineOrdersPage() {
                       )}
                     </div>
                     <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400">
-                      {new Date(order.createdAt).toLocaleTimeString()}
+                      {formatAppTime(order.createdAt, state.settings.timezone)}
                     </span>
                   </div>
                     <div className={`px-2 py-0.5 rounded-md border text-[9px] font-black uppercase tracking-widest ${STATUS_COLORS[order.status]}`}>

@@ -23,6 +23,7 @@ import { formatCurrency } from '../../lib/currencies';
 import { productsService, purchaseRecordsService, generateId, toRemoteStockHistory, toRemoteProduct, productToppingsService, applyVariantStockMovement } from '../../lib/services';
 import { commitStockInToInventory } from '../../lib/stockInCommit';
 import { localDb, queueOp } from '../../lib/localDb';
+import { formatAppTime, formatAppDate } from '../../lib/dateUtils';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { compressImage } from '../../shared/imageCompression';
 import { sonner } from '../../lib/sonner';
@@ -31,6 +32,7 @@ import { generateBarcodeValue } from '../../utils/barcode';
 import { BarcodePreview } from '../../shared/ui/BarcodePreview';
 import { MediaLibrary } from '../../shared/MediaLibrary';
 import ToppingAssignmentPanel from '../../shared/ui/ToppingAssignmentPanel';
+import { TransactionDetailModal } from '../transactions/TransactionDetailModal';
 
 interface ProductDetailHubProps {
   product: Product;
@@ -64,10 +66,15 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
   const [filterType, setFilterType] = useState<'ALL' | 'IN' | 'OUT' | 'RETURN'>('ALL');
   const [historyPage, setHistoryPage] = useState(1);
   const [showMediaLibrary, setShowMediaLibrary] = useState(false);
+  const [showBatchStockIn, setShowBatchStockIn] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [activeScannerField, setActiveScannerField] = useState<'sku' | 'barcode'>('barcode');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const HISTORY_PER_PAGE = 7;
+  
+  // For viewing sales directly from movement history without losing context
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [clickedRowId, setClickedRowId] = useState<string | null>(null);
 
   // ─── Edit Form State ───
   const [formData, setFormData] = useState({
@@ -587,6 +594,7 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
         label,
         qty: displayQty,
         reference: (h.referenceId ? String(h.referenceId).slice(-6).toUpperCase() : (h.note ? h.note.slice(0, 14) : '')),
+        fullReference: h.referenceId,
         entity: h.cashierName || 'System',
         user: h.cashierName || 'System',
         note: h.note,
@@ -609,17 +617,18 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
     historyPage * HISTORY_PER_PAGE
   );
 
-  const handleRowClick = (h: any) => {
+  const handleRowClick = async (h: any) => {
     // Both Sales (OUT) and Returns (now IN) should redirect to the bill
     const isRetailTransaction = h.label?.includes('Sale') || h.label?.includes('Return');
 
-    if (isRetailTransaction) {
-      dispatch({ type: 'SET_PENDING_RETURN_TAB', payload: 'product_hub' });
-      dispatch({ type: 'SET_LAST_PRODUCT_HUB', payload: product.id });
-      dispatch({ type: 'SET_PENDING_SEARCH', payload: h.reference });
-      const event = new CustomEvent('navigate', { detail: 'transactions' });
-      window.dispatchEvent(event);
-      onBack(); // Close hub
+    if (isRetailTransaction && h.fullReference) {
+      const sale = await localDb.sales.get(h.fullReference);
+      if (!sale) {
+        sonner.error(t('invoice_deleted', 'This invoice has been deleted.'));
+        return;
+      }
+      setClickedRowId(h.id);
+      setSelectedSale(sale);
     }
   };
 
@@ -1876,11 +1885,11 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
                       </td>
                     </tr>
                   ) : paginatedHistory.map((h) => (
-                    <tr
-                      key={h.id}
-                      onClick={() => handleRowClick(h)}
-                      className={`group hover:bg-gray-50/50 dark:hover:bg-white/[0.01] transition-colors cursor-pointer active:scale-[0.99]`}
-                    >
+                      <tr
+                        key={h.id}
+                        onClick={() => handleRowClick(h)}
+                        className={`group hover:bg-gray-50/50 dark:hover:bg-white/[0.01] transition-colors cursor-pointer active:scale-[0.99] ${clickedRowId === h.id ? 'bg-primary/10 border-l-4 border-primary' : ''}`}
+                      >
                       <td className="px-8 py-4">
                         <div className="flex items-center gap-3">
                           <div className={`p-2 rounded-lg ${h.bg} ${h.color}`}><h.icon className="w-3.5 h-3.5" /></div>
@@ -1888,7 +1897,7 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
                             <p className="text-[10px] font-black text-gray-900 dark:text-white uppercase leading-tight">
                               {new Date(h.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </p>
-                            <p className="text-[8px] text-gray-600 font-bold uppercase">{new Date(h.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                            <p className="text-[8px] text-gray-600 font-bold uppercase">{formatAppTime(h.date, state.settings.timezone)}</p>
                           </div>
                         </div>
                       </td>
@@ -1918,17 +1927,17 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
               {movementHistory.length === 0 ? (
                 <EmptyState compact icon={<History className="h-full w-full" />} title={t('no_records_found', 'No records found')} className="!py-20" />
               ) : paginatedHistory.map((h) => (
-                <div
-                  key={h.id}
-                  onClick={() => handleRowClick(h)}
-                  className="p-4 flex flex-col gap-3 active:bg-gray-50 dark:active:bg-white/5 transition-colors"
-                >
+                  <div
+                    key={h.id}
+                    onClick={() => handleRowClick(h)}
+                    className={`p-4 flex flex-col gap-3 active:bg-gray-50 dark:active:bg-white/5 transition-colors cursor-pointer ${clickedRowId === h.id ? 'bg-primary/5 border-l-4 border-primary' : ''}`}
+                  >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${h.bg} ${h.color}`}><h.icon className="w-3.5 h-3.5" /></div>
                       <div>
                         <p className="text-[10px] font-black text-gray-900 dark:text-white uppercase leading-tight">{new Date(h.date).toLocaleDateString()}</p>
-                        <p className="text-[8px] text-gray-600 font-bold uppercase">{new Date(h.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                        <p className="text-[8px] text-gray-600 font-bold uppercase">{formatAppTime(h.date, state.settings.timezone)}</p>
                       </div>
                     </div>
                     <div className={`text-sm font-black ${h.color}`}>
@@ -2017,6 +2026,29 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
         saveLabel={t('commit_changes', 'Confirm Changes')}
         unsaved={true}
       />
+      {showBatchStockIn && (
+        <BatchStockInSystem
+          targetProduct={product}
+          onClose={() => setShowBatchStockIn(false)}
+          onComplete={() => {
+            setShowBatchStockIn(false);
+          }}
+        />
+      )}
+
+      {selectedSale && (
+        <TransactionDetailModal
+          transaction={selectedSale}
+          onClose={() => {
+            setSelectedSale(null);
+            setTimeout(() => setClickedRowId(null), 1000);
+          }}
+          onBack={() => {
+            setSelectedSale(null);
+            setTimeout(() => setClickedRowId(null), 1000);
+          }}
+        />
+      )}
     </>
   );
 }
