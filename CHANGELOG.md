@@ -2,6 +2,15 @@
 
 Whenever a database change is made, it MUST be recorded here.
 
+### [2026-08-19] Fix: deal-system leakage — add-on stock + weighted magnitude + add-on revenue + negative-discount
+**Files:** `src/lib/services.ts`, `src/lib/calculateCart.ts`, `src/components/inventory/ProductDetailHub.tsx`, `src/components/inventory/InventoryReportManager.tsx`, `src/components/reports/ReportsManager.tsx`
+**Bugs fixed (verified by agent audit of the deals/discount/add-on system):**
+- **BUG 1 (add-on phantom inventory):** add-on stock deduction was nested inside `if (product && product.trackInventory)`, so add-ons of a NON-inventory-tracked parent never deducted stock → phantom inventory drain. Moved add-on stock deduction OUT of the parent gating so it runs for every item, gated only by the ADD-ON product's own `trackInventory`.
+- **BUG 2 (weighted add-on magnitude mismatch):** sale used `item.quantity` for add-on qty while refund/delete used `item.weight`. Now BOTH sale and refund/delete use `Math.abs(Number(item.weight || item.quantity) || 0)` (and reports use `parentQty` likewise), so add-on stock movements reconcile across the full lifecycle.
+- **BUG 3 (add-on revenue/COGS blind spot):** ledger-derived KPIs resolved the sale line only via top-level `sale.items`, so add-on stock_history entries (logged under the add-on product id) found no line → add-on revenue dropped to 0. Now `ProductDetailHub.ledgerKpis` AND `InventoryReportManager.kpiByProduct` also resolve `sale.items[].addonItems` (match `addon.addonProductId`), capturing add-on revenue/COGS. (Free-gift revenue stays 0 by design; COGS already correct via `product.cost`.)
+- **BUG 4 (negative total / billing leakage):** a fixed/percentage bill discount larger than the remaining subtotal drove `taxableBase` and `total` negative. Clamped `billDiscountAmount` to `≤ subtotalAfterItemDiscounts`, `totalDiscount` to `≤ subtotal`, and `taxableBase` to `≥ 0` in `calculateCart.ts`.
+**Verified:** `npx tsc --noEmit` clean; add-on deduction block appears exactly once in the sale-create path; refund `reqItem.qty = item.weight || item.quantity` matches the new sale-side magnitude. Pushed → triggers Vercel auto-redeploy (`jz-sandy.vercel.app`).
+
 ### [2026-08-19] Fix: ALL inventory KPIs (Sold Qty, Revenue, COGS, Margin) derive from stock ledger
 **Files:** `src/components/inventory/ProductDetailHub.tsx`, `src/components/inventory/InventoryReportManager.tsx`
 **Context:** After the Sold Qty fix, Revenue/COGS were still read from `sales.items`, which carries the same corruption (edit/delete/refund reversals store NEGATIVE quantities; deleted sales filtered out). For 100% accuracy every KPI must reconcile with `product.stock`.

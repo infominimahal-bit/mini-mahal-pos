@@ -141,18 +141,20 @@ export function calculateCart(input: CartCalculationInput): CartCalculationResul
     });
   }
 
-  // Manual bill discount
-  const billDiscountAmount = roundTo2(
+  // Manual bill discount — clamp so a discount can NEVER exceed the
+  // remaining subtotal (prevents a negative sale total / billing leakage).
+  const rawBillDiscount = roundTo2(
     billDiscountType === 'percentage'
       ? (subtotalAfterItemDiscounts * (billDiscountValue || 0)) / 100
       : (billDiscountValue || 0)
   );
+  const billDiscountAmount = Math.max(0, Math.min(rawBillDiscount, subtotalAfterItemDiscounts));
 
   // Totals
-  const totalDiscount = roundTo2(manualItemDiscountTotal + autoPromotionAmount + billDiscountAmount);
+  const totalDiscount = Math.max(0, Math.min(roundTo2(manualItemDiscountTotal + autoPromotionAmount + billDiscountAmount), subtotal));
   const taxableExtraTotal = roundTo2(extraCharges.filter(c => c.taxable !== false).reduce((s, c) => s + c.amount, 0));
   const nonTaxableExtraTotal = roundTo2(extraCharges.filter(c => c.taxable === false).reduce((s, c) => s + c.amount, 0));
-  const taxableBase = roundTo2(subtotal - totalDiscount + taxableExtraTotal);
+  const taxableBase = Math.max(0, roundTo2(subtotal - totalDiscount + taxableExtraTotal));
   const taxAmount = roundTo2(taxableBase * (taxRate / 100));
   const total = roundTo2(taxableBase + taxAmount + nonTaxableExtraTotal);
 

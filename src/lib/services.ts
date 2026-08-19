@@ -2017,45 +2017,9 @@ export const salesService = {
           }
         }
 
-        // --- ADD-ON STOCK DEDUCTION ---
-        if (item.addonItems && item.addonItems.length > 0) {
-          for (const addonItem of item.addonItems) {
-            const addonProduct = await localDb.products.get(addonItem.addon.addonProductId);
-            if (addonProduct && addonProduct.trackInventory) {
-              const addonQty = addonItem.quantity * Math.abs(item.quantity);
-              const newAddonStock = (addonProduct.stock || 0) - addonQty;
-
-              if (!skipStockEffects) {
-                await localDb.products.update(addonProduct.id, { stock: newAddonStock, updatedAt: now });
-
-                const aHistId = generateId();
-                const aHistEntry: StockHistory = {
-                  id: aHistId,
-                  productId: addonProduct.id,
-                  changeQty: -addonQty,
-                  type: 'sale',
-                  referenceId: id,
-                  note: `Add-on for Sale ${sale.invoiceNumber} (${addonItem.addon.name})`,
-                  balanceAfter: newAddonStock,
-                  cashierName: sale.cashier || 'System',
-                  createdAt: now,
-                };
-                await localDb.stockHistory.add(aHistEntry);
-                movements.push({
-                  id: aHistId,
-                  product_id: addonProduct.id,
-                  change_qty: -addonQty,
-                  type: 'sale',
-                  note: `Add-on for Sale ${sale.invoiceNumber} (${addonItem.addon.name})`,
-                  variant_id: '',
-                  variant_label: '',
-                  cashier_name: sale.cashier || 'System',
-                });
-                historyQueue.push({ entity: 'stock_history', histId: aHistId, remote: toRemoteStockHistory(aHistEntry), opts: { batchId: id } });
-              }
-            }
-          }
-        }
+        // Add-on stock deduction is performed AFTER this if/else (see block
+        // before FREE GIFT). It must NOT be gated by the PARENT's
+        // trackInventory — only the ADD-ON product's own trackInventory gates it.
       } else if (product && !product.trackInventory) {
         // Find variant cost fallback if applicable
         let baseCostFallback = Number(product.cost) || 0;
@@ -2083,6 +2047,50 @@ export const salesService = {
           purchaseCost: (baseCostFallback * (item.weight || item.quantity)) + addonCostTotal,
           fifoDetails: []
         };
+      }
+    }
+
+    // --- ADD-ON STOCK DEDUCTION (runs for EVERY item, gated only by the ADD-ON
+    // product's own trackInventory — NOT the parent's). Uses the parent's
+    // effective quantity (weight||quantity) so weighted-item + add-on sale/refund
+    // magnitudes always match and reconcile with the stock ledger. ---
+    if (!skipStockEffects && item.addonItems && item.addonItems.length > 0) {
+      const parentQty = Math.abs(Number(item.weight || item.quantity) || 0);
+      for (const addonItem of item.addonItems) {
+        const addonProduct = await localDb.products.get(addonItem.addon.addonProductId);
+        if (addonProduct && addonProduct.trackInventory) {
+          const addonQty = addonItem.quantity * parentQty;
+          const newAddonStock = (addonProduct.stock || 0) - addonQty;
+          if (newAddonStock < 0) anyOversold = true;
+
+          await localDb.products.update(addonProduct.id, { stock: newAddonStock, updatedAt: now });
+
+          const aHistId = generateId();
+          const aHistEntry: StockHistory = {
+            id: aHistId,
+            productId: addonProduct.id,
+            changeQty: -addonQty,
+            type: 'sale',
+            referenceId: id,
+            note: `Add-on for Sale ${newSale.invoiceNumber} (${addonItem.addon.name})`,
+            balanceAfter: newAddonStock,
+            cashierName: newSale.cashier || 'System',
+            createdAt: now,
+            ...(newAddonStock < 0 ? { wasOversold: true } : {}),
+          };
+          await localDb.stockHistory.add(aHistEntry);
+          movements.push({
+            id: aHistId,
+            product_id: addonProduct.id,
+            change_qty: -addonQty,
+            type: 'sale',
+            note: `Add-on for Sale ${newSale.invoiceNumber} (${addonItem.addon.name})`,
+            variant_id: '',
+            variant_label: '',
+            cashier_name: newSale.cashier || 'System',
+          });
+          historyQueue.push({ entity: 'stock_history', histId: aHistId, remote: toRemoteStockHistory(aHistEntry), opts: { batchId: id } });
+        }
       }
     }
 

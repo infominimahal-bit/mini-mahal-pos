@@ -214,7 +214,16 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
       const qty = Math.abs(Number(h.changeQty) || 0);
       if (!qty) continue;
       const sale = saleById.get(h.referenceId || '');
-      const item = sale?.items?.find((i: any) => i.product?.id === product.id);
+      let item: any = sale?.items?.find((i: any) => i.product?.id === product.id);
+      // BUG-3 FIX: add-on products log stock_history under the add-on product id,
+      // but live on sale.items[].addonItems (not top-level). Resolve them too so
+      // their revenue/COGS is captured instead of silently dropped to 0.
+      if (!item && sale) {
+        for (const it of sale.items || []) {
+          const a = (it.addonItems || []).find((ad: any) => ad.addon?.addonProductId === product.id);
+          if (a) { item = a; break; }
+        }
+      }
       const itemQty = item ? Math.abs(Number(item.weight ? item.weight : item.quantity) || 0) : 0;
       const scale = itemQty > 0 ? qty / itemQty : 1;
       if (h.type === 'sale') {

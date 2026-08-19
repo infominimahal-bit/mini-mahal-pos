@@ -123,7 +123,13 @@ export default function InventoryReportManager({
       if (!qty) continue;
       if (h.type !== 'sale' && h.type !== 'return') continue;
       const sale = saleById.get(h.referenceId || '');
-      const item = sale?.items?.find((i: any) => i.product?.id === h.productId);
+      let item: any = sale?.items?.find((i: any) => i.product?.id === h.productId);
+      if (!item && sale) {
+        for (const it of sale.items || []) {
+          const a = (it.addonItems || []).find((ad: any) => ad.addon?.addonProductId === h.productId);
+          if (a) { item = a; break; }
+        }
+      }
       const itemQty = item ? Math.abs(Number(item.weight ? item.weight : item.quantity) || 0) : 0;
       const scale = itemQty > 0 ? qty / itemQty : 1;
       const revenue = item ? (Number(item.subtotal) || 0) * scale : 0;

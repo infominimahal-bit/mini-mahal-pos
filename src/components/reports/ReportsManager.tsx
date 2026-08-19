@@ -410,18 +410,19 @@ export function ReportsManager() {
         let addonSubtotalSum = 0;
         let addonCostSum = 0;
 
+        const parentQty = Math.abs(Number(item.weight || item.quantity) || 0);
         const addonsAsItems = item.addonItems.map(addon => {
-          const addonSubtotal = (addon.price || 0) * (addon.quantity || 1) * (item.quantity || 1);
+          const addonSubtotal = (addon.price || 0) * (addon.quantity || 1) * parentQty;
           addonSubtotalSum += addonSubtotal;
 
           const actualAddonProd = state.products.find(p => p.id === addon.addon.addonProductId);
-          const addonCost = (actualAddonProd?.cost || 0) * (addon.quantity || 1) * (item.quantity || 1);
+          const addonCost = (actualAddonProd?.cost || 0) * (addon.quantity || 1) * parentQty;
           addonCostSum += addonCost;
 
           return {
             id: `${item.id}-addon-${addon.addon.id}`,
             product: actualAddonProd || { id: addon.addon.addonProductId, name: addon.name, category: 'Add-ons' },
-            quantity: (addon.quantity || 1) * (item.quantity || 1),
+            quantity: (addon.quantity || 1) * parentQty,
             // Propagate the parent's refunded quantity so partially-refunded addons
             // don't over-count COGS/revenue (B8).
             refundedQuantity: (addon.quantity || 1) * (item.refundedQuantity || 0),
