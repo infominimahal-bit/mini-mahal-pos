@@ -195,12 +195,16 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
 
   // ─── KPIs ───
   const totalPurchased = productPurchases.reduce((s, r) => s + (r.quantity || 0), 0);
-  const totalSoldUnits = productSales.reduce((s, sale) => {
-    return s + (sale.items || []).filter(i => i.product?.id === product.id)
-      .reduce((a, i) => {
-        const base = i.weight ? Number(i.weight) : (Number(i.quantity) || 0);
-        return a + Math.max(0, base - (Number(i.refundedQuantity) || 0));
-      }, 0);
+  // Sold Qty = net units sold, derived from the AUTHORITATIVE stock ledger
+  // (sales/stock_out = OUT, returns/deletes/refunds = IN). Reading from
+  // `sales.items` is unreliable: edit/delete/refund reversals store NEGATIVE
+  // quantities and deleted sales are filtered out of `productSales`, so the
+  // ledger is the single source of truth that reconciles with `product.stock`.
+  const totalSoldUnits = productStockHistory.reduce((s, h) => {
+    const qty = Math.abs(Number(h.changeQty) || 0);
+    if (h.type === 'sale') return s + qty;
+    if (h.type === 'return') return s - qty;
+    return s;
   }, 0);
   const totalRevenue = productSales.reduce((s, sale) => {
     return s + (sale.items || []).filter(i => i.product?.id === product.id)

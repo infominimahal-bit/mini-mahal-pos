@@ -99,6 +99,27 @@ export default function InventoryReportManager({
       );
     }
 
+    // Net-sold per product from the AUTHORITATIVE stock ledger. `sales.items`
+    // is unreliable here: edit/delete/refund reversals store negative quantities
+    // and deleted sales are excluded, breaking reconciliation with stock. The
+    // ledger captures every movement (sale=OUT, return=IN), so Sold Qty is
+    // derived from it to guarantee Stock + SoldQty = InitialStock.
+    const reportEnd = new Date(endDate);
+    if (reportEnd.getHours() === 0 && reportEnd.getMinutes() === 0) reportEnd.setHours(23, 59, 59, 999);
+    const reportStartMs = startDate.getTime();
+    const reportEndMs = reportEnd.getTime();
+    const soldQtyByProduct = new Map<string, number>();
+    for (const h of (state.stockHistory || [])) {
+      const hTs = new Date(h.createdAt).getTime();
+      if (hTs < reportStartMs || hTs > reportEndMs) continue;
+      if (!h.productId) continue;
+      const qty = Math.abs(Number(h.changeQty) || 0);
+      let cur = soldQtyByProduct.get(h.productId) || 0;
+      if (h.type === 'sale') cur += qty;
+      else if (h.type === 'return') cur -= qty;
+      soldQtyByProduct.set(h.productId, cur);
+    }
+
     const stats = productsToProcess.map(product => {
       const isInfinite = product.trackInventory === false || product.stock >= 990000;
 
@@ -137,14 +158,7 @@ export default function InventoryReportManager({
         return isOfficial && inDateRange && storeMatch;
       });
 
-      const soldQty = filteredSales.reduce((sum, sale) => {
-        return sum + (sale.items || [])
-          .filter(item => {
-            const itemProdId = item.product?.id || (item as any).productId;
-            return itemProdId === product.id;
-          })
-          .reduce((s, item) => s + netItemQty(item), 0);
-      }, 0);
+      const soldQty = soldQtyByProduct.get(product.id) || 0;
 
       const revenue = filteredSales.reduce((sum, sale) => {
         return sum + (sale.items || [])
@@ -240,7 +254,7 @@ export default function InventoryReportManager({
     });
 
     return filtered;
-  }, [state.products, state.sales, sales, search, statusFilter, categoryFilter, supplierFilter, globalCategory, globalSupplier, globalStore, startDate, endDate, sortField, sortDir]);
+  }, [state.products, state.sales, state.stockHistory, sales, search, statusFilter, categoryFilter, supplierFilter, globalCategory, globalSupplier, globalStore, startDate, endDate, sortField, sortDir]);
 
   const { page, totalPages, pageItems: displayedData, goToPage, pageSize, setPageSize } = usePagination(inventoryData, 25);
 

@@ -2,6 +2,11 @@
 
 Whenever a database change is made, it MUST be recorded here.
 
+### [2026-08-19] Fix: "Sold Qty" counter now reconciles with stock (derived from ledger)
+**Files:** `src/components/inventory/ProductDetailHub.tsx`, `src/components/inventory/InventoryReportManager.tsx`
+**Bug:** `Sold Qty` was computed from `sales.items` quantities. Edit/delete/refund reversals store NEGATIVE quantities in `items` (e.g. `INV-001049` completed had `quantity = -5`), and deleted sales are filtered out of `productSales` — so `Math.max(0, qty - refundedQuantity)` collapsed negatives to 0, under-counting. ProductDetailHub showed `42` while stock ledger implied `50` sold (Stock 50 + Sold 42 = 92 ≠ Initial 100 → 8-unit gap).
+**Fix:** Derive `Sold Qty` from the **authoritative stock ledger** (`stock_history`): net = Σ sale-OUT − Σ return-IN (per product, date-filtered in the report). This is exactly what the ProductDetailHub comment already declares as the source of truth ("derived sales/purchases missed delete-reversals because deleted sales are filtered out of `sales`"). Verified on live `jz` data: ledger net-sold = 50 = current stock → Stock + SoldQty = Initial reconciles. `state.stockHistory` (context) used in the report; `productStockHistory` (live query) used in the hub. tsc clean.
+
 ### [2026-08-19] Master schema + clone guide verified for fresh clone (closed 2 clone-breaking gaps)
 **Files:** `supabase/schema/SUPER_MASTER_SCHEMA.sql`, `docs/setup.md`
 **Context:** Verified the repo is clone-ready (fresh `git clone` → new Supabase project → push `SUPER_MASTER_SCHEMA.sql` must create a fully-working DB). Found 2 migrations whose effects were MISSING from the master schema (would break a fresh clone even though the live DB had them applied individually):
