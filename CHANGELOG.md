@@ -2,6 +2,11 @@
 
 Whenever a database change is made, it MUST be recorded here.
 
+### [2026-08-18] Receipt shows "EDITED FROM INV #X" for edited (corrected) bills
+**Files:** `src/components/pos/ReceiptPrint.tsx`
+**Context:** When a finalized bill is edited, the app creates a NEW corrected invoice linked via `sale.editedFromInvoice` (original invoice #). The eye-icon `TransactionDetailModal` already showed the edit banner, but the **printed/shared receipt** did not. Added an `editWatermark` (purple `*** EDITED FROM INV #<original> ***`) mirrored on all 11 receipt layouts next to the existing `refundWatermark`. The corrected bill's receipt now clearly states it was edited from the original invoice (tax/FBR audit trail on paper).
+**Note:** Code committed+pushed; live Vercel app still runs OLD code until a fresh deploy (token invalid).
+
 ### [2026-08-18] ALL-actions inventory + balance accuracy — magnitude guards (no sign flips)
 **Files:** `src/lib/services.ts`
 **Context (master directive — "all actions inventory + balance accuracy"):** After the negative-quantity inventory bug (INV-001030/001032/001035 had `total:-5000` and flipped a −5 OUT into a +5 IN, corrupting stock), the fix must be defensive on EVERY stock-affecting path so no future action can flip a sign. Applied `Math.abs(Number(...)||0)` magnitude safety to ALL stock movements and wallet/payment deltas:

@@ -879,6 +879,10 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
     <div style={{ border: '2px solid black', padding: '8px', textAlign: 'center', margin: '10px 0', fontWeight: clamp(baseWeight + 300), fontSize: `${fs.shopName}px`, textTransform: 'uppercase' }}>*** REFUNDED ***</div>
   ) : null;
 
+  const editWatermark = sale.editedFromInvoice ? (
+    <div style={{ border: '2px solid black', padding: '8px', textAlign: 'center', margin: '10px 0', fontWeight: clamp(baseWeight + 300), fontSize: `${fs.shopName}px`, textTransform: 'uppercase', color: '#7c3aed' }}>*** EDITED FROM INV #{sale.editedFromInvoice} ***</div>
+  ) : null;
+
   const notesBox = settings.receiptShowNotes && sale.notes ? (
     <div style={{ border: '2px solid black', padding: '6px', textAlign: 'center', margin: '12px auto', width: '90%', wordWrap: 'break-word', textTransform: 'uppercase', fontWeight: clamp(baseWeight + 100) }}>{sale.notes}</div>
   ) : null;
@@ -899,7 +903,7 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
 
   const renderDefaultBody = () => (
     <div style={baseContainer}>
-      {refundWatermark}
+      {refundWatermark}{editWatermark}
       <div style={{ borderTop: headerBorder, width: '100%', margin: '6px 0' }} />
       {renderHeaderSection()}
       <div style={{ paddingLeft: bodyPadL, paddingRight: bodyPadR }}>
@@ -921,7 +925,7 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
   // Layout 1: Horizontal Header Inline
   const renderHorizontalHeader = () => (
     <div style={baseContainer}>
-      {refundWatermark}
+      {refundWatermark}{editWatermark}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '2px solid #000', paddingBottom: '10px', marginBottom: '10px' }}>
         {renderLogo({ width: '50px', height: '50px', border: '2px solid #000', borderRadius: '8px', flexShrink: 0 })}
         <div style={{ textAlign: 'left' }}>
@@ -948,7 +952,7 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
   // Layout 2: Centered & Balanced Flow
   const renderCenteredFlow = () => (
     <div style={{ ...baseContainer, textAlign: 'center' }}>
-      {refundWatermark}
+      {refundWatermark}{editWatermark}
       {settings.receiptShowBarcode !== false && (
         <div style={{ margin: '10px 0', display: 'flex', justifyContent: 'center' }}>
           <BarcodePreview value={sale.invoiceNumber} height={40} showValue={true} options={{ width: is58mm ? 1.1 : 1.4, margin: 4 }} />
@@ -1003,7 +1007,7 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
   // Layout 3: Left-Aligned Strict Grid
   const renderLeftGrid = () => (
     <div style={baseContainer}>
-      {refundWatermark}
+      {refundWatermark}{editWatermark}
       <div style={{ marginBottom: '15px' }}>
         <div style={{ borderBottom: '3px solid #000', width: '100%', paddingBottom: '5px', fontSize: '16px', fontWeight: 'bold' }}>{settings.storeName || 'STORE NAME'}</div>
         {settings.receiptShowStoreAddress && <div style={{ marginTop: '4px' }}>{settings.storeAddress}</div>}
@@ -1038,7 +1042,7 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
   // Layout 4: Split Columns Address
   const renderSplitColumns = () => (
     <div style={baseContainer}>
-      {refundWatermark}
+      {refundWatermark}{editWatermark}
       <div style={{ textAlign: 'center', borderBottom: '1px dotted #000', paddingBottom: '10px', marginBottom: '10px' }}>
         {renderLogo({ width: '50px', height: '50px', border: '2px solid #000', borderRadius: '8px', margin: '0 auto 5px' })}
         {settings.receiptShowStoreName && <div style={{ fontWeight: clamp(baseWeight + 300), fontSize: `${fs.shopName}px`, textTransform: 'uppercase' }}>{settings.storeName}</div>}
@@ -1068,7 +1072,7 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
   // Layout 5: Floating Right Totals
   const renderFloatingTotals = () => (
     <div style={baseContainer}>
-      {refundWatermark}
+      {refundWatermark}{editWatermark}
       {settings.receiptShowStoreName && <div style={{ fontWeight: clamp(baseWeight + 300), fontSize: `${fs.shopName}px`, borderBottom: '2px solid #000', display: 'inline-block', paddingBottom: '2px', marginBottom: '10px' }}>{settings.storeName}</div>}
       <div style={{ marginBottom: '15px' }}>
         {settings.receiptShowStoreAddress && <div>{settings.storeAddress}</div>}
@@ -1099,7 +1103,7 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
   // Layout 6: Offset Corner Logo
   const renderOffsetLogo = () => (
     <div style={{ ...baseContainer, textAlign: 'right' }}>
-      {refundWatermark}
+      {refundWatermark}{editWatermark}
       {renderLogo({ position: 'absolute', top: '15px', left: '15px', width: '50px', height: '50px', border: '2px solid #000', borderRadius: '8px' })}
       <div style={{ paddingTop: '25px', paddingLeft: '70px', minHeight: '55px' }}>
         {settings.receiptShowStoreName && <div style={{ fontWeight: clamp(baseWeight + 300), fontSize: `${fs.shopName}px`, textTransform: 'uppercase' }}>{settings.storeName}</div>}
@@ -1124,7 +1128,7 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
   // Layout 7: Boxed Structured Sections
   const renderBoxedSections = () => (
     <div style={baseContainer}>
-      {refundWatermark}
+      {refundWatermark}{editWatermark}
       <div style={{ border: '1px solid #000', padding: '10px', textAlign: 'center', marginBottom: '10px' }}>
         {renderLogo({ width: '50px', height: '50px', border: '1px dashed #000', borderRadius: '8px', margin: '0 auto 5px' })}
         {settings.receiptShowStoreName && <div style={{ fontWeight: clamp(baseWeight + 300), fontSize: `${fs.shopName}px`, textTransform: 'uppercase' }}>{settings.storeName}</div>}
@@ -1161,7 +1165,7 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
   // Layout 8: Tear-Off Slip
   const renderTearOff = () => (
     <div style={baseContainer}>
-      {refundWatermark}
+      {refundWatermark}{editWatermark}
       <div style={{ textAlign: 'center' }}>
         {renderLogo({ width: '50px', height: '50px', border: '2px solid #000', borderRadius: '8px', margin: '0 auto 10px' })}
         {settings.receiptShowStoreName && <div style={{ fontWeight: clamp(baseWeight + 300), fontSize: `${fs.shopName}px`, textTransform: 'uppercase' }}>{settings.storeName}</div>}
@@ -1196,7 +1200,7 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
   // Layout 9: Vertical Line Split Header
   const renderVerticalLine = () => (
     <div style={baseContainer}>
-      {refundWatermark}
+      {refundWatermark}{editWatermark}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '15px' }}>
         {renderLogo({ width: '50px', height: '50px', border: '2px solid #000', flexShrink: 0 })}
         <div style={{ width: '2px', height: '40px', background: '#000', margin: '0 15px' }} />
@@ -1224,7 +1228,7 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
   // Layout 10: Emphasized Total Box
   const renderEmphasizedTotal = () => (
     <div style={baseContainer}>
-      {refundWatermark}
+      {refundWatermark}{editWatermark}
       <div style={{ textAlign: 'center' }}>
         {renderLogo({ width: '50px', height: '50px', border: '2px solid #000', borderRadius: '50%', margin: '0 auto 10px' })}
         {settings.receiptShowStoreName && <div style={{ fontWeight: clamp(baseWeight + 300), fontSize: `${fs.shopName}px`, textTransform: 'uppercase' }}>{settings.storeName}</div>}
