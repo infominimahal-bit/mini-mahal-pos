@@ -50,6 +50,18 @@ full and the wallet can never end up kam (under) or ziyada (over). Final status 
 the chosen "Refund Method" is recorded for the audit payout only. If you instead want refund-to-Online-Wallet
 to CREDIT the online wallet balance (store credit), say so and I'll switch it.
 
+### [2026-08-18] INVENTORY INTEGRITY BUG FIX — negative item quantity flipped stock sign (+sale rows)
+**Symptom (user):** product IN/OUT ledger didn't match `product.stock` (5–10 unit gap); a `POS SALE` row showed as `+5 IN` instead of `-5 OUT`.
+**Root cause:** `salesService.create` stock deduction used `const qty = item.weight || item.quantity;` (services.ts:1899).
+A sale item with a **negative quantity** (e.g. qty = -5, seen on INV-001030 / INV-001032 / INV-001035 during testing — those sales even had `total: -5000`)
+made `newStock = stock - qty = stock + 5` AND `changeQty: -qty = +5`, flipping the sign and corrupting inventory.
+**Fix:** `qty = Math.abs(Number(item.weight || item.quantity) || 0)` so a sale ALWAYS decreases stock (changeQty stays negative) regardless of input sign.
+**Live data repair (jz):** flipped the 3 corrupted `sale` rows (`change_qty +5 → -5`) and reconciled both products'
+`stock` to `SUM(stock_history.change_qty)`. Verified: `jeans` and `boys t shir` now both `stock = ledger = 90` with zero remaining
+sign anomalies (queried all products for `sale>0` / `return<0` / `stock_in<0` → empty).
+**Note:** `Math.abs` protects inventory, but a negative-quantity item would still yield a negative SALE TOTAL (revenue). Negative cart
+quantities should never be creatable — if they recur, the cart/stepper must be guarded (separate fix). For now inventory can no longer drift from this.
+
 ### [2026-08-18] Wallet balances now sync across devices (checkout = reporting)
 **Files:** `src/lib/cloudPull.ts`
 **Context:** Checkout reads `localDb.paymentModes.balance` for the Cash/Card/Online wallet chips. That local cache was only ever updated by the device's OWN sales (`adjustPaymentBalances`) and **never pulled from the cloud**, so every device showed its own per-device balance — while Reports/Sales tab derives the true aggregate from the synced `payment_movements` ledger. (Owner report: "har device pe apna apna aa raha h".) Cloud `payment_modes.balance` is the authoritative aggregate (maintained only by the `apply_payment_movements` RPC — `adjustPaymentBalances` never pushes `payment_modes.balance`, and SyncEngine now strips `balance` from `payment_modes` upserts to prevent drift).

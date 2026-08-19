@@ -1895,8 +1895,11 @@ export const salesService = {
       const item = newSale.items[i];
       const product = await localDb.products.get(item.product.id);
 
-      if (product && product.trackInventory) {
-        const qty = item.weight || item.quantity;
+       if (product && product.trackInventory) {
+        // DEFENSIVE (inventory integrity): always use the magnitude. A negative
+        // item.quantity/weight must NEVER flip the stock sign — a sale always
+        // DECREASES stock, so changeQty stays negative regardless of input sign.
+        const qty = Math.abs(Number(item.weight || item.quantity) || 0);
         // RULE: Allow negative stock — never block a sale on stock level
         const newStock = (product.stock || 0) - qty;
         if (newStock < 0) anyOversold = true;
