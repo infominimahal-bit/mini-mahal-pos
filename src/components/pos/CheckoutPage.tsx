@@ -172,6 +172,8 @@ export function CheckoutPage({ onClose, onComplete }: CheckoutPageProps) {
       const half = (finalTotal / 2).toString();
       setSplitAmountA(half);
       setSplitAmountB(half);
+    } else if (m !== 'cash') {
+      setAmountPaid(finalTotal.toString());
     }
   };
 
@@ -179,6 +181,12 @@ export function CheckoutPage({ onClose, onComplete }: CheckoutPageProps) {
   const [extraCharges, setExtraCharges] = useState<{ name: string; amount: string }[]>([
     { name: 'DC', amount: '' }
   ]);
+
+  useEffect(() => {
+    if (paymentMethod !== 'cash' && paymentMethod !== 'split') {
+      setAmountPaid(finalTotal.toString());
+    }
+  }, [finalTotal, paymentMethod]);
   const { retailEnabled, wholesaleEnabled, estoreEnabled } = state.settings;
   const { subtotal, totalDiscount, taxAmount, total: baseTotal, activePromotions: appliedDiscounts, freeGifts } = useCartCalculations(paymentMethod);
 
@@ -320,7 +328,7 @@ export function CheckoutPage({ onClose, onComplete }: CheckoutPageProps) {
       case 'split': {
         const a = parseFloat(splitAmountA) || 0;
         const b = parseFloat(splitAmountB) || 0;
-        return a > 0 && Math.abs((a + b) - finalTotal) < 0.01;
+        return a !== 0 && Math.abs((a + b) - finalTotal) < 0.01;
       }
       default: return false;
     }
@@ -720,12 +728,13 @@ export function CheckoutPage({ onClose, onComplete }: CheckoutPageProps) {
                     type="text" inputMode="decimal"
                     value={amountPaid}
                     onChange={e => setAmountPaid(e.target.value.replace(/[^0-9.]/g, ''))}
-                    className="w-full h-14 pl-12 pr-12 py-3 bg-white dark:bg-surface border border-gray-200 dark:border-white/10 rounded-full text-xl font-black text-gray-900 dark:text-white focus:border-primary outline-none transition-all [appearance:textfield] text-center"
+                    className="w-full h-14 pl-12 pr-12 py-3 bg-white dark:bg-surface border border-gray-200 dark:border-white/10 rounded-full text-xl font-black text-gray-900 dark:text-white focus:border-primary outline-none transition-all [appearance:textfield] text-center disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-white/5"
                     placeholder="0"
+                    disabled={paymentMethod !== 'cash'}
                   />
                 </div>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {quickAmounts.map((amt, idx) => (
+                <div className="grid grid-cols-4 gap-1.5 min-h-[32px]">
+                  {paymentMethod === 'cash' && quickAmounts.map((amt, idx) => (
                     <button key={`${amt}-${idx}`} onClick={() => setAmountPaid(amt.toString())}
                       className="py-1.5 sm:py-2 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 text-[8px] sm:text-[9px] font-black border border-gray-200 dark:border-white/10 rounded-full active:scale-95 touch-manipulation transition-all tabular-nums hover:border-transparent">
                       {state.settings.currency || 'Rs'} {Math.round(amt)}
