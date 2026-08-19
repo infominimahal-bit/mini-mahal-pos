@@ -1186,6 +1186,10 @@ body[style*="overflow:hidden"] .md\:hidden.lg\:hidden.bg-white.dark\:bg-\[\#0A0A
 }
 
 /* --- Sonner Toaster Mobile Top Offset Fix & Size Optimization --- */
+[data-sonner-toaster] {
+  z-index: 999999 !important;
+}
+
 @media (max-width: 640px) {
   [data-sonner-toaster] {
     top: max(env(safe-area-inset-top, 16px), 64px) !important;
