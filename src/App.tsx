@@ -304,8 +304,9 @@ function AppContent() {
   // Intercept for password recovery mode
 
   return (
-    <div dir={isRtl ? 'rtl' : 'ltr'} className="fixed inset-0 w-full bg-gray-50 dark:bg-app flex flex-col overflow-hidden">
+    <>
       <Toaster
+        className="!z-[999999]"
         position="top-center"
         expand={false}
         visibleToasts={3}
@@ -352,7 +353,8 @@ function AppContent() {
           },
         }}
       />
-      {location.pathname.startsWith('/store') ? (
+      <div dir={isRtl ? 'rtl' : 'ltr'} className="fixed inset-0 w-full bg-gray-50 dark:bg-app flex flex-col overflow-hidden">
+        {location.pathname.startsWith('/store') ? (
         <Suspense fallback={<LoadingView />}>
           <EStoreApp />
         </Suspense>
@@ -420,7 +422,8 @@ function AppContent() {
           <MobileBottomNav onShowMenu={() => setIsMobileMenuOpen(true)} />
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 
