@@ -462,8 +462,14 @@ export function TransactionDetailModal({ transaction, allTransactions, onNavigat
                           key={`bundle-${b.bundleId}-item-${itemIdx}`}
                           onClick={() => {
                             if (item.product?.id) {
-                              detailNavigate('/inventory/products', { state: { productId: item.product.id, fromSale: transaction.id } });
-                              onClose();
+                              const exists = state.products.some(p => p.id === item.product?.id);
+                              if (exists) {
+                                sonner.success('Opening product details...');
+                                detailNavigate('/inventory/products', { state: { productId: item.product.id, fromSale: transaction.id } });
+                                onClose();
+                              } else {
+                                sonner.error(t('product_deleted', 'Product Deleted'), t('product_deleted_msg', 'This product no longer exists in your inventory.'));
+                              }
                             }
                           }}
                           className={`${item.product?.id ? 'cursor-pointer hover:bg-violet-500/[0.03] dark:hover:bg-violet-500/[0.03] transition-colors group' : ''} bg-violet-500/[0.005] border-t border-gray-100/50 dark:border-white/5`}
@@ -511,8 +517,14 @@ export function TransactionDetailModal({ transaction, allTransactions, onNavigat
                         key={`standalone-${index}`}
                         onClick={() => {
                           if (item.product?.id) {
-                            detailNavigate('/inventory/products', { state: { productId: item.product.id, fromSale: transaction.id } });
-                            onClose();
+                            const exists = state.products.some(p => p.id === item.product?.id);
+                            if (exists) {
+                              sonner.success('Opening product details...');
+                              detailNavigate('/inventory/products', { state: { productId: item.product.id, fromSale: transaction.id } });
+                              onClose();
+                            } else {
+                              sonner.error(t('product_deleted', 'Product Deleted'), t('product_deleted_msg', 'This product no longer exists in your inventory.'));
+                            }
                           }
                         }}
                         className={item.product?.id ? "cursor-pointer hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors group" : ""}

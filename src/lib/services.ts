@@ -1134,7 +1134,7 @@ export const buildSalePaymentMoves = (sale: any): any[] => {
     return sale.splitPayments.map((p: any) => ({
       id: generateId(),
       modeId: normalizePaymentMethod(p.method),
-      delta: Number(p.amount || 0),
+      delta: Math.abs(Number(p.amount || 0)),
       referenceId: ref,
       note: `Sale ${sale.invoiceNumber || ref}`,
     }));
@@ -1142,7 +1142,7 @@ export const buildSalePaymentMoves = (sale: any): any[] => {
   return [{
     id: generateId(),
     modeId: normalizePaymentMethod(sale.paymentMethod),
-    delta: Number(sale.total || 0),
+    delta: Math.abs(Number(sale.total || 0)),
     referenceId: ref,
     note: `Sale ${sale.invoiceNumber || ref}`,
   }];
@@ -1155,7 +1155,7 @@ export const buildReversePaymentMoves = (sale: any, ratio = 1): any[] => {
     return sale.splitPayments.map((p: any) => ({
       id: generateId(),
       modeId: normalizePaymentMethod(p.method),
-      delta: -Number(p.amount || 0) * ratio,
+      delta: -Math.abs(Number(p.amount || 0)) * ratio,
       referenceId: ref,
       note: `Reverse ${sale.invoiceNumber || ref}`,
     }));
@@ -1163,7 +1163,7 @@ export const buildReversePaymentMoves = (sale: any, ratio = 1): any[] => {
   return [{
     id: generateId(),
     modeId: normalizePaymentMethod(sale.paymentMethod),
-    delta: -Number(sale.total || 0) * ratio,
+    delta: -Math.abs(Number(sale.total || 0)) * ratio,
     referenceId: ref,
     note: `Reverse ${sale.invoiceNumber || ref}`,
   }];
@@ -2236,7 +2236,8 @@ export const salesService = {
       for (const item of sale.items) {
         const product = await localDb.products.get(item.product.id);
         if (product && product.trackInventory) {
-          const qty = (item.weight || item.quantity) - (item.refundedQuantity || 0);
+          const itemQtyMag = Math.abs(Number(item.weight || item.quantity) || 0);
+          const qty = Math.max(0, itemQtyMag - (Number(item.refundedQuantity) || 0));
           if (qty <= 0) continue;
           const newStock = (product.stock || 0) + qty;
 
@@ -2329,7 +2330,7 @@ export const salesService = {
           for (const addonItem of item.addonItems) {
             const addonProduct = await localDb.products.get(addonItem.addon.addonProductId);
             if (addonProduct && addonProduct.trackInventory) {
-              const addonQty = (addonItem.quantity * item.quantity) - (item.refundedQuantity ? addonItem.quantity * item.refundedQuantity : 0);
+              const addonQty = (addonItem.quantity * itemQtyMag) - (item.refundedQuantity ? addonItem.quantity * item.refundedQuantity : 0);
               if (addonQty <= 0) continue;
 
               const newAddonStock = (addonProduct.stock || 0) + addonQty;
@@ -2560,17 +2561,17 @@ export const salesService = {
 
     // 1. Reverse Stock Locally & Update Sale Items
     for (const reqItem of itemsToReverse) {
-      if (reqItem.qty <= 0) continue;
+      if (Math.abs(Number(reqItem.qty) || 0) <= 0) continue;
 
       const item = sale.items[reqItem.index];
       if (!item) continue;
 
       // Update item's refunded quantity
-      item.refundedQuantity = (item.refundedQuantity || 0) + reqItem.qty;
+      item.refundedQuantity = (item.refundedQuantity || 0) + Math.abs(Number(Math.abs(Number(reqItem.qty) || 0)) || 0);
 
       const product = await localDb.products.get(item.product.id);
       if (product && product.trackInventory) {
-        const qty = reqItem.qty;
+        const qty = Math.abs(Number(Math.abs(Number(reqItem.qty) || 0)) || 0);
         const newStock = (product.stock || 0) + qty;
 
         await localDb.products.update(product.id, {
@@ -2607,7 +2608,7 @@ export const salesService = {
         if (item.selectedVariantId && product.variantData) {
           const variant = product.variantData.find(v => v.id === item.selectedVariantId);
           if (variant) {
-            const newVariantStock = (variant.stock || 0) + reqItem.qty;
+            const newVariantStock = (variant.stock || 0) + Math.abs(Number(reqItem.qty) || 0);
             const updatedVariantData = product.variantData.map(v =>
               v.id === variant.id ? { ...v, stock: newVariantStock } : v
             );
@@ -2621,7 +2622,7 @@ export const salesService = {
               productId: product.id,
               variantId: item.selectedVariantId,
               variantLabel: item.selectedVariantLabel || variant.cardTitle || variant.option1,
-              changeQty: reqItem.qty,
+              changeQty: Math.abs(Number(reqItem.qty) || 0),
               type: 'return',
               referenceId: id,
               note: `Sale #${sale.invoiceNumber} Refunded (Variant)`,
@@ -2633,7 +2634,7 @@ export const salesService = {
             returnMovements.push({
               id: vRetHistId,
               product_id: product.id,
-              change_qty: reqItem.qty,
+              change_qty: Math.abs(Number(reqItem.qty) || 0),
               type: 'return',
               note: `Sale #${sale.invoiceNumber} Refunded (Variant)`,
               variant_id: item.selectedVariantId,
@@ -2650,7 +2651,7 @@ export const salesService = {
         for (const addonItem of item.addonItems) {
           const addonProduct = await localDb.products.get(addonItem.addon.addonProductId);
           if (addonProduct && addonProduct.trackInventory) {
-            const addonQtyToRestore = reqItem.qty * addonItem.quantity;
+            const addonQtyToRestore = Math.abs(Number(reqItem.qty) || 0) * addonItem.quantity;
             if (addonQtyToRestore <= 0) continue;
 
             const newAddonStock = (addonProduct.stock || 0) + addonQtyToRestore;
