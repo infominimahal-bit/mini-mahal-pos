@@ -2039,6 +2039,12 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
       {selectedSale && (
         <TransactionDetailModal
           transaction={selectedSale}
+          allTransactions={productSales}
+          onNavigate={setSelectedSale}
+          onReprint={(sale) => {
+             // Handle reprint if needed from ProductDetailHub, or just no-op
+             sonner.info('Print requested', 'Navigate to Transactions to print this sale');
+          }}
           onClose={() => {
             setSelectedSale(null);
             setTimeout(() => setClickedRowId(null), 1000);
