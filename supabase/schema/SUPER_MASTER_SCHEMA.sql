@@ -1583,7 +1583,7 @@ BEGIN
         status = v_status,
         refunded_amount = COALESCE(refunded_amount, 0) + v_refunded_amount,
         items = COALESCE(return_data->>'items', items::TEXT)::JSONB,
-        notes = COALESCE(notes, '') || E'\n[RETURNED] ' || COALESCE(return_data->>'notes', ''),
+        notes = COALESCE(notes, '') || '[RETURNED] ' || COALESCE(return_data->>'notes', ''),
         updated_at = NOW()
     WHERE id = sale_id;
 
@@ -2021,7 +2021,7 @@ BEGIN
         status = v_status,
         refunded_amount = COALESCE(refunded_amount, 0) + v_refunded_amount,
         items = COALESCE(return_data->>'items', items::TEXT)::JSONB,
-        notes = COALESCE(notes, '') || E'\n[RETURNED] ' || COALESCE(return_data->>'notes', ''),
+        notes = COALESCE(notes, '') || '[RETURNED] ' || COALESCE(return_data->>'notes', ''),
         updated_at = NOW()
     WHERE id = sale_id;
     RETURN jsonb_build_object('success', true, 'id', sale_id);
