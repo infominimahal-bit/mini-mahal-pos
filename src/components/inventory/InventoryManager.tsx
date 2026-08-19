@@ -23,6 +23,7 @@ import { sonner } from '../../lib/sonner';
 import { productsService } from '../../lib/services';
 import { formatCurrency } from '../../lib/currencies';
 import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
+import { normalizeBarcodeValue } from '../../utils/barcode';
 import { useTranslation } from '../../hooks/useTranslation';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { generateId, localDb, queueOp } from '../../lib/localDb';
@@ -232,7 +233,10 @@ export function InventoryManager() {
   useBarcodeScanner((barcode: string) => {
     if (!state?.products) return;
     const term = barcode.trim();
-    const normalizedTerm = term.toUpperCase().replace(/O/g, '0');
+    // Use the shared OCR normalizer (O→0, I→1, L→1, S→5, Z→2) so scanning matches
+    // exactly the same rule ProductGrid uses — a physical scan must resolve the
+    // same product on every screen.
+    const normalizedTerm = normalizeBarcodeValue(term);
 
     // 1. Exact match
     let found = state.products.find(
@@ -242,8 +246,8 @@ export function InventoryManager() {
     // 2. Normalized match (handles OCR confusion)
     if (!found) {
       found = state.products.find((p: Product) => {
-        const pBarcode = (p.barcode || '').toUpperCase().replace(/O/g, '0');
-        const pSku = (p.sku || '').toUpperCase().replace(/O/g, '0');
+        const pBarcode = normalizeBarcodeValue(p.barcode || '');
+        const pSku = normalizeBarcodeValue(p.sku || '');
         return pBarcode === normalizedTerm || pSku === normalizedTerm;
       });
     }

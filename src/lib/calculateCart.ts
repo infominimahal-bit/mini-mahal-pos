@@ -86,42 +86,50 @@ export function calculateCart(input: CartCalculationInput): CartCalculationResul
         });
         activePromotions.push({ discountId: discount.id, discountName: discount.name, discountAmount: 0, type: 'free_gift' });
 
-      } else if (discount.type === 'mix_and_match') {
+      } else if (discount.type === 'mix_and_match' || discount.type === 'bogo') {
         const mmCond = discount.conditions?.find((c: any) => c.type === 'category' || c.type === 'specific_products');
-        if (mmCond && mmCond.targetQuantity) {
-          const eligibleItems: { index: number; price: number; qty: number }[] = [];
-          cart.forEach((item, index) => {
-            const unitPrice = item.product.price || (item.subtotal / (Math.abs(item.quantity) || 1));
-            if (mmCond.type === 'category' && mmCond.value?.includes(item.product.category)) {
-              eligibleItems.push({ index, price: unitPrice, qty: item.quantity });
-            } else if (mmCond.type === 'specific_products' && mmCond.value?.includes(item.product.id)) {
-              eligibleItems.push({ index, price: unitPrice, qty: item.quantity });
-            }
-          });
-          const unrolled: { index: number; price: number }[] = [];
-          eligibleItems.forEach(item => {
-            for (let i = 0; i < item.qty; i++) unrolled.push({ index: item.index, price: item.price });
-          });
-          unrolled.sort((a, b) => b.price - a.price);
-
-          const sets = Math.floor(unrolled.length / mmCond.targetQuantity);
-          if (sets > 0) {
-            let dealDiscount = 0;
-            for (let s = 0; s < sets; s++) {
-              const bundle = unrolled.slice(s * mmCond.targetQuantity, (s + 1) * mmCond.targetQuantity);
-              const bundleTotal = bundle.reduce((sum, item) => sum + item.price, 0);
-              if (mmCond.rewardType === 'fixed_total') {
-                const bd = bundleTotal - (mmCond.rewardValue || 0);
-                if (bd > 0) dealDiscount += bd;
-              } else if (mmCond.rewardType === 'percentage_off_all') {
-                dealDiscount += bundleTotal * (mmCond.rewardValue || 0) / 100;
-              } else if (mmCond.rewardType === 'cheapest_free') {
-                dealDiscount += bundle[bundle.length - 1].price;
+        if (mmCond) {
+          // BOGO = "buy (minQuantity||1) get 1 free" → set size minQuantity+1, cheapest free.
+          // mix_and_match reads its targetQuantity/rewardType directly from the condition.
+          const targetQuantity = discount.type === 'bogo'
+            ? Math.max(2, (mmCond.minQuantity || 1) + 1)
+            : (mmCond.targetQuantity || 0);
+          const rewardType = discount.type === 'bogo' ? 'cheapest_free' : mmCond.rewardType;
+          if (targetQuantity > 0) {
+            const eligibleItems: { index: number; price: number; qty: number }[] = [];
+            cart.forEach((item, index) => {
+              const unitPrice = item.product.price || (item.subtotal / (Math.abs(item.quantity) || 1));
+              if (mmCond.type === 'category' && mmCond.value?.includes(item.product.category)) {
+                eligibleItems.push({ index, price: unitPrice, qty: item.quantity });
+              } else if (mmCond.type === 'specific_products' && mmCond.value?.includes(item.product.id)) {
+                eligibleItems.push({ index, price: unitPrice, qty: item.quantity });
               }
-            }
-            if (dealDiscount > 0) {
-              autoPromotionAmount = roundTo2(autoPromotionAmount + dealDiscount);
-              activePromotions.push({ discountId: discount.id, discountName: discount.name, discountAmount: roundTo2(dealDiscount), type: 'mix_and_match' });
+            });
+            const unrolled: { index: number; price: number }[] = [];
+            eligibleItems.forEach(item => {
+              for (let i = 0; i < item.qty; i++) unrolled.push({ index: item.index, price: item.price });
+            });
+            unrolled.sort((a, b) => b.price - a.price);
+
+            const sets = Math.floor(unrolled.length / targetQuantity);
+            if (sets > 0) {
+              let dealDiscount = 0;
+              for (let s = 0; s < sets; s++) {
+                const bundle = unrolled.slice(s * targetQuantity, (s + 1) * targetQuantity);
+                const bundleTotal = bundle.reduce((sum, item) => sum + item.price, 0);
+                if (rewardType === 'fixed_total') {
+                  const bd = bundleTotal - (mmCond.rewardValue || 0);
+                  if (bd > 0) dealDiscount += bd;
+                } else if (rewardType === 'percentage_off_all') {
+                  dealDiscount += bundleTotal * (mmCond.rewardValue || 0) / 100;
+                } else if (rewardType === 'cheapest_free') {
+                  dealDiscount += bundle[bundle.length - 1].price;
+                }
+              }
+              if (dealDiscount > 0) {
+                autoPromotionAmount = roundTo2(autoPromotionAmount + dealDiscount);
+                activePromotions.push({ discountId: discount.id, discountName: discount.name, discountAmount: roundTo2(dealDiscount), type: discount.type });
+              }
             }
           }
         }

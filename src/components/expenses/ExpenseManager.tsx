@@ -176,6 +176,48 @@ export function ExpenseManager() {
       if (editingExpense) {
         const updated = await expensesService.update(editingExpense.id, fullExpenseData);
         dispatch({ type: 'UPDATE_EXPENSE', payload: updated });
+
+        // #17-FIX: keep the linked supplier payable in sync with the edited expense
+        // (amount change, supplier reassign, or supplier removed). Stops the supplier
+        // balance from drifting when a Supplies expense is edited.
+        try {
+          const { localDb } = await import('../../lib/localDb');
+          const linkedBill = (await localDb.supplierTransactions.toArray())
+            .find(t => t.referenceId === editingExpense.id);
+          const newAmount = Number(fullExpenseData.amount) || 0;
+          if (supplierId && newAmount > 0) {
+            if (linkedBill) {
+              if (linkedBill.supplierId === supplierId) {
+                await suppliersService.updateBill(linkedBill.id, {
+                  amount: newAmount,
+                  note: fullExpenseData.description || linkedBill.note,
+                });
+              } else {
+                await suppliersService.deleteTransaction(linkedBill.id);
+                await suppliersService.recordBill({
+                  supplierId,
+                  amount: newAmount,
+                  note: fullExpenseData.description || 'Supplies expense',
+                  referenceId: editingExpense.id,
+                  sourceType: 'manual_bill',
+                });
+              }
+            } else {
+              await suppliersService.recordBill({
+                supplierId,
+                amount: newAmount,
+                note: fullExpenseData.description || 'Supplies expense',
+                referenceId: editingExpense.id,
+                sourceType: 'manual_bill',
+              });
+            }
+          } else if (linkedBill) {
+            await suppliersService.deleteTransaction(linkedBill.id);
+          }
+        } catch (billErr) {
+          console.warn('[ExpenseManager] Failed to reconcile supplier bill:', billErr);
+        }
+
         sonner.success('Expense updated successfully.');
       } else {
         const created = await expensesService.create(fullExpenseData);

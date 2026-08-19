@@ -188,7 +188,7 @@ export function BarcodeGenerator({ products, onClose, onProductsChange }: Barcod
 
     /* ─── Settings ────────────────────────────────────────────────── */
     const [paperSize, setPaperSize] = useState<PaperSize>((state.settings.barcodePaperSize as PaperSize) || 'A4');
-    const [a4Columns, setA4Columns] = useState<number>(state.settings.barcodeA4Columns || 4);
+    const [a4Columns, setA4Columns] = useState<number>(state.settings.barcodeA4Columns || 3);
     const [a4Rows, setA4Rows] = useState<number>(state.settings.barcodeA4Rows || 10);
     const [showPrice, setShowPrice] = useState(state.settings.barcodeShowPrice ?? true);
     const [showName, setShowName] = useState(state.settings.barcodeShowName ?? true);

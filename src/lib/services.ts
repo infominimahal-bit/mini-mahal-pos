@@ -868,7 +868,11 @@ export async function recordCustomerLedger(entry: {
 }): Promise<number> {
   try {
     const prevRows = await localDb.customerLedger.where('customerId').equals(entry.customerId).toArray();
-    const prev = prevRows.length ? Number(prevRows[prevRows.length - 1].balanceAfter || 0) : 0;
+    // Order by createdAt (NOT Dexie insertion PK order) so the running balance is
+    // computed from the true chronological last entry — avoids drift when ids are
+    // generated out of order across devices/offline.
+    const sortedRows = prevRows.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const prev = sortedRows.length ? Number(sortedRows[sortedRows.length - 1].balanceAfter || 0) : 0;
     const balanceAfter = prev + (entry.debit || 0) - (entry.credit || 0);
     const ledgerId = generateId();
     const row: any = {
@@ -1263,11 +1267,29 @@ export const productsService = {
     const now = new Date();
     const barcodeVal = product.barcodeValue || product.barcode || generateBarcodeValue(product.name || id);
 
+    // AUTO-GENERATED BARCODE UNIQUENESS (RULE F1): the random 6-digit suffix can
+    // collide. For the auto-gen path (no user barcode supplied) guarantee a unique
+    // value against existing local products so a scanned code never resolves the
+    // WRONG product. User-supplied barcodes are validated by the guard above.
+    let finalBarcodeVal = barcodeVal;
+    if (!product.barcode || !product.barcode.trim()) {
+      const existingBarcodes = new Set(
+        (await localDb.products.toArray())
+          .map(p => (p.barcodeValue || p.barcode || '').trim().toLowerCase())
+          .filter(Boolean)
+      );
+      let attempt = 0;
+      while (existingBarcodes.has(finalBarcodeVal.toLowerCase()) && attempt < 50) {
+        finalBarcodeVal = generateBarcodeValue(product.name || id);
+        attempt++;
+      }
+    }
+
     const newProduct = {
       ...product,
       id,
-      barcodeValue: barcodeVal,
-      barcode: barcodeVal,
+      barcodeValue: finalBarcodeVal,
+      barcode: finalBarcodeVal,
       batches: [],
       createdAt: now,
       updatedAt: now
@@ -2192,7 +2214,7 @@ export const salesService = {
           reference: newSale.invoiceNumber,
           note: 'Sale',
         });
-        if (balAfter) {
+        if (typeof balAfter === 'number') {
           await localDb.customers.update(customer.id, { balance: balAfter });
           await queueOp('customers', 'update', customer.id, toRemoteCustomer({ ...customer, balance: balAfter, updatedAt: now }), { batchId: id });
         }
@@ -2438,7 +2460,7 @@ export const salesService = {
           reference: sale.invoiceNumber,
           note: 'Sale deleted/reversed',
         });
-        if (balAfter) {
+        if (typeof balAfter === 'number') {
           await localDb.customers.update(customer.id, { balance: balAfter });
           await queueOp('customers', 'update', customer.id, toRemoteCustomer({ ...customer, balance: balAfter, updatedAt: now }));
         }
@@ -3100,6 +3122,17 @@ export const suppliersService = {
     queueOp('supplier_transactions', 'delete', id, {});
   },
 
+  // Update a previously-recorded supplier bill (used when a linked Supplies
+  // expense is edited). Keeps the supplier payable in sync with the expense amount.
+  async updateBill(id: string, updates: { amount?: number; note?: string }) {
+    const tx: any = await localDb.supplierTransactions.get(id);
+    if (!tx) return null;
+    const updated = { ...tx, ...updates, updatedAt: new Date() };
+    await localDb.supplierTransactions.put(updated);
+    await queueOp('supplier_transactions', 'update', id, toRemoteSupplierTransaction(updated));
+    return updated;
+  },
+
   async fetchRemote(lastSyncTime?: Date): Promise<Supplier[]> {
     const queryFn = () => {
       let q = supabase.from('suppliers').select('*');
@@ -3240,6 +3273,13 @@ export const expensesService = {
 
   async delete(id: string): Promise<void> {
     const existing = await localDb.expenses.get(id);
+    // Reverse the linked supplier payable (if this was a Supplies expense) so the
+    // supplier balance is NOT left inflated after the expense is deleted.
+    const linkedBill = (await localDb.supplierTransactions.toArray()).find(t => t.referenceId === id);
+    if (linkedBill) {
+      await localDb.supplierTransactions.delete(linkedBill.id);
+      await queueOp('supplier_transactions', 'delete', linkedBill.id, {});
+    }
     await localDb.expenses.delete(id);
     await queueOp('expenses', 'delete', id, {});
     if (existing) {
@@ -3536,6 +3576,14 @@ export const purchaseRecordsService = {
           });
         }
       }
+    }
+
+    // Reverse the linked supplier payable (if this stock-in posted one), so the
+    // supplier balance is NOT left inflated after the record is deleted.
+    const linkedBill = (await localDb.supplierTransactions.toArray()).find(t => t.referenceId === id);
+    if (linkedBill) {
+      await localDb.supplierTransactions.delete(linkedBill.id);
+      await queueOp('supplier_transactions', 'delete', linkedBill.id, {});
     }
 
     await localDb.purchaseRecords.delete(id);

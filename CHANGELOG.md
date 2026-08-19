@@ -2,6 +2,22 @@
 
 Whenever a database change is made, it MUST be recorded here.
 
+### [2026-08-19] Whole-system leakage audit — supply / discount / expense / wallet / settings / barcode
+**Files:** `src/lib/calculateCart.ts`, `src/lib/services.ts`, `src/components/inventory/PurchaseHistory.tsx`, `src/components/inventory/ProductDetailHub.tsx`, `src/components/inventory/InventoryManager.tsx`, `src/components/inventory/BarcodeGenerator.tsx`, `src/components/expenses/ExpenseManager.tsx`
+**Bugs fixed (found by 4 parallel subsystem audits):**
+- **Discount — BOGO no-op (HIGH):** `calculateCart.ts` had no `bogo` branch, so a BOGO promo silently applied ZERO discount (revenue overstated). Now `bogo` is handled like `mix_and_match` with `cheapest_free` + set size `minQuantity+1` (BOGO = buy 1 get 1 free).
+- **Supply — credit receipt no payable (HIGH):** `PurchaseHistory` quick-entry called `purchaseRecordsService.create` directly, bypassing the supplier-bill post → goods received on credit left supplier balance understated. Now posts `suppliersService.recordBill` (referenceId = record id), mirroring `commitStockInToInventory`.
+- **Supply — delete orphans payable (HIGH):** `purchaseRecordsService.delete` reversed stock but never deleted the linked supplier transaction → supplier balance inflated. Now deletes the linked bill by `referenceId`.
+- **Expense — delete orphans payable (HIGH):** `expensesService.delete` did not reverse the linked supplier bill for Supplies expenses → supplier balance inflated. Now reverses it by `referenceId`.
+- **Expense — edit doesn't sync payable (MED):** editing a Supplies expense left the supplier bill stale (amount/supplier drift). `ExpenseManager` now reconciles the linked bill (update amount / reassign supplier / remove when supplier cleared).
+- **Wallet — balance stale at 0 (MED):** `if (balAfter)` skipped the `customer.balance` write when the running balance hit exactly 0 (falsy) → balance never reset. Changed to `typeof balAfter === 'number'`.
+- **Wallet — ledger drift (MED):** `recordCustomerLedger` took the previous balance from the last row by Dexie PK order, not `createdAt` → drift across devices/offline. Now sorts by `createdAt`.
+- **Inventory — adjustment reconciliation (MED):** manual adjustment clamped `product.stock` to 0 but logged the full (unclamped) `qtyChange` in `stock_history` → ledger diverged from stock. Now logs the actually-applied (clamped) delta.
+- **Barcode — collision (MED):** auto-generated barcode used 6 random digits with NO uniqueness check → two products could collide and a scan resolved the wrong product. `productsService.create` now guarantees a unique auto-generated barcode against existing local products.
+- **Barcode — defaults/normalizer (LOW):** `BarcodeGenerator` default columns `4` vs everywhere-else `3` → aligned to `3`. `InventoryManager` scan used only `O→0` while `ProductGrid` used the full OCR normalizer → now both use `normalizeBarcodeValue` (consistent scan resolution on every screen).
+- **Variant barcode (verified OK):** variant children with no explicit barcode already auto-generate one via `productsService.create`; the update path preserves that. No change needed.
+**Verified:** `npx tsc --noEmit` clean. Pushed → triggers Vercel auto-redeploy.
+
 ### [2026-08-19] Fix: deal-system leakage — add-on stock + weighted magnitude + add-on revenue + negative-discount
 **Files:** `src/lib/services.ts`, `src/lib/calculateCart.ts`, `src/components/inventory/ProductDetailHub.tsx`, `src/components/inventory/InventoryReportManager.tsx`, `src/components/reports/ReportsManager.tsx`
 **Bugs fixed (verified by agent audit of the deals/discount/add-on system):**

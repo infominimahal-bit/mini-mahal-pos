@@ -296,6 +296,10 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
       const freshProduct = await localDb.products.get(product.id);
       const currentStock = freshProduct?.stock ?? product.stock ?? 0;
       const finalStock = Math.max(0, currentStock + qtyChange);
+      // Log the ACTUALLY-APPLIED (clamped) delta, not the requested qtyChange, so the
+      // stock ledger (stock_history) reconciles with product.stock even when an
+      // adjustment would otherwise drive stock negative.
+      const appliedDelta = finalStock - currentStock;
 
       const updatedProduct = {
         ...product,
@@ -311,11 +315,11 @@ export function ProductDetailHub({ product, onBack, onEdit }: ProductDetailHubPr
       const histEntry = {
         id: histId,
         productId: product.id,
-        changeQty: qtyChange,
-        type: qtyChange > 0 ? 'adjustment' as const : 'adjustment_out' as const,
+        changeQty: appliedDelta,
+        type: appliedDelta >= 0 ? 'adjustment' as const : 'adjustment_out' as const,
         referenceId: newRecord.id,
         note: `Adjustment: ${reason}`,
-        balanceAfter: updatedProduct.stock,
+        balanceAfter: finalStock,
         cashierName: profile?.email || 'System',
         createdAt: now
       };

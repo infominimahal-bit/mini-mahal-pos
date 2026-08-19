@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/SupabaseAppContext';
 import { PurchaseRecord, Product } from '../../types';
-import { purchaseRecordsService, productsService } from '../../lib/services';
+import { purchaseRecordsService, productsService, suppliersService } from '../../lib/services';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { Button, Badge, DateRangePicker, EmptyState, Pagination } from '../../shared/ui';
 import { ExportButton } from '../../shared/export';
@@ -146,6 +146,26 @@ export function PurchaseHistory() {
       } as PurchaseRecord;
 
       const newRecord = await purchaseRecordsService.create(recordData);
+
+      // POST SUPPLIER PAYABLE: a credit stock-in must also record a supplier bill,
+      // otherwise goods received on credit leave the supplier balance understated
+      // (phantom free stock). Mirrors commitStockInToInventory's bill linkage.
+      if (supplierName) {
+        const matched = state.suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase());
+        if (matched) {
+          try {
+            await suppliersService.recordBill({
+              supplierId: matched.id,
+              amount: quantity * (costPrice || 0),
+              note: `Stock In: ${productName} x${quantity}`,
+              referenceId: newRecord.id,
+              sourceType: 'auto_purchase',
+            });
+          } catch (ledgerErr) {
+            console.warn('[PurchaseHistory] Failed to record supplier bill:', ledgerErr);
+          }
+        }
+      }
 
       // purchaseRecordsService.create now handles stock update, batch creation,
       // and stock_history logging internally. We only need to dispatch state updates.
