@@ -36,6 +36,20 @@ Whenever a database change is made, it MUST be recorded here.
 - `TransactionDetailModal` (eye-icon): shows a purple banner — **"Edited from #INV-XX"** (click opens the original) on the corrected bill, or **"This bill was edited → #INV-YY"** (click opens the correction) on the original.
 - Verified: the edit already created correct IN/OUT records (proven by product-history screenshot: `Sale Deleted +10 IN` + `POS Sale +20 OUT` at the same timestamp). Now they are explicitly marked as an edit.
 
+### [2026-08-18] Refund simplification — remove partial refund; only full refund + exact wallet reversal
+**User directive:** "refund pe partial refund khatam karo, only refund aaye" + "wallet real rakhna, real amount, wallet na kam na ziyada".
+**Change:** `RefundSaleModal` no longer offers a Partial Refund option — it is now ALWAYS a full refund
+(refunds ALL remaining items, status becomes `refunded`). Removed the item-qty stepper UI, `partialQtys`,
+`calculatedPartialRefund`, and the Full/Partial `SegmentedControl`. `reason` + `Refund Method` selector retained.
+**Why this fixes the wallet accuracy:** `returnSale` (services.ts) for `type:'full'` reverses the wallet
+(payment-mode balance) by EXACTLY `sale.total` — the real amount that was originally taken. The old partial path
+used a proportional `taxRatio` and was the only source of any wallet drift; with partial gone, every refund is
+full and the wallet can never end up kam (under) or ziyada (over). Final status is always `refunded`
+(not `partially_refunded`), so downstream dashboards/receipts show a clean full refund.
+**Note (unchanged):** the wallet reversal reverses the ORIGINAL payment method's till (standard accounting);
+the chosen "Refund Method" is recorded for the audit payout only. If you instead want refund-to-Online-Wallet
+to CREDIT the online wallet balance (store credit), say so and I'll switch it.
+
 ### [2026-08-18] Wallet balances now sync across devices (checkout = reporting)
 **Files:** `src/lib/cloudPull.ts`
 **Context:** Checkout reads `localDb.paymentModes.balance` for the Cash/Card/Online wallet chips. That local cache was only ever updated by the device's OWN sales (`adjustPaymentBalances`) and **never pulled from the cloud**, so every device showed its own per-device balance — while Reports/Sales tab derives the true aggregate from the synced `payment_movements` ledger. (Owner report: "har device pe apna apna aa raha h".) Cloud `payment_modes.balance` is the authoritative aggregate (maintained only by the `apply_payment_movements` RPC — `adjustPaymentBalances` never pushes `payment_modes.balance`, and SyncEngine now strips `balance` from `payment_modes` upserts to prevent drift).
