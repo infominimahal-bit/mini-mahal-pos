@@ -1,553 +1,9 @@
-import Dexie, { Table } from 'dexie';
-import {
-  Product,
-  Customer,
-  Sale,
-  StoreOrder,
-  Discount,
-  User,
-  AppSettings,
-  SalesTab,
-  Expense,
-  PurchaseRecord,
-  Category,
-  Supplier,
-  StockHistory,
-  Payment,
-  Topping,
-  VariantStockHistory,
-  ProductAddon,
-} from '../types';
-
-export const SETTINGS_ID = '00000000-0000-4000-8000-000000000001';
-
-export type PendingOpEntity =
-  | 'products'
-  | 'customers'
-  | 'sales'
-  | 'discounts'
-  | 'users'
-  | 'app_settings'
-  | 'sales_tabs'
-  | 'expenses'
-  | 'categories'
-  | 'suppliers'
-  // product_batches removed — batch system deprecated
-  | 'purchase_records'
-  | 'purchase_orders'
-  | 'purchase_order_items'
-  | 'supplier_transactions'
-  | 'payments'
-  | 'stock_history'
-  | 'bundles'
-  | 'bundle_items'
-  | 'bundle_slots'
-  | 'bundle_slot_options'
-  | 'toppings'
-  | 'variant_stock_history'
-  | 'product_addons'
-  | 'store_orders'
-  | 'salesmen'
-  | 'customer_ledger'
-  | 'toppings'
-  | 'product_toppings';
-
-export type PendingOpType = 'create' | 'update' | 'delete' | 'upsert';
-
-export interface PendingOp {
-  id?: number;
-  entity: PendingOpEntity;
-  opType: PendingOpType;
-  entityId: string;
-  payload: any;
-  createdAt: number;
-  retries: number;
-  status: 'pending' | 'failed' | 'error';
-  lastError?: string;
-  batchId?: string;
-}
-
-export interface SyncHistoryItem {
-  id?: number;
-  timestamp: number;
-  itemsSynced: number;
-  entities: string[];
-  status: 'success' | 'partial' | 'failed';
-}
-
-export class PosDB extends Dexie {
-  products!: Table<Product>;
-  customers!: Table<Customer>;
-  sales!: Table<Sale>;
-  discounts!: Table<Discount>;
-  users!: Table<User>;
-  categories!: Table<Category>;
-  suppliers!: Table<Supplier>;
-  productBatches!: Table<any>; // DEPRECATED — kept for Dexie schema compat
-  purchaseRecords!: Table<any>;
-  purchaseOrders!: Table<any>;
-  purchaseOrderItems!: Table<any>;
-  supplierTransactions!: Table<any>;
-  payments!: Table<any>;
-  paymentModes!: Table<any>;
-  stockHistory!: Table<any>;
-  salesTabs!: Table<SalesTab>;
-  expenses!: Table<Expense>;
-  appSettings!: Table<any>;
-  pendingOps!: Table<PendingOp>;
-  syncHistory!: Table<SyncHistoryItem>;
-  bundles!: Table<any>;
-  bundleItems!: Table<any>;
-  bundleSlots!: Table<any>;
-  bundleSlotOptions!: Table<any>;
-  toppings!: Table<Topping>;
-  variantStockHistory!: Table<VariantStockHistory>;
-  productAddons!: Table<ProductAddon>;
-  savedReceiptPngs!: Table<any>;
-  storeOrders!: Table<StoreOrder>;
-  salesmen!: Table<any>;
-
-  constructor() {
-    // Make the IndexedDB name unique per Supabase Project so different clones on localhost don't share data
-    // NOTE: 'ZaynahsPosDB_' prefix is intentionally PRESERVED — renaming would orphan
-    // every existing device's IndexedDB data (full local cache wipe on upgrade).
-    // Universal branding applies to UI strings, never to persistence keys.
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-    const projectRef = supabaseUrl.split('//')[1]?.split('.')[0] || 'default';
-    const dbName = `ZaynahsPosDB_${projectRef}`;
-
-    super(dbName);
-    this.version(19).stores({
-      savedReceiptPngs: 'id, invoiceNumber, saleDate',
-      products: 'id, name, barcode, barcodeValue, sku, categoryId, supplierId, isDraft, trackInventory, stock, showInEstore',
-      categories: 'id, name',
-      suppliers: 'id, name',
-      sales: 'id, invoiceNumber, customerId, timestamp, saleDate, status, dcNumber, extraCharges',
-      customers: 'id, name, phone, email',
-      expenses: 'id, categoryId, date',
-      discounts: 'id, name, type, active',
-      users: 'id, username, email',
-      productBatches: 'id, productId, created_at, status',
-      purchaseRecords: 'id, productId, supplierId, date',
-      purchaseOrders: 'id, poNumber, supplierId',
-      purchaseOrderItems: 'id, poId, productId',
-      supplierTransactions: 'id, supplierId',
-      payments: 'id, supplierId',
-      stockHistory: 'id, productId, timestamp, type',
-      salesTabs: 'id, userId',
-      appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns, enableSplitPayment',
-      pendingOps: '++id, [entity+entityId], status, createdAt',
-      syncHistory: '++id, timestamp',
-      bundles: 'id, name, active',
-      bundleItems: 'id, bundleId, productId',
-      bundleSlots: 'id, bundleId',
-      bundleSlotOptions: 'id, slotId, productId',
-      toppings: 'id, name',
-      variantStockHistory: 'id, productId, variantId, createdAt',
-      productAddons: 'id, productId, addonProductId, active',
-      storeOrders: 'id, invoiceNumber, customerId, status, createdAt',
-      // Legacy compatibility:
-      app_settings: 'id, storeName, currency, enableSplitPayment, enableExtraCharges',
-      purchase_records: 'id, productId, supplierId, date'
-    });
-
-    this.version(20).stores({
-      savedReceiptPngs: 'id, invoiceNumber, saleDate',
-      products: 'id, name, barcode, barcodeValue, sku, categoryId, supplierId, isDraft, trackInventory, stock, showInEstore',
-      categories: 'id, name',
-      suppliers: 'id, name',
-      sales: 'id, invoiceNumber, customerId, timestamp, saleDate, status, dcNumber, extraCharges',
-      customers: 'id, name, phone, email',
-      expenses: 'id, categoryId, date',
-      discounts: 'id, name, type, active',
-      users: 'id, username, email',
-      productBatches: 'id, productId, created_at, status',
-      purchaseRecords: 'id, productId, supplierId, date',
-      purchaseOrders: 'id, poNumber, supplierId',
-      purchaseOrderItems: 'id, poId, productId',
-      supplierTransactions: 'id, supplierId',
-      payments: 'id, supplierId',
-      paymentModes: 'id, name, isActive',
-      stockHistory: 'id, productId, timestamp, type',
-      salesTabs: 'id, userId',
-      appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns, enableSplitPayment',
-      pendingOps: '++id, [entity+entityId], status, createdAt',
-      syncHistory: '++id, timestamp',
-      bundles: 'id, name, active',
-      bundleItems: 'id, bundleId, productId',
-      bundleSlots: 'id, bundleId',
-      bundleSlotOptions: 'id, slotId, productId',
-      toppings: 'id, name',
-      variantStockHistory: 'id, productId, variantId, createdAt',
-      productAddons: 'id, productId, addonProductId, active',
-      storeOrders: 'id, invoiceNumber, customerId, status, createdAt',
-      // Legacy compatibility:
-      app_settings: 'id, storeName, currency, enableSplitPayment, enableExtraCharges',
-      purchase_records: 'id, productId, supplierId, date'
-    });
-
-    this.version(21).stores({
-      pendingOps: '++id, [entity+entityId], status, createdAt, batchId'
-    });
-
-    this.version(22).stores({
-      customer_ledger: 'id, customerId, saleId, type, createdAt'
-    });
-
-    this.version(18).stores({
-      savedReceiptPngs: 'id, invoiceNumber, saleDate',
-      products: 'id, name, barcode, barcodeValue, sku, categoryId, supplierId, isDraft, trackInventory, stock, showInEstore',
-      categories: 'id, name',
-      suppliers: 'id, name',
-      sales: 'id, invoiceNumber, customerId, timestamp, saleDate, status, dcNumber, extraCharges, estoreStatus',
-      customers: 'id, name, phone, email',
-      expenses: 'id, categoryId, date',
-      discounts: 'id, name, type, active',
-      users: 'id, username, email',
-      productBatches: 'id, productId, created_at, status',
-      purchaseRecords: 'id, productId, supplierId, date',
-      purchaseOrders: 'id, poNumber, supplierId',
-      purchaseOrderItems: 'id, poId, productId',
-      supplierTransactions: 'id, supplierId',
-      payments: 'id, supplierId',
-      stockHistory: 'id, productId, timestamp, type',
-      salesTabs: 'id, userId',
-      appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns, enableSplitPayment',
-      pendingOps: '++id, [entity+entityId], status, createdAt',
-      syncHistory: '++id, timestamp',
-      bundles: 'id, name, active',
-      bundleItems: 'id, bundleId, productId',
-      bundleSlots: 'id, bundleId',
-      bundleSlotOptions: 'id, slotId, productId',
-      toppings: 'id, name',
-      variantStockHistory: 'id, productId, variantId, createdAt',
-      productAddons: 'id, productId, addonProductId, active',
-      // Legacy compatibility:
-      app_settings: 'id, storeName, currency, enableSplitPayment, enableExtraCharges',
-      purchase_records: 'id, productId, supplierId, date'
-    });
-
-    this.version(16).stores({
-      products: 'id, name, barcode, barcodeValue, sku, categoryId, supplierId, isDraft, trackInventory, stock',
-      categories: 'id, name',
-      suppliers: 'id, name',
-      sales: 'id, invoiceNumber, customerId, timestamp, saleDate, status, dcNumber, extraCharges',
-      customers: 'id, name, phone, email',
-      expenses: 'id, categoryId, date',
-      discounts: 'id, name, type, active',
-      users: 'id, username, email',
-      productBatches: 'id, productId, created_at, status',
-      purchaseRecords: 'id, productId, supplierId, date',
-      purchaseOrders: 'id, poNumber, supplierId',
-      purchaseOrderItems: 'id, poId, productId',
-      supplierTransactions: 'id, supplierId',
-      payments: 'id, supplierId',
-      stockHistory: 'id, productId, timestamp, type',
-      salesTabs: 'id, userId',
-      appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns, enableSplitPayment',
-      pendingOps: '++id, [entity+entityId], status, createdAt',
-      syncHistory: '++id, timestamp',
-      bundles: 'id, name, active',
-      bundleItems: 'id, bundleId, productId',
-      bundleSlots: 'id, bundleId',
-      bundleSlotOptions: 'id, slotId, productId',
-      // Legacy compatibility:
-      app_settings: 'id, storeName, currency, enableSplitPayment, enableExtraCharges',
-      purchase_records: 'id, productId, supplierId, date'
-    });
-
-    this.version(15).stores({
-      products: 'id, name, barcode, barcodeValue, sku, categoryId, supplierId, isDraft, trackInventory, stock',
-      categories: 'id, name',
-      suppliers: 'id, name',
-      sales: 'id, invoiceNumber, customerId, timestamp, saleDate, status, dcNumber, extraCharges',
-      customers: 'id, name, phone, email',
-      expenses: 'id, categoryId, date',
-      discounts: 'id, name, type, active',
-      users: 'id, username, email',
-      productBatches: 'id, productId, created_at, status',
-      purchaseRecords: 'id, productId, supplierId, date',
-      purchaseOrders: 'id, poNumber, supplierId',
-      purchaseOrderItems: 'id, poId, productId',
-      supplierTransactions: 'id, supplierId',
-      payments: 'id, supplierId',
-      stockHistory: 'id, productId, timestamp, type',
-      salesTabs: 'id, userId',
-      appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns, enableSplitPayment',
-      pendingOps: '++id, [entity+entityId], status, createdAt',
-      syncHistory: '++id, timestamp',
-      bundles: 'id, name, active',
-      bundleItems: 'id, bundleId, productId',
-      // Legacy compatibility:
-      app_settings: 'id, storeName, currency, enableSplitPayment, enableExtraCharges',
-      purchase_records: 'id, productId, supplierId, date'
-    });
-
-    this.version(14).stores({
-      products: 'id, name, barcode, barcodeValue, sku, categoryId, supplierId, isDraft, trackInventory, stock',
-      categories: 'id, name',
-      suppliers: 'id, name',
-      sales: 'id, invoiceNumber, customerId, timestamp, saleDate, status, dcNumber, extraCharges',
-      customers: 'id, name, phone, email',
-      expenses: 'id, categoryId, date',
-      discounts: 'id, name, type, active',
-      users: 'id, username, email',
-      productBatches: 'id, productId, created_at, status',
-      purchaseRecords: 'id, productId, supplierId, date',
-      purchaseOrders: 'id, poNumber, supplierId',
-      purchaseOrderItems: 'id, poId, productId',
-      supplierTransactions: 'id, supplierId',
-      payments: 'id, supplierId',
-      stockHistory: 'id, productId, timestamp, type',
-      salesTabs: 'id, userId',
-      appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns, enableSplitPayment',
-      pendingOps: '++id, [entity+entityId], status, createdAt',
-      syncHistory: '++id, timestamp',
-      // Legacy compatibility:
-      app_settings: 'id, storeName, currency, enableSplitPayment, enableExtraCharges',
-      purchase_records: 'id, productId, supplierId, date'
-    });
-
-    this.version(13).stores({
-      products: 'id, name, barcode, barcodeValue, sku, categoryId, supplierId, isDraft, trackInventory, stock',
-      categories: 'id, name',
-      suppliers: 'id, name',
-      sales: 'id, invoiceNumber, customerId, timestamp, saleDate, status, dcNumber, extraCharges',
-      customers: 'id, name, phone, email',
-      expenses: 'id, categoryId, date',
-      discounts: 'id, name, type, active',
-      users: 'id, username, email',
-      productBatches: 'id, productId, created_at, status',
-      purchaseRecords: 'id, productId, supplierId, date',
-      purchaseOrders: 'id, poNumber, supplierId',
-      purchaseOrderItems: 'id, poId, productId',
-      supplierTransactions: 'id, supplierId',
-      payments: 'id, supplierId',
-      stockHistory: 'id, productId, timestamp, type',
-      salesTabs: 'id, userId',
-      appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns, enableSplitPayment',
-      pendingOps: '++id, [entity+entityId], status, createdAt',
-      syncHistory: '++id, timestamp',
-      // Legacy compatibility:
-      app_settings: 'id, storeName, currency, enableSplitPayment, enableExtraCharges',
-      purchase_records: 'id, productId, supplierId, date'
-    }).upgrade(async trans => {
-      try {
-        const legacySettings = await trans.table('app_settings').toArray();
-        if (legacySettings.length > 0) {
-          const currentSettings = await trans.table('appSettings').toArray();
-          if (currentSettings.length === 0) {
-            await trans.table('appSettings').bulkPut(legacySettings);
-            console.log(`[DB] Legacy app_settings (${legacySettings.length} rows) migrated to appSettings.`);
-          }
-          await trans.table('app_settings').clear();
-        }
-      } catch (err) {
-        console.warn('[DB] Failed to migrate legacy app_settings:', err);
-      }
-
-      try {
-        const legacyPurchases = await trans.table('purchase_records').toArray();
-        if (legacyPurchases.length > 0) {
-          const currentPurchases = await trans.table('purchaseRecords').toArray();
-          if (currentPurchases.length === 0) {
-            await trans.table('purchaseRecords').bulkPut(legacyPurchases);
-            console.log(`[DB] Legacy purchase_records (${legacyPurchases.length} rows) migrated to purchaseRecords.`);
-          }
-          await trans.table('purchase_records').clear();
-        }
-      } catch (err) {
-        console.warn('[DB] Failed to migrate legacy purchase_records:', err);
-      }
-    });
-
-    this.version(12).stores({
-      products: 'id, name, barcode, barcodeValue, sku, categoryId, supplierId, isDraft, trackInventory, stock',
-      categories: 'id, name',
-      suppliers: 'id, name',
-      sales: 'id, invoiceNumber, customerId, timestamp, saleDate, status, dcNumber, extraCharges',
-      customers: 'id, name, phone, email',
-      expenses: 'id, categoryId, date',
-      expense_categories: 'id, name',
-      purchase_records: 'id, productId, supplierId, date',
-      app_settings: 'id, storeName, currency, enableSplitPayment, enableExtraCharges',
-      discounts: 'id, name, type, active',
-      terminal_stats: 'id',
-      sync_status: 'id'
-    });
-
-    this.version(11).stores({
-      products: 'id, name, barcode, sku, categoryId, supplierId, isDraft, trackInventory, stock',
-      categories: 'id, name',
-      suppliers: 'id, name',
-      sales: 'id, invoiceNumber, customerId, timestamp, saleDate, status, dcNumber, extraCharges',
-      customers: 'id, name, phone, email',
-      expenses: 'id, categoryId, date',
-      expense_categories: 'id, name',
-      purchase_records: 'id, productId, supplierId, date',
-      app_settings: 'id, storeName, currency, enableSplitPayment, enableExtraCharges',
-      discounts: 'id, name, type, active',
-      terminal_stats: 'id',
-      sync_status: 'id'
-    });
-
-    this.version(1).stores({
-      products: 'id, name, sku, barcode, category, supplier',
-      customers: 'id, name, email, phone',
-      sales: 'id, invoiceNumber, customerId, timestamp',
-      discounts: 'id, name',
-      users: 'id, username, email',
-      categories: 'id, name',
-      suppliers: 'id, name',
-      productBatches: 'id, productId',
-      purchaseRecords: 'id, productId, date',
-      purchaseOrders: 'id, poNumber, supplierId',
-      purchaseOrderItems: 'id, poId, productId',
-      supplierTransactions: 'id, supplierId',
-      payments: 'id, supplierId',
-      stockHistory: 'id, productId',
-      salesTabs: 'id, userId',
-      expenses: 'id, category, date',
-      appSettings: 'id',
-      pendingOps: '++id, [entity+entityId], status, createdAt',
-      syncHistory: '++id, timestamp'
-    });
-
-    this.version(2).stores({
-      products: 'id, name, sku, barcode, category, supplier',
-      customers: 'id, name, email, phone',
-      sales: 'id, invoiceNumber, customerId, timestamp',
-      discounts: 'id, name',
-      users: 'id, username, email',
-      categories: 'id, name',
-      suppliers: 'id, name',
-      productBatches: 'id, productId',
-      purchaseRecords: 'id, productId, date',
-      purchaseOrders: 'id, poNumber, supplierId',
-      purchaseOrderItems: 'id, poId, productId',
-      supplierTransactions: 'id, supplierId',
-      payments: 'id, supplierId',
-      stockHistory: 'id, productId',
-      salesTabs: 'id, userId',
-      expenses: 'id, category, date',
-      appSettings: 'id',
-      pendingOps: '++id, [entity+entityId], status, createdAt',
-      syncHistory: '++id, timestamp'
-    });
-
-    this.version(4).stores({
-      products: 'id, name, sku, barcode, category, supplier',
-      customers: 'id, name, email, phone',
-      sales: 'id, invoiceNumber, customerId, timestamp',
-      discounts: 'id, name',
-      users: 'id, username, email',
-      categories: 'id, name',
-      suppliers: 'id, name',
-      productBatches: 'id, productId',
-      purchaseRecords: 'id, productId, date',
-      purchaseOrders: 'id, poNumber, supplierId',
-      purchaseOrderItems: 'id, poId, productId',
-      supplierTransactions: 'id, supplierId',
-      payments: 'id, supplierId',
-      stockHistory: 'id, productId',
-      salesTabs: 'id, userId',
-      expenses: 'id, category, date',
-      appSettings: 'id',
-      pendingOps: '++id, [entity+entityId], status, createdAt',
-      syncHistory: '++id, timestamp'
-    }).upgrade(async trans => {
-      await trans.table('products').clear();
-      await trans.table('customers').clear();
-      await trans.table('sales').clear();
-      await trans.table('appSettings').clear();
-      console.log('✅ LocalDB v4 Upgrade: Purged inconsistent caches for fresh sync.');
-    });
-
-    this.version(5).stores({
-      products: 'id, name, sku, barcode, category, supplier',
-      customers: 'id, name, email, phone',
-      sales: 'id, invoiceNumber, customerId, timestamp',
-      discounts: 'id, name',
-      users: 'id, username, email',
-      categories: 'id, name',
-      suppliers: 'id, name',
-      productBatches: 'id, productId',
-      purchaseRecords: 'id, productId, date',
-      purchaseOrders: 'id, poNumber, supplierId',
-      purchaseOrderItems: 'id, poId, productId',
-      supplierTransactions: 'id, supplierId',
-      payments: 'id, supplierId',
-      stockHistory: 'id, productId',
-      salesTabs: 'id, userId',
-      expenses: 'id, category, date',
-      appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType',
-      pendingOps: '++id, [entity+entityId], status, createdAt',
-      syncHistory: '++id, timestamp'
-    });
-
-    this.version(6).stores({
-      products: 'id, name, sku, barcode, category, supplier',
-      customers: 'id, name, email, phone',
-      sales: 'id, invoiceNumber, customerId, timestamp',
-      discounts: 'id, name',
-      users: 'id, username, email',
-      categories: 'id, name',
-      suppliers: 'id, name',
-      productBatches: 'id, productId',
-      purchaseRecords: 'id, productId, date',
-      purchaseOrders: 'id, poNumber, supplierId',
-      purchaseOrderItems: 'id, poId, productId',
-      supplierTransactions: 'id, supplierId',
-      payments: 'id, supplierId',
-      stockHistory: 'id, productId',
-      salesTabs: 'id, userId',
-      expenses: 'id, category, date',
-      appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns',
-      pendingOps: '++id, [entity+entityId], status, createdAt',
-      syncHistory: '++id, timestamp'
-    });
-
-    this.version(7).stores({
-      sales: 'id, invoiceNumber, customerId, timestamp',
-      expenses: 'id, category, date'
-    });
-
-    this.version(8).stores({
-      salesTabs: 'id, userId'
-    }).upgrade(async trans => {
-      // Clear salesTabs to ensure new fields (notes, editingSaleId) are hydrated correctly from cloud
-      await trans.table('salesTabs').clear();
-    });
-
-    this.version(9).stores({
-      sales: 'id, invoiceNumber, customerId, timestamp, status, paymentMethod',
-      products: 'id, name, sku, barcode, category, supplier, stock, active',
-      stockHistory: 'id, productId, timestamp, type',
-      expenses: 'id, category, date, paymentMethod',
-      customers: 'id, name, email, phone',
-      productBatches: 'id, productId, created_at, status'
-    });
-
-    this.version(10).stores({
-      sales: 'id, invoiceNumber, dcNumber, customerId, timestamp, status, paymentMethod',
-      appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns, enableSplitPayment'
-    });
-
-    this.version(11).stores({
-      sales: 'id, invoiceNumber, dcNumber, customerId, timestamp, status, paymentMethod, salesmanId',
-      salesmen: 'id, name, active'
-    });
-
-    this.version(12).stores({
-      sales: 'id, invoiceNumber, dcNumber, customerId, timestamp, status, paymentMethod, salesmanId',
-    });
-  }
-}
+import { PosDB } from './PosDB';
+import { PendingOpEntity, PendingOpType, PendingOp, SyncHistoryItem } from '../types';
 
 export const localDb = new PosDB();
+export const SETTINGS_ID = '00000000-0000-4000-8000-000000000001';
 
-
-// Atomic ID generation helper
 export function generateId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -558,10 +14,6 @@ export function generateId(): string {
   });
 }
 
-/**
- * Queue Operation Helper
- * Handles deduplication logic: if item is already in queue, we merge payloads or keep 'create' status.
- */
 export async function queueOp(
   entity: PendingOpEntity,
   opType: PendingOpType,
@@ -570,9 +22,6 @@ export async function queueOp(
   options?: { batchId?: string }
 ) {
   try {
-    // ── QUEUE SIZE CAP (FINANCIAL SAFETY) ──
-    // Never drop sales/stock_history ops — losing them silently corrupts the cloud ledger.
-    // Instead, prune earlier-errored ops (they are already stuck) then always enqueue.
     const queueCount = await localDb.pendingOps.count();
     if (queueCount >= 1000) {
       const droppable = await localDb.pendingOps
@@ -582,9 +31,7 @@ export async function queueOp(
         .toArray();
       if (droppable.length > 0) {
         await localDb.pendingOps.bulkDelete(droppable.map(o => o.id).filter(Boolean) as number[]);
-        console.warn(`[DB] Queue at cap — pruned ${droppable.length} errored ops to make room. NEVER dropping pending ops.`);
-      } else {
-        console.warn(`[DB] Pending ops queue at ${queueCount} items — all pending (financial records). Queue stays; sync will drain it.`);
+        console.warn(`[DB] Queue at cap — pruned ${droppable.length} errored ops to make room.`);
       }
     }
 
@@ -594,14 +41,6 @@ export async function queueOp(
       .first();
 
     if (existing && opType !== 'delete') {
-      // MERGE RULES (universal, financial-safe):
-      // 1. A queued 'delete' MUST survive later update/upsert attempts — deleting a record
-      //    then editing it means the record is deleted; allowing the update to win would
-      //    silently RESURRECT financial records on the cloud (dedup data-loss class).
-      // 2. Fresh payload 'create'/'upsert' stays in that state (create+update = create).
-      // 3. Merging MUST reset retries/status — a stuck op (error, retries >= 5) merged with
-      //    a new edit becomes processable again. Never leave a zombie op that forever fails
-      //    both the retry filter and the error-recovery filter.
       let newOpType: PendingOpType | 'upsert';
       if (existing.opType === 'delete') {
         newOpType = 'delete';
@@ -636,19 +75,13 @@ export async function queueOp(
       });
     }
 
-    // Trigger network sync if online (Debounced or Async)
-    // We will import this dynamically to avoid circular dependencies
-    import('./syncEngine').then(m => m.syncToCloud().catch(null));
-
+    import('./syncEngine').then(m => m.syncToCloud().catch(() => {}));
     window.dispatchEvent(new Event('pendingops-changed'));
   } catch (err) {
     console.error('[DB] Queue Operation Failed:', err);
   }
 }
 
-/**
- * Utility to check if an entity is pending deletion
- */
 export async function isPendingDelete(entity: PendingOpEntity, entityId: string): Promise<boolean> {
   const op = await localDb.pendingOps
     .where('[entity+entityId]')
@@ -657,11 +90,6 @@ export async function isPendingDelete(entity: PendingOpEntity, entityId: string)
   return op?.opType === 'delete';
 }
 
-/**
- * True when a locally-unsynced (non-delete, non-error) op exists for this entity.
- * Used to avoid realtime updates clobbering pending local edits — the queued op
- * will sync the local value and win, so we must not overwrite it mid-flight.
- */
 export async function isPendingChange(entity: PendingOpEntity, entityId: string): Promise<boolean> {
   const op = await localDb.pendingOps
     .where('[entity+entityId]')
@@ -670,87 +98,41 @@ export async function isPendingChange(entity: PendingOpEntity, entityId: string)
   return !!op && op.opType !== 'delete' && op.status !== 'error';
 }
 
-/**
- * Map Dexie table names to Sync Engine Entity names
- */
 export const TABLE_TO_ENTITY: Record<string, PendingOpEntity> = {
-  'products': 'products',
-  'customers': 'customers',
-  'sales': 'sales',
-  'discounts': 'discounts',
-  'users': 'users',
-  'categories': 'categories',
-  'suppliers': 'suppliers',
-  'productBatches': 'product_batches',
-  'purchaseRecords': 'purchase_records',
-  'purchaseOrders': 'purchase_orders',
-  'purchaseOrderItems': 'purchase_order_items',
-  'supplierTransactions': 'supplier_transactions',
-  'payments': 'payments',
-  'stockHistory': 'stock_history',
-  'salesTabs': 'sales_tabs',
-  'expenses': 'expenses',
-  'appSettings': 'app_settings',
-  'bundles': 'bundles',
-  'bundleItems': 'bundle_items',
-  'bundleSlots': 'bundle_slots',
-  'bundleSlotOptions': 'bundle_slot_options',
-  'variantStockHistory': 'variant_stock_history',
-  'productAddons': 'product_addons',
+  'products': 'products', 'customers': 'customers', 'sales': 'sales', 'discounts': 'discounts',
+  'users': 'users', 'categories': 'categories', 'suppliers': 'suppliers', 'productBatches': 'product_batches',
+  'purchaseRecords': 'purchase_records', 'purchaseOrders': 'purchase_orders', 'purchaseOrderItems': 'purchase_order_items',
+  'supplierTransactions': 'supplier_transactions', 'payments': 'payments', 'stockHistory': 'stock_history',
+  'salesTabs': 'sales_tabs', 'expenses': 'expenses', 'appSettings': 'app_settings', 'bundles': 'bundles',
+  'bundleItems': 'bundle_items', 'bundleSlots': 'bundle_slots', 'bundleSlotOptions': 'bundle_slot_options',
+  'variantStockHistory': 'variant_stock_history', 'productAddons': 'product_addons',
 };
 
-/**
- * Seed Local Database from Supabase data — FIELD-LEVEL MERGE
- * 
- * CRITICAL FIX: The old version would skip an ENTIRE entity if it had ANY pending op.
- * This caused stale prices/names/etc. to persist forever when an unrelated field
- * (e.g. stock) had a pending update.
- * 
- * NEW BEHAVIOR: Remote data is always the BASE. Only the specific fields from pending
- * ops are overlaid on top, so cloud changes (like price updates) always propagate.
- */
 export async function seedLocalDb(data: any) {
   try {
     const pending = await localDb.pendingOps.toArray();
-
-    // Build a map: entity:entityId -> Set of pending payload field names
     const pendingFieldsMap = new Map<string, Record<string, any>>();
     for (const op of pending) {
-      if (op.opType === 'delete') continue; // Deletes don't need field-level merge
+      if (op.opType === 'delete') continue;
       const key = `${op.entity}:${op.entityId}`;
       const existing = pendingFieldsMap.get(key) || {};
-      // Merge all pending payloads for this entity (later ops override earlier ones)
       pendingFieldsMap.set(key, { ...existing, ...op.payload });
     }
 
-    // Set of entity IDs pending deletion
-    const pendingDeleteIds = new Set(
-      pending.filter(p => p.opType === 'delete').map(p => `${p.entity}:${p.entityId}`)
-    );
+    const pendingDeleteIds = new Set(pending.filter(p => p.opType === 'delete').map(p => `${p.entity}:${p.entityId}`));
 
     const seedTable = async (tableName: keyof typeof localDb, items: any[] | undefined) => {
       if (!items || !Array.isArray(items)) return;
-
       const entityName = TABLE_TO_ENTITY[tableName as string] || (tableName as PendingOpEntity);
-
-      // Skip items pending deletion — they should NOT be re-seeded
       const nonDeletedItems = items.filter(item => !pendingDeleteIds.has(`${entityName}:${item.id}`));
-
-      // FIELD-LEVEL MERGE: For items with pending ops, use remote as base
-      // but overlay the pending fields so local changes are preserved
       const mergedItems = nonDeletedItems.map(item => {
         const key = `${entityName}:${item.id}`;
         const pendingPayload = pendingFieldsMap.get(key);
-        if (!pendingPayload) return item; // No pending ops — pure remote data
-
-        // Start with remote (fresh) data, overlay only the pending local fields
-        // This ensures price/name/description from cloud always propagate
-        // while stock/qty changes from pending ops are preserved
+        if (!pendingPayload) return item;
         return { ...item, ...pendingPayload };
       });
-
       if (mergedItems.length > 0) {
-        const table = localDb[tableName] as Table<any>;
+        const table = localDb[tableName] as any;
         if (typeof table.bulkPut === 'function') {
           await table.bulkPut(mergedItems);
         }
@@ -758,74 +140,46 @@ export async function seedLocalDb(data: any) {
     };
 
     const tasks = [
-      seedTable('products', data.products),
-      seedTable('customers', data.customers),
-      seedTable('sales', data.sales),
-      seedTable('discounts', data.discounts),
-      seedTable('users', data.users),
-      seedTable('categories', data.categories),
-      seedTable('suppliers', data.suppliers),
-      seedTable('salesTabs', data.salesTabs),
-      seedTable('expenses', data.expenses),
-      seedTable('supplierTransactions', data.supplierTransactions),
-      seedTable('productBatches', data.productBatches),
-      seedTable('purchaseRecords', data.purchaseRecords),
-      seedTable('stockHistory', data.stockHistory),
-      seedTable('bundles', data.bundles),
-      seedTable('bundleItems', data.bundleItems),
-      seedTable('bundleSlots', data.bundleSlots),
-      seedTable('bundleSlotOptions', data.bundleSlotOptions),
-      seedTable('variantStockHistory', data.variantStockHistory),
+      seedTable('products', data.products), seedTable('customers', data.customers),
+      seedTable('sales', data.sales), seedTable('discounts', data.discounts),
+      seedTable('users', data.users), seedTable('categories', data.categories),
+      seedTable('suppliers', data.suppliers), seedTable('salesTabs', data.salesTabs),
+      seedTable('expenses', data.expenses), seedTable('supplierTransactions', data.supplierTransactions),
+      seedTable('productBatches', data.productBatches), seedTable('purchaseRecords', data.purchaseRecords),
+      seedTable('stockHistory', data.stockHistory), seedTable('bundles', data.bundles),
+      seedTable('bundleItems', data.bundleItems), seedTable('bundleSlots', data.bundleSlots),
+      seedTable('bundleSlotOptions', data.bundleSlotOptions), seedTable('variantStockHistory', data.variantStockHistory),
       seedTable('productAddons', data.productAddons),
     ];
-
     await Promise.all(tasks);
 
     if (data.settings) {
-      const settingsPending = await localDb.pendingOps
-        .where('[entity+entityId]')
-        .equals(['app_settings', SETTINGS_ID])
-        .first();
-
+      const settingsPending = await localDb.pendingOps.where('[entity+entityId]').equals(['app_settings', SETTINGS_ID]).first();
       if (!settingsPending) {
         await localDb.appSettings.put({ ...data.settings, id: SETTINGS_ID });
       } else {
-        // Field-level merge for settings too — remote is base, pending fields overlay
         const pendingPayload = settingsPending.payload || {};
-        const merged = { ...data.settings, ...pendingPayload, id: SETTINGS_ID };
-        await localDb.appSettings.put(merged);
+        await localDb.appSettings.put({ ...data.settings, ...pendingPayload, id: SETTINGS_ID });
       }
     }
-
     console.log('[DB] ✅ Local seeding complete (field-level merge)');
   } catch (err) {
     console.error('[DB] ❌ Seeding failed:', err);
   }
 }
 
-/**
- * Purge all local data from IndexedDB
- */
 export async function purgeLocalData() {
-  try {
-    const tables = localDb.tables;
-    await Promise.all(tables.map(table => table.clear()));
-    console.log('[DB] 🗑️ Local database purged successfully');
-
-    // Clear any sync markers in localStorage if applicable
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.includes('sync') || key.includes('marker') || key.includes('last_'))) {
-        keysToRemove.push(key);
-      }
+  const tables = localDb.tables;
+  for (const table of tables) {
+    if (table.name !== 'appSettings') {
+      await table.clear();
     }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
-
-    // Force a reload to reset app state
-    window.location.reload();
-  } catch (err) {
-    console.error('[DB] ❌ Purge failed:', err);
-    throw err;
   }
+  
+  // Reset the sync timestamp so the next reload forces a FULL pull from cloud
+  localStorage.removeItem('cloud_last_pull_v1');
+  
+  // Delete indexed db completely as fallback
+  await localDb.delete();
+  window.location.reload();
 }

@@ -144,7 +144,7 @@ export function ComboSelectionModal({
       }`}
     >
       <CheckCircle className="h-4 w-4" />
-      {t('add_to_cart', 'Add to Cart')}
+      {"Add to Cart"}
     </button>
   );
 
@@ -160,7 +160,7 @@ export function ComboSelectionModal({
         <div className="sticky top-0 z-10 -mx-5 sm:-mx-6 px-5 sm:px-6 bg-surface shadow-[0_1px_0_rgba(0,0,0,0.05)] dark:shadow-[0_1px_0_rgba(255,255,255,0.05)] pb-3 pt-3 -mt-5 sm:-mt-6 mb-4 border-0 space-y-1">
           <div className="flex justify-between items-center">
             <p className="text-[10px] sm:text-[11px] text-gray-500 uppercase tracking-widest">
-              {t('configure_combo', 'Configure your choices')}
+              {"Configure your choices"}
             </p>
             <div className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all shrink-0 ${
               totalSelected === totalRequired

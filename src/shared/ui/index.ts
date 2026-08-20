@@ -27,3 +27,4 @@ export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { BottomSheet, type BottomSheetProps } from './BottomSheet';
 export { Select, type SelectProps } from './Select';
 export { Modal } from './Modal';
+export { SearchableSelect, type SearchableSelectProps } from './SearchableSelect';

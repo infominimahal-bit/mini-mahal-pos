@@ -13,6 +13,7 @@ import {
   type ExportColumn,
   type ReportExportConfig,
 } from './exportEngine';
+import { useSettingsStore } from '../../stores';
 
 /**
  * ExportButton — the single reusable export trigger for ALL business reports.
@@ -102,6 +103,7 @@ export function ExportButton({
       filename,
       currencySymbol,
       brand,
+      paperSize: useSettingsStore.getState().settings.receiptPaperSize || 'A4',
     };
 
     setBusy(format);

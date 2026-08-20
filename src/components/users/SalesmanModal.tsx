@@ -1,3 +1,4 @@
+import { useUsersStore } from '../../stores';
 import { useState, useEffect } from 'react';
 import { Loader2, Save, User as UserIcon, Phone } from 'lucide-react';
 import { Salesman } from '../../types';
@@ -5,7 +6,6 @@ import { useApp } from '../../context/SupabaseAppContext';
 import { salesmenService } from '../../lib/services';
 import { sonner } from '../../lib/sonner';
 import { Modal } from '../../shared/ui/Modal';
-import { useTranslation } from '../../hooks/useTranslation';
 import { Button, ToggleSwitch } from '../../shared/ui';
 
 interface SalesmanModalProps {
@@ -15,8 +15,7 @@ interface SalesmanModalProps {
 }
 
 export function SalesmanModal({ isOpen, onClose, salesman }: SalesmanModalProps) {
-  const { state, dispatch } = useApp();
-  const { t } = useTranslation();
+  const appSalesmen = useUsersStore(s => s.salesmen);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -62,10 +61,7 @@ export function SalesmanModal({ isOpen, onClose, salesman }: SalesmanModalProps)
 
         const updatedSalesman = await salesmenService.update(salesman.id, updatePayload);
         
-        dispatch({
-          type: 'SET_SALESMEN',
-          payload: state.salesmen.map(s => s.id === salesman.id ? updatedSalesman : s)
-        });
+        useUsersStore.getState().setSalesmen(appSalesmen.map(s => s.id === salesman.id ? updatedSalesman : s));
         sonner.success('Salesman updated successfully');
       } else {
         const newSalesman = await salesmenService.create({
@@ -74,10 +70,7 @@ export function SalesmanModal({ isOpen, onClose, salesman }: SalesmanModalProps)
           active: formData.active,
         });
 
-        dispatch({
-          type: 'ADD_SALESMAN',
-          payload: newSalesman
-        });
+        useUsersStore.getState().addSalesman(newSalesman);
         sonner.success('Salesman added successfully');
       }
 
@@ -102,7 +95,7 @@ export function SalesmanModal({ isOpen, onClose, salesman }: SalesmanModalProps)
         onClick={onClose}
         className="!min-h-0 !px-4 sm:!px-6 !py-2.5 sm:!py-3.5 !text-[9px] sm:!text-[10px] !font-black !text-[#ff4b6e] !border !border-rose-200 dark:!border-rose-900/30 hover:!bg-rose-50 dark:hover:!bg-rose-500/10 !shrink-0"
       >
-        {t('discard_upper', 'DISCARD')}
+        {"DISCARD"}
       </Button>
       <Button
         type="button"
@@ -113,7 +106,7 @@ export function SalesmanModal({ isOpen, onClose, salesman }: SalesmanModalProps)
       >
         {loading ? <Loader2 className="w-4 h-4 sm:h-5 sm:w-5 animate-spin shrink-0" /> : <Save className="w-4 h-4 sm:h-5 sm:w-5 shrink-0" />}
         <span className="leading-none ml-2">
-          {salesman ? t('commit_changes', 'COMMIT CHANGES') : t('register_salesman', 'REGISTER SALESMAN')}
+          {salesman ? "COMMIT CHANGES" : "REGISTER SALESMAN"}
         </span>
       </Button>
     </div>
@@ -123,7 +116,7 @@ export function SalesmanModal({ isOpen, onClose, salesman }: SalesmanModalProps)
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={salesman ? t('edit_salesman', 'EDIT SALESMAN') : t('register_new_salesman', 'REGISTER NEW SALESMAN')}
+      title={salesman ? "EDIT SALESMAN" : "REGISTER NEW SALESMAN"}
       maxWidth="lg"
       footer={footer}
     >
@@ -131,12 +124,12 @@ export function SalesmanModal({ isOpen, onClose, salesman }: SalesmanModalProps)
         <div className="space-y-6">
           <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
             <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-            {t('identity_details', 'Identity Details')}
+            {"Identity Details"}
           </h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('full_legal_name', 'Full Legal Name *')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Full Legal Name *"}</label>
               <div className="relative">
                 <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
@@ -151,7 +144,7 @@ export function SalesmanModal({ isOpen, onClose, salesman }: SalesmanModalProps)
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('phone_number_optional', 'Phone Number (Optional)')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Phone Number (Optional)"}</label>
               <div className="relative">
                 <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
@@ -170,8 +163,8 @@ export function SalesmanModal({ isOpen, onClose, salesman }: SalesmanModalProps)
         {/* Access Protocol */}
         <div className="p-5 bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/10 rounded-[24px] flex items-center justify-between">
           <div className="flex flex-col">
-            <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-tight">{t('system_status', 'System Status')}</span>
-            <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mt-0.5">{t('active_inactive', 'Active / Inactive')}</span>
+            <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-tight">{"System Status"}</span>
+            <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mt-0.5">{"Active / Inactive"}</span>
           </div>
           <ToggleSwitch
             checked={formData.active}

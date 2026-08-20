@@ -1,0 +1,99 @@
+import { supabase } from '../../lib/supabase';
+import { localDb } from '../../lib/localDb';
+import { can } from '../../lib/permissions';
+import { sonner } from '../../lib/sonner';
+import { User } from '../../types';
+import { signOutLogic } from './signOutLogic';
+
+export async function loadProfileLogic(userId: string, setProfile: any, setUser: any, setLoading: any) {
+  try {
+    const { data, error } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
+    if (error) throw error;
+    if (data) {
+      if (data.active === false) {
+        await signOutLogic(setLoading, () => {}, setUser, setProfile);
+        sonner.error('Your account has been deactivated by an administrator.');
+        return;
+      }
+      const pData = data as any;
+      const profileData: User = {
+        id: pData.id, username: pData.username, name: pData.name, email: pData.email,
+        role: pData.role as any, permissions: pData.permissions || [],
+        canEditPrice: can(pData.role, 'edit_price'), canGiveDiscount: can(pData.role, 'give_discount'),
+        canDeleteSale: can(pData.role, 'delete_sale'), canViewProfit: can(pData.role, 'view_profit'),
+        canManageStock: can(pData.role, 'manage_stock'), canManagePO: can(pData.role, 'manage_po'),
+        canViewRecords: can(pData.role, 'view_records'), canEditSale: can(pData.role, 'edit_sale'),
+        active: pData.active ?? true, lastLogin: pData.last_login ? new Date(pData.last_login) : undefined,
+        avatar: pData.avatar || undefined, offlineHash: (pData as any).offline_hash ?? (pData as any).offlineHash,
+      };
+      setProfile(profileData);
+      localStorage.setItem('pos_offline_profile', JSON.stringify(profileData));
+      localDb.users.put(profileData).catch(() => {});
+      const { enableFullAuthInit } = await import('../../lib/supabase');
+      enableFullAuthInit();
+    } else {
+      if (navigator.onLine) {
+        await signOutLogic(setLoading, () => {}, setUser, setProfile);
+        sonner.error('Session Invalid', 'Your account no longer exists. Please sign in again.');
+      } else {
+        const cached = localStorage.getItem('pos_offline_profile');
+        if (cached) setProfile(JSON.parse(cached));
+      }
+    }
+  } catch (error: any) {
+    const isOfflineError = !navigator.onLine || error?.toString().includes('Failed to fetch');
+    if (isOfflineError) {
+      const cached = localStorage.getItem('pos_offline_profile');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed.lastLogin) parsed.lastLogin = new Date(parsed.lastLogin);
+          setProfile(parsed);
+          setUser({ id: parsed.id, email: parsed.email } as any);
+          return;
+        } catch (e) {}
+      }
+    }
+    const isNetworkError = !navigator.onLine || error?.toString().includes('Failed to fetch') || error?.toString().includes('ERR_NAME_NOT_RESOLVED');
+    if (!isNetworkError) {
+      try {
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        if (!refreshError && refreshData?.user) {
+          const { data: retryData, error: retryError } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
+          if (!retryError && retryData) {
+            const pData = retryData as any;
+            const profileData: User = {
+              id: pData.id, username: pData.username, name: pData.name, email: pData.email,
+              role: pData.role as any, permissions: pData.permissions || [],
+              canEditPrice: can(pData.role, 'edit_price'), canGiveDiscount: !!pData.can_give_discount,
+              canDeleteSale: can(pData.role, 'delete_sale'), canViewProfit: !!pData.can_view_profit,
+              canManageStock: can(pData.role, 'manage_stock'), canManagePO: !!pData.can_manage_po,
+              canViewRecords: can(pData.role, 'view_records'), canEditSale: !!pData.can_edit_sale,
+              active: pData.active ?? true, lastLogin: pData.last_login ? new Date(pData.last_login) : undefined,
+              avatar: pData.avatar || undefined, offlineHash: (pData as any).offline_hash ?? (pData as any).offlineHash,
+            };
+            setProfile(profileData);
+            localStorage.setItem('pos_offline_profile', JSON.stringify(profileData));
+            return;
+          }
+        }
+      } catch (_) {}
+    }
+    if (isNetworkError) {
+      const cached = localStorage.getItem('pos_offline_profile');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed.lastLogin) parsed.lastLogin = new Date(parsed.lastLogin);
+          setProfile(parsed);
+          setUser({ id: parsed.id, email: parsed.email } as any);
+          return;
+        } catch (e) {}
+      }
+      return;
+    }
+    sonner.error('Failed to load user profile. Please try logging in again.');
+  } finally {
+    setLoading(false);
+  }
+}

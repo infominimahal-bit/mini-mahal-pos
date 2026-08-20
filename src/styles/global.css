@@ -1,0 +1,209 @@
+/* Enhanced Electron-safe dark mode dropdown fix — OS overrides need !important */
+.dark select:not([class*="bg-[#f8f9fa]"]):not([class*="bg-white"]),
+.dark select:not([class*="bg-[#f8f9fa]"]):not([class*="bg-white"]) option,
+.dark .select:not([class*="bg-[#f8f9fa]"]):not([class*="bg-white"]),
+.dark .select:not([class*="bg-[#f8f9fa]"]):not([class*="bg-white"]) option {
+  background-color: #1a1a2e !important;
+  color: #ffffff !important;
+  border-color: #6366f1 !important;
+}
+
+/* Ensure selects on light backgrounds stay visible even in dark mode context */
+select[class*="bg-[#f8f9fa]"],
+select[class*="bg-white"],
+.select[class*="bg-[#f8f9fa]"],
+.select[class*="bg-white"] {
+  background-color: white !important;
+  color: #111827 !important;
+}
+
+/* Prevent OS-level blue highlights from making text unreadable */
+.dark select option:hover,
+.dark select option:checked,
+.dark select option:focus {
+  background-color: #6366f1 !important;
+  color: #000000 !important;
+}
+
+/* Target internal listbox rendering for Webkit/Electron */
+.dark select::-webkit-listbox {
+  background-color: #1a1a2e !important;
+}
+
+select option {
+  padding: 10px 14px !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-white/10 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400 dark:bg-white/20;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    font-size: 12px;
+    line-height: 1.4;
+    color: #000;
+    background: white;
+  }
+
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
+
+/* Focus styles for accessibility */
+.focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Loading states */
+.loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.4),
+      transparent);
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% {
+    left: -100%;
+  }
+
+  100% {
+    left: 100%;
+  }
+}
+
+/* Responsive grid utilities */
+.grid-responsive {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.grid-responsive-sm {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.grid-responsive-lg {
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+}
+
+/* Mobile-first responsive design */
+@media (max-width: 640px) {
+  .mobile-stack {
+    flex-direction: column;
+  }
+
+  .mobile-full {
+    width: 100%;
+  }
+
+  .mobile-hidden {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .tablet-show {
+    display: block;
+  }
+}
+
+@media (min-width: 1024px) {
+  .desktop-show {
+    display: block;
+  }
+}
+
+/* Custom scrollbar styles for WebKit browsers */
+.dark ::-webkit-scrollbar-track {
+  background: #171717;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Camera Scanner Fixes */
+#reader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 2.5rem !important;
+}
+
+#reader {
+  border: none !important;
+  background: black !important;
+}
+
+#reader__scan_region {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* --- Sonner Toaster Mobile Top Offset Fix & Size Optimization --- */
+@media (max-width: 640px) {
+  [data-sonner-toaster] {
+    top: max(env(safe-area-inset-top, 16px), 64px) !important;
+    bottom: auto !important;
+    right: 16px !important;
+    left: 16px !important;
+  }
+
+  [data-sonner-toaster] [data-toast] {
+    width: auto !important;
+    max-width: 280px !important;
+    margin: 0 auto !important;
+    border-radius: 2rem !important;
+    padding: 6px 12px !important;
+    font-size: 9px !important;
+    line-height: 1.2 !important;
+    text-align: center !important;
+    justify-content: center !important;
+  }
+}
+
+/* Smooth momentum scrolling for iOS/Safari */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}

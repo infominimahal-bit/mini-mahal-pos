@@ -1,14 +1,17 @@
 import { useMemo } from 'react';
-import { useApp, checkDiscountEligibility } from '../context/SupabaseAppContext';
 import { calculateCart } from '../lib/calculateCart';
+import { checkDiscountEligibility } from '../lib/discountUtils';
+import { useCartStore, useSettingsStore, useAppStore, useProductsStore } from '../stores';
 
-/**
- * POS cart calculations hook — delegates to the shared pure `calculateCart()`
- * function (MASTER §10: one pricing engine, no second implementation anywhere).
- */
 export function useCartCalculations(paymentMethod: string = 'cash', cardDetails?: any) {
-  const { state } = useApp();
-  const { cart, discounts, selectedCustomer, settings, billDiscountValue, billDiscountType, products } = state;
+  const cart = useCartStore(s => s.cart);
+  const selectedCustomer = useCartStore(s => s.selectedCustomer);
+  const billDiscountValue = useCartStore(s => s.billDiscountValue);
+  const billDiscountType = useCartStore(s => s.billDiscountType);
+  
+  const settings = useSettingsStore(s => s.settings);
+  const discounts = useAppStore(s => s.discounts);
+  const products = useProductsStore(s => s.products);
 
   return useMemo(() => {
     return calculateCart({

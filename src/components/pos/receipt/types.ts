@@ -1,0 +1,42 @@
+import { type CSSProperties, type ReactNode } from 'react';
+import { type Sale } from '../../types';
+
+export interface ReceiptCtx {
+  sale: Sale;
+  settings: any;
+  profile: any;
+  appBundles: any[];
+  fs: { shopName: number; body: number; total: number; footer: number; meta: number };
+  baseWeight: number;
+  clamp: (w: number) => number;
+  currencyCode: string;
+  showDiscount: boolean;
+  is58mm: boolean;
+  isA4: boolean;
+  template: string;
+  headerBorder: string;
+  totalBorder: string;
+  tracking: string;
+  taxLabel: string;
+  paperWidthPx: string;
+  pageSizeCSS: string;
+  fontFamily: string;
+  padTop: number;
+  padBottom: number;
+  padLeft: number;
+  padRight: number;
+  offsetX: number;
+  bodyPadL: string;
+  bodyPadR: string;
+  shBundles: any[];
+  shStandalone: any[];
+  shDealDiscount: number;
+  shItemDiscount: number;
+  shBillDiscount: number;
+  bd: any;
+  baseContainer: CSSProperties;
+  RECEIPT_WATERMARK: ReactNode;
+  refundWatermark: ReactNode;
+  editWatermark: ReactNode;
+  notesBox: ReactNode;
+}

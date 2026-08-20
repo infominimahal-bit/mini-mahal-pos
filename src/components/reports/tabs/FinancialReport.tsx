@@ -31,21 +31,21 @@ export function FinancialReport({
   const { t } = useTranslation();
 
   const exportColumns = [
-    { key: 'metric', label: t('metric', 'Metric') },
-    { key: 'value', label: t('value', 'Value') },
+    { key: 'metric', label: "Metric" },
+    { key: 'value', label: "Value" },
   ];
 
   const exportRows = useMemo(() => {
     const rows = [
-      { metric: t('total_revenue', 'Total Revenue'), value: totalRevenue },
-      { metric: t('total_transactions', 'Total Transactions'), value: totalTransactions },
-      { metric: t('cost_of_goods', 'Cost of Goods'), value: totalCostOfGoods },
-      { metric: t('gross_profit', 'Gross Profit'), value: grossProfit },
-      { metric: t('total_expenses', 'Total Expenses'), value: totalExpenseAmount },
-      { metric: t('net_profit', 'Net Profit'), value: netProfit },
+      { metric: "Total Revenue", value: totalRevenue },
+      { metric: "Total Transactions", value: totalTransactions },
+      { metric: "Cost of Goods", value: totalCostOfGoods },
+      { metric: "Gross Profit", value: grossProfit },
+      { metric: "Total Expenses", value: totalExpenseAmount },
+      { metric: "Net Profit", value: netProfit },
     ];
     walletStats.forEach(w => {
-      rows.push({ metric: `${t('wallet_net', 'Wallet Net')} (${w.method})`, value: w.net });
+      rows.push({ metric: `${"Wallet Net"} (${w.method})`, value: w.net });
     });
     return rows;
   }, [t, totalRevenue, totalTransactions, totalCostOfGoods, grossProfit, totalExpenseAmount, netProfit, walletStats]);
@@ -56,7 +56,7 @@ export function FinancialReport({
         <ExportButton
           data={exportRows}
           columns={exportColumns}
-          title={t('financial_report', 'Financial Report')}
+          title={"Financial Report"}
           currencySymbol={getCurrencySymbol(currency)}
           className="!min-h-0 !px-4 !py-2.5 !rounded-xl !text-[10px] !font-black !bg-gray-100 dark:!bg-white/5 !text-gray-600 dark:!text-gray-400 !border-gray-200 dark:!border-white/5 hover:!text-primary"
         />
@@ -65,40 +65,40 @@ export function FinancialReport({
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <div className="stat-card bg-gradient-to-br from-blue-600 to-indigo-700">
           <div className="stat-card-inner">
-            <span className="stat-card-label">{t("total_revenue", "Total Revenue")}</span>
+            <span className="stat-card-label">{"Total Revenue"}</span>
             <span className="stat-card-value">{formatCurrency(totalRevenue, currency)}</span>
             <p className="text-[7px] font-black text-white/40 uppercase tracking-widest mt-1">
-              {totalTransactions} {t("transactions", "Transactions")}
+              {totalTransactions} {"Transactions"}
             </p>
           </div>
           <TrendingUp className="stat-card-icon" />
         </div>
         <div className="stat-card bg-gradient-to-br from-rose-500 to-red-600">
           <div className="stat-card-inner">
-            <span className="stat-card-label">{t("cost_of_goods", "Cost of Goods")}</span>
+            <span className="stat-card-label">{"Cost of Goods"}</span>
             <span className="stat-card-value">{formatCurrency(totalCostOfGoods, currency)}</span>
             <p className="text-[7px] font-black text-white/40 uppercase tracking-widest mt-1">
-              {t("est_inventory_cost", "Est. Inventory Cost")}
+              {"Est. Inventory Cost"}
             </p>
           </div>
           <TrendingDown className="stat-card-icon" />
         </div>
         <div className="stat-card bg-gradient-to-br from-orange-500 to-amber-600">
           <div className="stat-card-inner">
-            <span className="stat-card-label">{t("total_expenses", "Total Expenses")}</span>
+            <span className="stat-card-label">{"Total Expenses"}</span>
             <span className="stat-card-value">{formatCurrency(totalExpenseAmount, currency)}</span>
             <p className="text-[7px] font-black text-white/40 uppercase tracking-widest mt-1">
-              {filteredExpensesCount} {t("records", "Records")}
+              {filteredExpensesCount} {"Records"}
             </p>
           </div>
           <Wallet className="stat-card-icon" />
         </div>
         <div className="stat-card bg-gradient-to-br from-indigo-500 to-violet-700">
           <div className="stat-card-inner">
-            <span className="stat-card-label">{t("net_profit", "Net Profit")}</span>
+            <span className="stat-card-label">{"Net Profit"}</span>
             <span className="stat-card-value">{formatCurrency(netProfit, currency)}</span>
             <p className="text-[7px] font-black text-white/40 uppercase tracking-widest mt-1">
-              {t("gp_minus_expenses", "GP - Expenses")}
+              {"GP - Expenses"}
             </p>
           </div>
           <DollarSign className="stat-card-icon" />
@@ -109,13 +109,13 @@ export function FinancialReport({
       <div className="space-y-4">
         <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-600 flex items-center gap-2">
           <span className="w-1.5 h-4 bg-violet-600 rounded-full inline-block shadow-lg shadow-violet-600/20"></span>
-          {t("wallet_wise_summary", "Wallet-wise Summary (Net Cash Movement)")}
+          {"Wallet-wise Summary (Net Cash Movement)"}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-3 gap-6">
           {[
-            { method: 'cash', label: t("cash_wallet", "Cash Wallet"), icon: <Banknote className="h-6 w-6" />, color: 'text-primary', accent: 'emerald', bg: 'bg-primary/10 dark:bg-primary/5', bar: 'bg-primary', stats: walletStats.find(w => w.method === 'cash') },
-            { method: 'card', label: t("card_wallet", "Card Wallet"), icon: <CreditCard className="h-6 w-6" />, color: 'text-blue-500', accent: 'blue', bg: 'bg-blue-500/10 dark:bg-blue-500/5', bar: 'bg-blue-500', stats: walletStats.find(w => w.method === 'card') },
-            { method: 'online', label: t("online_wallet", "Online Wallet"), icon: <Building2 className="h-6 w-6" />, color: 'text-cyan-500', accent: 'cyan', bg: 'bg-cyan-500/10 dark:bg-cyan-500/5', bar: 'bg-cyan-500', stats: walletStats.find(w => w.method === 'online') }
+            { method: 'cash', label: "Cash Wallet", icon: <Banknote className="h-6 w-6" />, color: 'text-primary', accent: 'emerald', bg: 'bg-primary/10 dark:bg-primary/5', bar: 'bg-primary', stats: walletStats.find(w => w.method === 'cash') },
+            { method: 'card', label: "Card Wallet", icon: <CreditCard className="h-6 w-6" />, color: 'text-blue-500', accent: 'blue', bg: 'bg-blue-500/10 dark:bg-blue-500/5', bar: 'bg-blue-500', stats: walletStats.find(w => w.method === 'card') },
+            { method: 'online', label: "Online Wallet", icon: <Building2 className="h-6 w-6" />, color: 'text-cyan-500', accent: 'cyan', bg: 'bg-cyan-500/10 dark:bg-cyan-500/5', bar: 'bg-cyan-500', stats: walletStats.find(w => w.method === 'online') }
           ].map((w, i) => (
             <div key={i} className="group relative p-6 rounded-[1.5rem] border border-white/5 bg-gradient-to-br from-white to-gray-50 dark:from-[#171717] dark:to-[#111] shadow-xl hover:scale-[1.02] transition-all duration-300">
               <div className="flex items-center justify-between mb-6">
@@ -123,27 +123,27 @@ export function FinancialReport({
                   <div className={`p-3.5 rounded-2xl ${w.bg} ${w.color} shadow-lg shadow-black/[0.02] group-hover:scale-110 transition-transform`}>{w.icon}</div>
                   <div>
                     <span className={`text-[10px] font-black uppercase tracking-[0.2em] opacity-60 ${w.color}`}>{w.label}</span>
-                    <h4 className="text-lg font-black text-gray-900 dark:text-white leading-tight">{t("net_flow", "Net Flow")}</h4>
+                    <h4 className="text-lg font-black text-gray-900 dark:text-white leading-tight">{"Net Flow"}</h4>
                   </div>
                 </div>
               </div>
               <div className="space-y-4">
                 <div className="flex justify-between items-center px-1">
-                  <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{t("total_sales", "Total Sales")}</span>
+                  <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{"Total Sales"}</span>
                   <span className="text-sm font-black text-primary dark:text-emerald-400">+{formatCurrency(w.stats?.sales || 0, currency)}</span>
                 </div>
                 <div className="flex justify-between items-center px-1">
-                  <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{t("total_refunds", "Total Refunds")}</span>
+                  <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{"Total Refunds"}</span>
                   <span className="text-sm font-black text-rose-500">-{formatCurrency(w.stats?.refunds || 0, currency)}</span>
                 </div>
                 <div className="flex justify-between items-center px-1">
-                  <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{t("total_expenses", "Total Expenses")}</span>
+                  <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{"Total Expenses"}</span>
                   <span className="text-sm font-black text-rose-500">-{formatCurrency(w.stats?.expenses || 0, currency)}</span>
                 </div>
                 <div className="relative pt-4 mt-4 border-t border-gray-200 dark:border-white/5">
                   <div className={`absolute top-0 left-0 w-8 h-[2px] ${w.bar} -translate-y-[1px]`}></div>
                   <div className="flex justify-between items-center px-1">
-                    <span className="text-[11px] font-black text-gray-900 dark:text-white uppercase tracking-widest">{t("wallet_net", "Wallet Net")}</span>
+                    <span className="text-[11px] font-black text-gray-900 dark:text-white uppercase tracking-widest">{"Wallet Net"}</span>
                     <span className={`text-xl font-black ${w.color}`}>{formatCurrency(w.stats?.net || 0, currency)}</span>
                   </div>
                 </div>
@@ -160,16 +160,16 @@ export function FinancialReport({
             <div className="p-4 bg-white/10 rounded-3xl"><TrendingUp className="h-8 w-8 text-emerald-400" /></div>
             <div>
               <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.3em] mb-1">
-                {t("final_reconciliation", "Final Business Reconciliation")}
+                {"Net Profit Summary"}
               </p>
               <p className="text-xs text-white/30 font-bold max-w-[300px]">
-                {t("final_reconciliation_desc", "Total Revenue remaining after deducting all business expenses for this period.")}
+                {"Total Revenue remaining after deducting all business expenses for this period."}
               </p>
             </div>
           </div>
           <div className="text-center md:text-right relative z-10">
               <p className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.4em] mb-2">
-                {t("grand_total_net", "Net Profit (Final)")}
+                {"Net Profit (Final)"}
               </p>
               <p className="text-5xl font-black text-white tracking-tighter drop-shadow-2xl">{formatCurrency(netProfit, currency)}</p>
           </div>

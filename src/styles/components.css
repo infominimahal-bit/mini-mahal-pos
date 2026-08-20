@@ -1,0 +1,219 @@
+@layer components {
+  .card {
+    @apply bg-white dark:bg-surface rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-bold uppercase tracking-widest transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed;
+    min-height: 44px;
+    /* touch target minimum */
+  }
+
+  .btn-primary {
+    @apply bg-primary hover:bg-primary-hover text-white shadow-lg;
+  }
+
+  .btn-secondary {
+    @apply bg-surface border border-default text-default hover:bg-gray-50 dark:hover:bg-white/5;
+  }
+
+  .btn-danger {
+    @apply bg-danger text-white shadow-lg hover:opacity-90;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-default hover:bg-app;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  .btn-md {
+    @apply px-4 py-2.5 text-sm;
+  }
+
+  .btn-lg {
+    @apply px-6 py-3.5 text-base;
+  }
+
+  .input {
+    @apply w-full px-4 py-3 border border-gray-200 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 bg-white dark:bg-[#1C1C1C] text-gray-900 dark:text-white;
+  }
+
+  .input-sm {
+    @apply px-3 py-2 text-sm;
+  }
+
+  .select {
+    @apply w-full px-4 py-3 border border-gray-200 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 bg-white dark:bg-[#1C1C1C] text-gray-900 dark:text-white;
+  }
+
+  .textarea {
+    @apply w-full px-4 py-3 border border-gray-200 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 bg-white dark:bg-[#1C1C1C] text-gray-900 dark:text-white resize-none;
+  }
+
+  .stat-card {
+    @apply relative overflow-hidden rounded-[1.25rem] sm:rounded-[1.5rem] transition-all duration-300 hover:scale-[1.02] shadow-xl border border-white/10;
+    min-height: 80px;
+    background-size: 200% 200%;
+  }
+
+  .stat-card-inner {
+    @apply relative z-10 p-2.5 sm:p-5 flex flex-col justify-between h-full;
+  }
+
+  .stat-card-label {
+    @apply text-[8px] sm:text-[10px] font-black uppercase tracking-[0.1em] sm:tracking-[0.2em] text-white/60 mb-0.5 block leading-tight truncate;
+  }
+
+  .stat-card-value {
+    @apply text-base sm:text-2xl lg:text-2xl xl:text-3xl font-black text-white tracking-[-0.05em] leading-none block whitespace-nowrap drop-shadow-md;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .premium-card {
+    @apply relative overflow-hidden rounded-[1.75rem] sm:rounded-[3rem] border border-white/5 bg-white dark:bg-surface shadow-2xl transition-all duration-500;
+  }
+
+  .glass-card {
+    @apply bg-white/5 border border-white/10 rounded-[1.5rem] sm:rounded-[2rem] shadow-xl;
+  }
+
+  .stat-card-icon {
+    @apply absolute -bottom-2 -right-2 sm:-bottom-4 sm:-right-4 opacity-10 pointer-events-none transition-all duration-700 group-hover:scale-110 group-hover:opacity-20 group-hover:-rotate-12 h-16 w-16 sm:h-24 sm:w-24;
+  }
+
+  .chip-nav-container {
+    @apply flex items-center gap-1.5 p-1 bg-white dark:bg-zinc-900/50 rounded-[1.25rem] border border-gray-200/50 dark:border-white/5 overflow-x-auto scrollbar-hide shadow-sm;
+  }
+
+  .chip-nav-item {
+    @apply flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all duration-300 relative z-10 whitespace-nowrap active:scale-95;
+  }
+
+  /* --- Content Layout (scroll is handled by main tag in App.tsx) --- */
+  .main-content-scroll {
+    @apply flex-1 flex flex-col pb-[80px] sm:pb-[90px] lg:pb-4 min-h-0 w-full;
+  }
+
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/80 dark:bg-app-[6px] flex items-start justify-center z-[250] p-0 sm:p-6 overflow-y-auto;
+    padding-top: max(env(safe-area-inset-top, 16px), 24px);
+    padding-bottom: max(env(safe-area-inset-bottom, 16px), 80px);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Z-Index Stack Constants */
+  .z-base-modal {
+    @apply z-[250];
+  }
+
+  .z-nested-modal {
+    @apply z-[300];
+  }
+
+  .z-toast {
+    @apply z-[350];
+  }
+
+  .z-tooltip {
+    @apply z-[400];
+  }
+
+  .modal {
+    @apply bg-white dark:bg-surface border dark:border-white/5 transition-all duration-300;
+    box-shadow: 0 32px 64px -12px rgba(0, 0, 0, 0.5);
+    width: 360px;
+    max-width: 360px !important;
+    max-height: 90dvh;
+    min-height: 0;
+    transform-origin: center center;
+    overscroll-behavior: contain;
+    border-radius: 2.5rem;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    /* Interactive fix for mobile keyboard */
+    position: relative;
+    z-index: 50;
+  }
+
+  /* Responsive Modal Pattern (Mobile Bottom Sheet) */
+  @media (max-width: 767px) {
+    .modal-overlay {
+      @apply items-end p-0;
+      touch-action: none;
+    }
+
+    .modal,
+    .modal-xl {
+      @apply w-full max-w-full !important;
+      border-radius: 1.75rem 1.75rem 0 0 !important;
+      max-height: calc(100dvh - 16px) !important;
+      margin-bottom: 0 !important;
+      height: auto;
+      flex-shrink: 0;
+    }
+
+    .modal-body {
+      max-height: 75dvh !important;
+      touch-action: pan-y;
+    }
+  }
+
+  /* Universal 360px modal — identical on desktop, tablet, and mobile */
+  @media (min-width: 640px) {
+    .modal {
+      width: 360px;
+      max-width: 360px !important;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .modal {
+      max-width: 360px !important;
+    }
+  }
+
+  /* Expansive Modal for Reports/Checkouts */
+  .modal-xl {
+    @apply w-full max-w-[1400px] !important;
+    max-height: 95dvh;
+    min-height: 0;
+    @apply bg-white dark:bg-surface shadow-2xl overflow-hidden flex flex-col rounded-[2.5rem];
+  }
+
+  @media (max-width: 1024px) {
+    .modal-xl {
+      @apply max-w-[95%] !important;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .modal-xl {
+      @apply max-w-full !important;
+      border-radius: 0;
+      height: 100dvh;
+      max-height: 100dvh;
+    }
+  }
+
+
+  .modal-header {
+    @apply px-5 py-3.5 border-b border-gray-100 dark:border-white/5 flex items-center justify-between flex-shrink-0 bg-white dark:bg-surface;
+  }
+
+  .modal-body {
+    @apply p-4 sm:p-8 scrollbar-hide overflow-y-auto;
+    max-height: 85dvh;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    scroll-behavior: smooth;
+  }
+
+  .modal-footer {
+    @apply px-6 py-3.5 border-t border-gray-100 dark:border-white/5 flex justify-end space-x-3 flex-shrink-0 bg-gray-50/30 dark:bg-black/20;
+  }
+}

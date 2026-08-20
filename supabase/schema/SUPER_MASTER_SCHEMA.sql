@@ -206,6 +206,46 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+-- ════════════════════════════════════════════════════════════════
+-- 8. USERS  (Extends Supabase auth.users)
+-- ════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS users (
+    id                  UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    username            TEXT NOT NULL UNIQUE,
+    name                TEXT NOT NULL,
+    email               TEXT,
+    role                TEXT NOT NULL DEFAULT 'cashier' CHECK (role IN ('admin', 'manager', 'cashier', 'salesman')),
+    permissions         TEXT[] DEFAULT '{}',
+
+    -- Granular ACL Booleans
+    can_edit_price      BOOLEAN DEFAULT false,
+    can_give_discount   BOOLEAN DEFAULT false,
+    can_delete_sale     BOOLEAN DEFAULT false,
+    can_view_profit     BOOLEAN DEFAULT false,
+    can_manage_stock    BOOLEAN DEFAULT false,
+    can_manage_po       BOOLEAN DEFAULT false,
+    can_view_records    BOOLEAN DEFAULT false,
+    can_edit_sale       BOOLEAN DEFAULT false,
+
+    active              BOOLEAN DEFAULT true,
+    last_login          TIMESTAMPTZ,
+    avatar              TEXT,
+    offline_hash        TEXT,
+
+    created_at          TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at          TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE users REPLICA IDENTITY FULL;
+
+-- ── Current user role (server-side auth helper, MASTER §2.1.4) ──
+CREATE OR REPLACE FUNCTION current_user_role()
+RETURNS TEXT LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions AS $$
+    SELECT role FROM public.users WHERE id = auth.uid();
+$$;
+
+
 
 -- ════════════════════════════════════════════════════════════════
 -- 1. APP SETTINGS  (Singleton — 1 row only)
@@ -594,38 +634,6 @@ CREATE TABLE IF NOT EXISTS discounts (
 ALTER TABLE discounts REPLICA IDENTITY FULL;
 
 
--- ════════════════════════════════════════════════════════════════
--- 8. USERS  (Extends Supabase auth.users)
--- ════════════════════════════════════════════════════════════════
-
-CREATE TABLE IF NOT EXISTS users (
-    id                  UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    username            TEXT NOT NULL UNIQUE,
-    name                TEXT NOT NULL,
-    email               TEXT,
-    role                TEXT NOT NULL DEFAULT 'cashier' CHECK (role IN ('admin', 'manager', 'cashier', 'salesman')),
-    permissions         TEXT[] DEFAULT '{}',
-
-    -- Granular ACL Booleans
-    can_edit_price      BOOLEAN DEFAULT false,
-    can_give_discount   BOOLEAN DEFAULT false,
-    can_delete_sale     BOOLEAN DEFAULT false,
-    can_view_profit     BOOLEAN DEFAULT false,
-    can_manage_stock    BOOLEAN DEFAULT false,
-    can_manage_po       BOOLEAN DEFAULT false,
-    can_view_records    BOOLEAN DEFAULT false,
-    can_edit_sale       BOOLEAN DEFAULT false,
-
-    active              BOOLEAN DEFAULT true,
-    last_login          TIMESTAMPTZ,
-    avatar              TEXT,
-    offline_hash        TEXT,
-
-    created_at          TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
-    updated_at          TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-ALTER TABLE users REPLICA IDENTITY FULL;
 
 
 
@@ -1362,12 +1370,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DO $$ BEGIN
-  CREATE TRIGGER trigger_update_customer_stats
-      AFTER INSERT OR UPDATE ON sales
-      FOR EACH ROW
-      EXECUTE FUNCTION update_customer_stats();
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- DISABLED: Frontend is sole writer of customer.total_purchases (prevents multi-device race).
+-- See migration 20260820140000_remove_customer_stats_trigger.sql
+-- DO $$ BEGIN
+--   CREATE TRIGGER trigger_update_customer_stats
+--       AFTER INSERT OR UPDATE ON sales
+--       FOR EACH ROW
+--       EXECUTE FUNCTION update_customer_stats();
+-- EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 
 -- ── Auto-Create User Profile from Supabase Auth ──
@@ -1421,11 +1431,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- ── Current user role (server-side auth helper, MASTER §2.1.4) ──
-CREATE OR REPLACE FUNCTION current_user_role()
-RETURNS TEXT LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions AS $$
-    SELECT role FROM public.users WHERE id = auth.uid();
-$$;
 
 -- ── Users RLS + role-escalation guard (MASTER §2, applied live 2026-08-18) ──
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -3080,21 +3085,21 @@ BEGIN
   -- (their stock lives in variant_data; variant oversell is guarded client-side).
   DECLARE
     v_allow_neg boolean := false;
+    v_oversell int;
   BEGIN
     SELECT COALESCE(allow_negative_stock, false) INTO v_allow_neg FROM app_settings LIMIT 1;
     IF NOT v_allow_neg THEN
-      PERFORM (
-        WITH agg AS (
-          SELECT (h->>'product_id')::uuid AS pid, SUM((h->>'change_qty')::int) AS delta
-          FROM jsonb_array_elements(p_history) h
-          WHERE h->>'variant_id' IS NULL OR h->>'variant_id' = ''
-          GROUP BY pid
-        )
-        SELECT 1 FROM agg
-        JOIN products p ON p.id = agg.pid
-        WHERE (p.stock + agg.delta) < 0
-        LIMIT 1
-      );
+      WITH agg AS (
+        SELECT (hist_item->>'product_id')::uuid AS pid, SUM((hist_item->>'change_qty')::int) AS delta
+        FROM jsonb_array_elements(p_history) hist_item
+        WHERE hist_item->>'variant_id' IS NULL OR hist_item->>'variant_id' = ''
+        GROUP BY pid
+      )
+      SELECT 1 INTO v_oversell FROM agg
+      JOIN products p ON p.id = agg.pid
+      WHERE (p.stock + agg.delta) < 0
+      LIMIT 1;
+      
       IF FOUND THEN
         RAISE EXCEPTION 'OVERSELL: stock would go negative for a product (allow_negative_stock=false)';
       END IF;
@@ -3287,42 +3292,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION guard_store_order_update()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF TG_OP = 'UPDATE' AND NOT store_order_transition_is_valid(OLD.status, NEW.status) THEN
-    RAISE EXCEPTION 'INVALID_TRANSITION: store_order % cannot go % -> %', OLD.id, OLD.status, NEW.status USING ERRCODE = 'P0001';
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_guard_store_order_update ON store_orders;
-CREATE TRIGGER trg_guard_store_order_update
-BEFORE UPDATE ON store_orders
-FOR EACH ROW EXECUTE FUNCTION guard_store_order_update();
-
-CREATE OR REPLACE FUNCTION guard_store_order_insert()
-RETURNS TRIGGER AS $$
-DECLARE
-  cnt integer;
-BEGIN
-  IF NEW.customer_phone IS NOT NULL AND NEW.customer_phone <> '' THEN
-    SELECT count(*) INTO cnt FROM store_orders
-      WHERE customer_phone = NEW.customer_phone
-        AND created_at > now() - interval '10 minutes';
-    IF cnt >= 20 THEN
-      RAISE EXCEPTION 'RATE_LIMIT: too many recent orders from this phone' USING ERRCODE = 'P0002';
-    END IF;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_guard_store_order_insert ON store_orders;
-CREATE TRIGGER trg_guard_store_order_insert
-BEFORE INSERT ON store_orders
-FOR EACH ROW EXECUTE FUNCTION guard_store_order_insert();-- ============================================================================
+-- (Duplicate trigger creation removed to prevent 42883 error)-- ============================================================================
 -- rpc_role_guards: canonical signed delete_sale_atomic (5-arg) and refund_sale_atomic
 -- (7-arg) are defined further below (hard delete + row_tombstone per MASTER §0.6).
 -- The soft-delete (status='deleted') overloads were removed — do not re-add.
@@ -3747,11 +3717,11 @@ ALTER TABLE public.suppliers    ADD COLUMN IF NOT EXISTS _actor_id uuid, ADD COL
 -- policies that would let any online user insert. The signed WITH CHECK below is
 -- the only write path.
 DROP POLICY IF EXISTS app_settings_all ON public.app_settings;
-CREATE POLICY app_settings_all ON public.app_settings FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY app_settings_all ON public.app_settings FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS expenses_all ON public.expenses;
-CREATE POLICY expenses_all ON public.expenses FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY expenses_all ON public.expenses FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS suppliers_all ON public.suppliers;
-CREATE POLICY suppliers_all ON public.suppliers FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY suppliers_all ON public.suppliers FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS settings_insert ON public.app_settings;
 DROP POLICY IF EXISTS expenses_insert ON public.expenses;
@@ -3766,20 +3736,8 @@ DROP POLICY IF EXISTS expenses_delete ON public.expenses;
 DROP POLICY IF EXISTS suppliers_update ON public.suppliers;
 DROP POLICY IF EXISTS suppliers_delete ON public.suppliers;
 
-DROP POLICY IF EXISTS app_settings_write_guard ON public.app_settings;
-CREATE POLICY app_settings_write_guard ON public.app_settings FOR INSERT TO anon, authenticated WITH CHECK (public.verify_table_write(_actor_id, _actor_role, 'manage_settings', _actor_sig, 'admin', 'manager'));
-DROP POLICY IF EXISTS app_settings_update_guard ON public.app_settings;
-CREATE POLICY app_settings_update_guard ON public.app_settings FOR UPDATE TO anon, authenticated WITH CHECK (public.verify_table_write(_actor_id, _actor_role, 'manage_settings', _actor_sig, 'admin', 'manager'));
-DROP POLICY IF EXISTS expenses_write_guard ON public.expenses;
-CREATE POLICY expenses_write_guard ON public.expenses FOR INSERT TO anon, authenticated WITH CHECK (public.verify_table_write(_actor_id, _actor_role, 'manage_expenses', _actor_sig, 'admin', 'manager'));
-DROP POLICY IF EXISTS expenses_update_guard ON public.expenses;
-CREATE POLICY expenses_update_guard ON public.expenses FOR UPDATE TO anon, authenticated WITH CHECK (public.verify_table_write(_actor_id, _actor_role, 'manage_expenses', _actor_sig, 'admin', 'manager'));
-DROP POLICY IF EXISTS suppliers_write_guard ON public.suppliers;
-CREATE POLICY suppliers_write_guard ON public.suppliers FOR INSERT TO anon, authenticated WITH CHECK (public.verify_table_write(_actor_id, _actor_role, 'manage_suppliers', _actor_sig, 'admin', 'manager'));
-DROP POLICY IF EXISTS suppliers_update_guard ON public.suppliers;
-CREATE POLICY suppliers_update_guard ON public.suppliers FOR UPDATE TO anon, authenticated WITH CHECK (public.verify_table_write(_actor_id, _actor_role, 'manage_suppliers', _actor_sig, 'admin', 'manager'));
 -- DELETE stays permissive (RLS DELETE cannot take a payload signature without an
--- RPC). INSERT/UPDATE are the financially-critical paths and are guarded.
+-- RPC).
 DROP POLICY IF EXISTS app_settings_delete_guard ON public.app_settings;
 CREATE POLICY app_settings_delete_guard ON public.app_settings FOR DELETE TO anon, authenticated USING (true);
 DROP POLICY IF EXISTS expenses_delete_guard ON public.expenses;
@@ -3851,6 +3809,127 @@ CREATE POLICY salesmen_all ON public.salesmen FOR ALL TO anon, authenticated USI
 ALTER TABLE public.row_tombstones ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS row_tombstones_all ON public.row_tombstones;
 CREATE POLICY row_tombstones_all ON public.row_tombstones FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- PHASE 4: Atomic RPCs for bill-edit + manual stock adjustment.
+-- (Recovered into the consolidated schema; definitions also live in
+--  supabase/migrations/20260820140000_edit_sale_atomic_and_stock_adjustment.sql)
+CREATE OR REPLACE FUNCTION edit_sale_atomic(
+  p_new_sale jsonb,
+  p_new_history jsonb,
+  p_old_sale_id uuid,
+  p_old_reverse_history jsonb
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public, extensions AS $$
+DECLARE
+  v_id uuid;
+  h jsonb;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sales WHERE id = p_old_sale_id) THEN
+    RAISE EXCEPTION 'OLD_SALE_NOT_FOUND';
+  END IF;
+  IF p_new_sale->>'idempotency_key' IS NOT NULL AND p_new_sale->>'idempotency_key' <> '' THEN
+    IF EXISTS (SELECT 1 FROM sales WHERE idempotency_key = (p_new_sale->>'idempotency_key')::uuid) THEN
+      RETURN jsonb_build_object('success', true, 'already_committed', true,
+        'new_id', (SELECT id FROM sales WHERE idempotency_key = (p_new_sale->>'idempotency_key')::uuid));
+    END IF;
+  END IF;
+  INSERT INTO sales (
+    id, invoice_number, customer_id, customer_name, customer_phone,
+    items, subtotal, discount_amount, bill_discount_value, bill_discount_type,
+    tax_amount, total, received_amount, change_amount, payment_method,
+    card_details, status, cashier, cashier_role, receipt_number, notes,
+    applied_discounts, free_gifts, timestamp, sale_date, sale_type,
+    extra_charges, split_payments, refunded_amount, estore_status,
+    delivery_address, delivery_fee, delivery_location_lat, delivery_location_lng,
+    customer_notes, source_order_id, salesman_id, salesman_name,
+    idempotency_key, edited_from_invoice, created_at, updated_at
+  ) VALUES (
+    (p_new_sale->>'id')::uuid,
+    p_new_sale->>'invoice_number',
+    NULLIF(p_new_sale->>'customer_id','')::uuid,
+    p_new_sale->>'customer_name',
+    p_new_sale->>'customer_phone',
+    COALESCE(p_new_sale->'items','[]'::jsonb),
+    (p_new_sale->>'subtotal')::numeric,
+    (p_new_sale->>'discount_amount')::numeric,
+    (p_new_sale->>'bill_discount_value')::numeric,
+    p_new_sale->>'bill_discount_type',
+    (p_new_sale->>'tax_amount')::numeric,
+    (p_new_sale->>'total')::numeric,
+    (p_new_sale->>'received_amount')::numeric,
+    (p_new_sale->>'change_amount')::numeric,
+    p_new_sale->>'payment_method',
+    p_new_sale->'card_details',
+    p_new_sale->>'status',
+    p_new_sale->>'cashier',
+    p_new_sale->>'cashier_role',
+    p_new_sale->>'receipt_number',
+    p_new_sale->>'notes',
+    p_new_sale->'applied_discounts',
+    p_new_sale->'free_gifts',
+    (p_new_sale->>'timestamp')::timestamptz,
+    (p_new_sale->>'sale_date')::date,
+    p_new_sale->>'sale_type',
+    p_new_sale->'extra_charges',
+    p_new_sale->'split_payments',
+    (p_new_sale->>'refunded_amount')::numeric,
+    p_new_sale->>'estore_status',
+    p_new_sale->>'delivery_address',
+    (p_new_sale->>'delivery_fee')::numeric,
+    (p_new_sale->>'delivery_location_lat')::numeric,
+    (p_new_sale->>'delivery_location_lng')::numeric,
+    p_new_sale->>'customer_notes',
+    NULLIF(p_new_sale->>'source_order_id','')::uuid,
+    NULLIF(p_new_sale->>'salesman_id','')::uuid,
+    p_new_sale->>'salesman_name',
+    NULLIF(p_new_sale->>'idempotency_key','')::uuid,
+    p_new_sale->>'edited_from_invoice',
+    COALESCE((p_new_sale->>'created_at')::timestamptz, now()),
+    now()
+  ) ON CONFLICT (id) DO NOTHING RETURNING id INTO v_id;
+  IF v_id IS NULL THEN v_id := (p_new_sale->>'id')::uuid; END IF;
+  FOR h IN SELECT * FROM jsonb_array_elements(p_new_history) LOOP
+    IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
+      INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', v_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+    ELSE
+      INSERT INTO stock_history (id, product_id, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', v_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+    END IF;
+  END LOOP;
+  FOR h IN SELECT * FROM jsonb_array_elements(p_old_reverse_history) LOOP
+    IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
+      INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', p_old_sale_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+    ELSE
+      INSERT INTO stock_history (id, product_id, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', p_old_sale_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+    END IF;
+  END LOOP;
+  DELETE FROM sales WHERE id = p_old_sale_id;
+  RETURN jsonb_build_object('success', true, 'new_id', v_id);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION stock_adjustment(
+  p_product_id uuid,
+  p_change_qty integer,
+  p_type text,
+  p_note text,
+  p_cashier text,
+  p_variant_id text DEFAULT NULL,
+  p_variant_label text DEFAULT NULL
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public, extensions AS $$
+BEGIN
+  IF p_variant_id IS NOT NULL AND p_variant_id <> '' THEN
+    INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, note, cashier_name, created_at, updated_at)
+    VALUES (gen_random_uuid(), p_product_id, p_variant_id, COALESCE(p_variant_label, ''), p_change_qty, p_type, p_note, p_cashier, now(), now());
+  ELSE
+    INSERT INTO stock_history (id, product_id, change_qty, type, note, cashier_name, created_at, updated_at)
+    VALUES (gen_random_uuid(), p_product_id, p_change_qty, p_type, p_note, p_cashier, now(), now());
+  END IF;
+  RETURN jsonb_build_object('success', true);
+END;
+$$;
 
 -- 2. Broad grants (idempotent) — RLS still applies; guard tables stay guarded.
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon;

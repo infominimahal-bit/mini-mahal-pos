@@ -1,3 +1,4 @@
+import { useSettingsStore } from '../stores';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/SupabaseAppContext';
 import { TouchKeyboard } from '../shared/ui/TouchKeyboard';
@@ -17,7 +18,8 @@ export function useTouchKeyboard() {
 }
 
 export function TouchKeyboardProvider({ children }: { children: React.ReactNode }) {
-  const { state } = useApp();
+  const appSettings = useSettingsStore(s => s.settings);
+
   const [isOpen, setIsOpen] = useState(false);
   const [activeElement, setActiveElement] = useState<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
@@ -168,7 +170,7 @@ export function TouchKeyboardProvider({ children }: { children: React.ReactNode 
   }, [activeElement, handleInput]);
 
   useEffect(() => {
-    if (!state.settings.touchKeyboardEnabled) {
+    if (!appSettings.touchKeyboardEnabled) {
       setIsOpen(false); setActiveElement(null);
       return;
     }
@@ -233,7 +235,7 @@ export function TouchKeyboardProvider({ children }: { children: React.ReactNode 
       document.removeEventListener('focusin', onFocusIn);
       document.removeEventListener('mousedown', onMouseDown);
     };
-  }, [state.settings.touchKeyboardEnabled, openKeyboard, closeKeyboard]);
+  }, [appSettings.touchKeyboardEnabled, openKeyboard, closeKeyboard]);
 
   return (
     <TouchKeyboardContext.Provider value={{ isKeyboardOpen: isOpen, openKeyboard, closeKeyboard }}>

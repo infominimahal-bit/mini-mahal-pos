@@ -1,6 +1,5 @@
 import React from 'react';
 import { Save, RefreshCw } from 'lucide-react';
-import { useTranslation } from '../../hooks/useTranslation';
 
 interface StickyFormFooterProps {
   show?: boolean;
@@ -27,8 +26,6 @@ export function StickyFormFooter({
   unsaved = false,
   statusBadge
 }: StickyFormFooterProps) {
-  const { t } = useTranslation();
-
   if (!show) return null;
 
   return (
@@ -39,7 +36,7 @@ export function StickyFormFooter({
           <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 rounded-full border border-amber-500/20 shrink-0">
             <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
             <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">
-              {t('unsaved_modifications', 'Unsaved')}
+              {"Unsaved"}
             </span>
           </div>
         )}
@@ -52,7 +49,7 @@ export function StickyFormFooter({
             onClick={onDiscard}
             className="px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl border border-gray-200 dark:border-white/10 text-[10px] font-black uppercase tracking-widest text-gray-600 hover:text-rose-500 dark:text-gray-400 dark:hover:text-white hover:bg-rose-50 dark:hover:bg-rose-500/5 transition-all active:scale-95 bg-white dark:bg-transparent shadow-sm shrink-0"
           >
-            {discardLabel || t('discard', 'Discard')}
+            {discardLabel || "Discard"}
           </button>
           
           <button
@@ -68,12 +65,12 @@ export function StickyFormFooter({
             {isSaving ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>{t('processing', 'Saving...')}</span>
+                <span>{"Saving..."}</span>
               </>
             ) : (
               <>
                 <Save className="w-4 h-4" />
-                <span>{saveLabel || t('save_changes', 'Save Changes')}</span>
+                <span>{saveLabel || "Save Changes"}</span>
               </>
             )}
           </button>

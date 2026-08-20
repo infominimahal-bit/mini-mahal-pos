@@ -1,3 +1,4 @@
+import { useSettingsStore } from '../../stores';
 import { useSync } from '../../hooks/useSync';
 import { WifiOff, RefreshCw, CheckCircle, Cloud, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
@@ -8,7 +9,8 @@ import { formatAppTime, formatAppDateTime } from '../../lib/dateUtils';
 export function SyncStatusBadge() {
     const { isOnline, isSyncing, pendingCount, lastSyncTime, hasError, isRetrying } = useSync();
     const [showManager, setShowManager] = useState(false);
-    const { state } = useApp();
+    const appSettings = useSettingsStore(s => s.settings);
+
 
     const isStale = isOnline && !isSyncing && pendingCount === 0 && !hasError && lastSyncTime &&
         (Date.now() - lastSyncTime.getTime()) > 5 * 60 * 1000;
@@ -88,7 +90,7 @@ export function SyncStatusBadge() {
                         onClick={() => setShowManager(true)}
                         style={{ minHeight: 'unset' }}
                         className="flex items-center justify-center gap-1.5 flex-shrink-0 w-8 h-8 sm:w-auto sm:h-9 px-2.5 sm:px-3 rounded-full bg-amber-500/20 dark:bg-amber-500/30 text-amber-600 dark:text-amber-400 border border-transparent shadow-sm transition-all relative active:scale-95"
-                        title={`${pendingCount} changes struggling to sync — last sync: ${lastSyncTime ? formatAppDateTime(lastSyncTime, state.settings.country) : 'never'}. Click to view queue.`}
+                        title={`${pendingCount} changes struggling to sync — last sync: ${lastSyncTime ? formatAppDateTime(lastSyncTime, appSettings.country) : 'never'}. Click to view queue.`}
                     >
                         <RefreshCw className="h-5 w-5 sm:h-3 sm:w-3 animate-spin" />
                         <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 flex sm:hidden items-center justify-center bg-amber-500 text-white rounded-full text-[9px] font-black shadow-sm">
@@ -107,7 +109,7 @@ export function SyncStatusBadge() {
                     onClick={() => setShowManager(true)}
                     style={{ minHeight: 'unset' }}
                     className="flex items-center justify-center gap-1.5 flex-shrink-0 w-8 h-8 sm:w-auto sm:h-9 px-2.5 sm:px-3 rounded-full bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-transparent shadow-sm hover:scale-105 active:scale-95 transition-all group relative"
-                    title={`${pendingCount} changes waiting to sync — last sync: ${lastSyncTime ? formatAppDateTime(lastSyncTime, state.settings.country) : 'never'}. Click to view queue.`}
+                    title={`${pendingCount} changes waiting to sync — last sync: ${lastSyncTime ? formatAppDateTime(lastSyncTime, appSettings.country) : 'never'}. Click to view queue.`}
                 >
                     <Cloud className="h-5 w-5 sm:h-3 sm:w-3 animate-bounce" />
                     <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 flex sm:hidden items-center justify-center bg-amber-500 text-white rounded-full text-[9px] font-black shadow-sm">
@@ -122,7 +124,7 @@ export function SyncStatusBadge() {
                         </span>
                         {lastSyncTime && (
                             <span className="text-[8px] font-mono opacity-60 bg-primary/10 px-1 rounded-sm border border-primary/20">
-                                {formatAppTime(lastSyncTime, state.settings.country, false)}
+                                {formatAppTime(lastSyncTime, appSettings.country, false)}
                             </span>
                         )}
                     </div>
@@ -140,14 +142,14 @@ export function SyncStatusBadge() {
                     onClick={() => setShowManager(true)}
                     style={{ minHeight: 'unset' }}
                     className="flex items-center justify-center gap-1.5 flex-shrink-0 w-8 h-8 sm:w-auto sm:h-9 px-2.5 sm:px-3 rounded-full bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-transparent shadow-sm animate-pulse"
-                    title={`Data may be stale — last sync: ${lastSyncTime ? formatAppDateTime(lastSyncTime, state.settings.country) : 'never'}. Click to check.`}
+                    title={`Data may be stale — last sync: ${lastSyncTime ? formatAppDateTime(lastSyncTime, appSettings.country) : 'never'}. Click to check.`}
                 >
                     <Cloud className="h-5 w-5 sm:h-3 sm:w-3" />
                     <div className="hidden sm:flex items-center gap-1 leading-none">
                         <span className="text-[9px] font-bold uppercase tracking-tight">Stale</span>
                         {lastSyncTime && (
                             <span className="text-[8px] font-mono opacity-60 bg-primary/10 px-1 rounded-sm border border-primary/20">
-                                {formatAppTime(lastSyncTime, state.settings.country, false)}
+                                {formatAppTime(lastSyncTime, appSettings.country, false)}
                             </span>
                         )}
                     </div>
@@ -164,14 +166,14 @@ export function SyncStatusBadge() {
                 onClick={() => setShowManager(true)}
                 style={{ minHeight: 'unset' }}
                 className="flex items-center justify-center gap-1.5 flex-shrink-0 w-8 h-8 sm:w-auto sm:h-9 px-2.5 sm:px-3 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-primary dark:text-emerald-400 border border-transparent group cursor-pointer transition-all hover:bg-emerald-500/20 dark:hover:bg-emerald-800/30"
-                title={lastSyncTime ? `Verified Cloud Handshake: ${formatAppDateTime(lastSyncTime, state.settings.country)} - Click to view history.` : 'Everything in sync - Click to view history.'}
+                title={lastSyncTime ? `Verified Cloud Handshake: ${formatAppDateTime(lastSyncTime, appSettings.country)} - Click to view history.` : 'Everything in sync - Click to view history.'}
             >
                 <CheckCircle className="h-5 w-5 sm:h-3 sm:w-3 opacity-80" />
                 <div className="hidden sm:flex items-center leading-none gap-1 sm:gap-1.5 text-left">
                     <span className="text-[9px] font-black uppercase tracking-tight opacity-90">Sync OK</span>
                     {lastSyncTime && (
                         <span className="text-[8px] font-mono opacity-60 bg-primary/10 px-1 rounded-sm border border-primary/20">
-                            {formatAppTime(lastSyncTime, state.settings.country, false)}
+                            {formatAppTime(lastSyncTime, appSettings.country, false)}
                         </span>
                     )}
                 </div>

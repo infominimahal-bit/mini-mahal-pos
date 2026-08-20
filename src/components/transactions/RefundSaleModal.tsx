@@ -4,6 +4,7 @@ import { Modal } from '../../shared/ui/Modal';
 import { RotateCcw, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '../../lib/currencies';
 import { useApp } from '../../context/SupabaseAppContext';
+import { useSettingsStore } from '../../stores';
 import { Button, Select } from '../../shared/ui';
 
 interface RefundSaleModalProps {
@@ -15,7 +16,7 @@ interface RefundSaleModalProps {
 }
 
 export default function RefundSaleModal({ isOpen, onClose, sale, onConfirmRefund, isProcessing }: RefundSaleModalProps) {
-  const { state: { settings } } = useApp();
+  const settings = useSettingsStore(s => s.settings);
   // Default refund method = original sale method (fall back to cash for split/cheque)
   const defaultMethod = (['cash', 'card', 'online', 'digital'].includes(sale.paymentMethod))
     ? sale.paymentMethod

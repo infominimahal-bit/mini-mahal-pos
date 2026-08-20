@@ -1,3 +1,4 @@
+import { useAppStore, useSettingsStore, useUsersStore } from '../../stores';
 import { useState } from 'react';
 import { Plus, Edit, Trash2, Percent, Gift } from 'lucide-react';
 import { Discount } from '../../types';
@@ -6,19 +7,19 @@ import { can } from '../../lib/permissions';
 import { DiscountModal } from './DiscountModal';
 import { sonner } from '../../lib/sonner';
 import { formatAppDate } from '../../lib/dateUtils';
-import { useTranslation } from '../../hooks/useTranslation';
 import { SharedSearchBar } from '../../shared/modules/search-and-list';
 import { Button, Badge, EmptyState, Pagination, usePagination } from '../../shared/ui';
 
 export function DiscountManager() {
-  const { state, dispatch } = useApp();
-  const { t } = useTranslation();
-  const canManageDiscounts = can(state.currentUser?.role, 'manage_discounts');
+  const appCurrentUser = useUsersStore(s => s.currentUser);
+const appDiscounts = useAppStore(s => s.discounts);
+const appSettings = useSettingsStore(s => s.settings);
+  const canManageDiscounts = can(appCurrentUser?.role, 'manage_discounts');
   const [searchTerm, setSearchTerm] = useState('');
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState<Discount | null>(null);
 
-  const filteredDiscounts = state.discounts.filter(discount =>
+  const filteredDiscounts = appDiscounts.filter(discount =>
     discount?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     discount?.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -39,7 +40,7 @@ export function DiscountManager() {
         sonner.loading('Deleting discount...');
         const { discountsService } = await import('../../lib/services');
         await discountsService.delete(discountId);
-        dispatch({ type: 'DELETE_DISCOUNT', payload: discountId });
+        useAppStore.getState().deleteDiscount(discountId);
         sonner.success('Discount deleted successfully!');
       } catch (error) {
         console.error('Error deleting discount:', error);
@@ -61,10 +62,7 @@ export function DiscountManager() {
       const updatedDiscount = { ...discount, active: !discount.active };
       const { discountsService } = await import('../../lib/services');
       await discountsService.update(discount.id, updatedDiscount);
-      dispatch({
-        type: 'UPDATE_DISCOUNT',
-        payload: updatedDiscount
-      });
+      useAppStore.getState().updateDiscount(updatedDiscount);
       sonner.success(`Discount ${discount.active ? 'deactivated' : 'activated'} successfully!`);
     } catch (error) {
       console.error('Error updating discount:', error);
@@ -121,8 +119,8 @@ export function DiscountManager() {
               <Gift className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             </div>
             <div className="shrink-0 flex flex-col">
-              <h1 className="text-lg sm:text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">{t("discounts", "Discounts")}</h1>
-              <p className="hidden sm:block text-gray-600 dark:text-gray-400 text-[9px] font-black uppercase tracking-[0.2em] mt-1 opacity-60">{t("promotional_offers", "Promotional Offers")}</p>
+              <h1 className="text-lg sm:text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">{"Discounts"}</h1>
+              <p className="hidden sm:block text-gray-600 dark:text-gray-400 text-[9px] font-black uppercase tracking-[0.2em] mt-1 opacity-60">{"Promotional Offers"}</p>
             </div>
           </div>
         </div>
@@ -132,7 +130,7 @@ export function DiscountManager() {
           onClick={handleAddDiscount}
           icon={<Plus className="h-3.5 w-3.5" />}
         >
-          <span>{t("add_discount", "Add Discount")}</span>
+          <span>{"Add Discount"}</span>
         </Button>
       </div>
 
@@ -140,32 +138,32 @@ export function DiscountManager() {
       <div className="relative z-20 grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
         <div className="stat-card bg-gradient-to-br from-emerald-500 to-teal-700">
           <div className="stat-card-inner">
-            <span className="stat-card-label">{t("total_discounts", "Total Discounts")}</span>
-            <span className="stat-card-value">{state.discounts.length}</span>
+            <span className="stat-card-label">{"Total Discounts"}</span>
+            <span className="stat-card-value">{appDiscounts.length}</span>
           </div>
           <Percent className="stat-card-icon h-10 w-10 text-white" />
         </div>
 
         <div className="stat-card bg-gradient-to-br from-green-500 to-emerald-600">
           <div className="stat-card-inner">
-            <span className="stat-card-label">{t("active_discounts", "Active Discounts")}</span>
-            <span className="stat-card-value">{state.discounts.filter(d => d.active).length}</span>
+            <span className="stat-card-label">{"Active Discounts"}</span>
+            <span className="stat-card-value">{appDiscounts.filter(d => d.active).length}</span>
           </div>
           <Gift className="stat-card-icon h-10 w-10 text-white" />
         </div>
 
         <div className="stat-card bg-gradient-to-br from-purple-500 to-fuchsia-700">
           <div className="stat-card-inner">
-            <span className="stat-card-label">{t("percentage_offers", "Percentage Offers")}</span>
-            <span className="stat-card-value">{state.discounts.filter(d => d.type === 'percentage').length}</span>
+            <span className="stat-card-label">{"Percentage Offers"}</span>
+            <span className="stat-card-value">{appDiscounts.filter(d => d.type === 'percentage').length}</span>
           </div>
           <Percent className="stat-card-icon h-10 w-10 text-white" />
         </div>
 
         <div className="stat-card bg-gradient-to-br from-orange-500 to-rose-600">
           <div className="stat-card-inner">
-            <span className="stat-card-label">{t("free_gift_offers", "Free Gift Offers")}</span>
-            <span className="stat-card-value">{state.discounts.filter(d => d.type === 'free_gift').length}</span>
+            <span className="stat-card-label">{"Free Gift Offers"}</span>
+            <span className="stat-card-value">{appDiscounts.filter(d => d.type === 'free_gift').length}</span>
           </div>
           <Gift className="stat-card-icon h-10 w-10 text-white" />
         </div>
@@ -178,7 +176,7 @@ export function DiscountManager() {
             <SharedSearchBar
               value={searchTerm}
               onChange={setSearchTerm}
-              placeholder={t("search_discounts_placeholder", "Search discounts...")}
+              placeholder={"Search discounts..."}
             />
           </div>
         </div>
@@ -190,13 +188,13 @@ export function DiscountManager() {
               <table className="table">
                 <thead className="table-header">
               <tr>
-                <th className="table-header-cell">{t("discount", "Discount")}</th>
-                <th className="table-header-cell hidden sm:table-cell">{t("type", "Type")}</th>
-                <th className="table-header-cell">{t("value", "Value")}</th>
-                <th className="table-header-cell hidden md:table-cell">{t("conditions", "Conditions")}</th>
-                <th className="table-header-cell hidden lg:table-cell">{t("valid_period", "Valid Period")}</th>
-                <th className="table-header-cell hidden sm:table-cell">{t("status", "Status")}</th>
-                <th className="table-header-cell text-right">{t("actions", "Actions")}</th>
+                <th className="table-header-cell">{"Discount"}</th>
+                <th className="table-header-cell hidden sm:table-cell">{"Type"}</th>
+                <th className="table-header-cell">{"Value"}</th>
+                <th className="table-header-cell hidden md:table-cell">{"Conditions"}</th>
+                <th className="table-header-cell hidden lg:table-cell">{"Valid Period"}</th>
+                <th className="table-header-cell hidden sm:table-cell">{"Status"}</th>
+                <th className="table-header-cell text-right">{"Actions"}</th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-surface divide-y divide-gray-200 dark:divide-white/5">
@@ -205,8 +203,8 @@ export function DiscountManager() {
                   <td colSpan={7}>
                     <EmptyState
                       icon={<Gift className="h-12 w-12" />}
-                      title={t("no_discounts_found", "No discounts found")}
-                      subtext={t("no_discounts_subtext", "Create your first promotional offer")}
+                      title={"No discounts found"}
+                      subtext={"Create your first promotional offer"}
                     />
                   </td>
                 </tr>
@@ -227,7 +225,7 @@ export function DiscountManager() {
                   </td>
                   <td className="table-cell font-semibold" data-label="Value">
                     {discount.type === 'percentage' && `${discount.value}%`}
-                    {discount.type === 'fixed' && `${state.settings.currency} ${discount.value}`}
+                    {discount.type === 'fixed' && `${appSettings.currency} ${discount.value}`}
                     {discount.type === 'free_gift' && 'Free Gift'}
                   </td>
                   <td className="table-cell hidden md:table-cell" data-label="Conditions">
@@ -237,8 +235,8 @@ export function DiscountManager() {
                   </td>
                   <td className="table-cell text-gray-900 dark:text-gray-300 hidden lg:table-cell" data-label="Valid Period">
                     <div className="text-xs">
-                      <div>{formatAppDate(discount.validFrom, state.settings.country)}</div>
-                      <div className="text-gray-600 dark:text-gray-400">to {formatAppDate(discount.validTo, state.settings.country)}</div>
+                      <div>{formatAppDate(discount.validFrom, appSettings.country)}</div>
+                      <div className="text-gray-600 dark:text-gray-400">to {formatAppDate(discount.validTo, appSettings.country)}</div>
                     </div>
                   </td>
                   <td className="table-cell hidden sm:table-cell" data-label="Status">
@@ -247,7 +245,7 @@ export function DiscountManager() {
                       className={`badge ${discount.active ? 'badge-emerald' : 'badge-danger'
                         } cursor-pointer hover:opacity-80`}
                     >
-                      {discount.active ? t("active", "Active") : t("inactive", "Inactive")}
+                      {discount.active ? "Active" : "Inactive"}
                     </button>
                   </td>
                   <td className="table-cell text-right">

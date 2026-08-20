@@ -1,3 +1,4 @@
+import { useInventoryStore } from '../../stores';
 import { useState, useEffect } from 'react';
 import { X, User, Phone, Mail, MapPin, Hash, Plus, Trash2, ShieldCheck, Sparkles, ArrowRight, Save, RefreshCw } from 'lucide-react';
 import { Customer } from '../../types';
@@ -5,7 +6,6 @@ import { useApp } from '../../context/SupabaseAppContext';
 import { sonner } from '../../lib/sonner';
 import { Modal } from '../../shared/ui/Modal';
 import { cn } from '../../lib/utils';
-import { useTranslation } from '../../hooks/useTranslation';
 import { Button, Select } from '../../shared/ui';
 
 interface CustomerModalProps {
@@ -15,8 +15,7 @@ interface CustomerModalProps {
 }
 
 export function CustomerModal({ isOpen, onClose, customer }: CustomerModalProps) {
-  const { state, dispatch } = useApp();
-  const { t } = useTranslation();
+  const appCategories = useInventoryStore(s => s.categories);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -73,8 +72,8 @@ export function CustomerModal({ isOpen, onClose, customer }: CustomerModalProps)
 
   const handleSubmit = async () => {
     if (!formData.name || !formData.phone) {
-      sonner.error(t('critical_data_missing', 'Critical Data Missing'), {
-        description: t('customer_mandatory_fields_error', 'Identity name and contact phone are mandatory for CRM registration.')
+      sonner.error("Critical Data Missing", {
+        description: "Identity name and contact phone are mandatory for CRM registration."
       });
       return;
     }
@@ -93,15 +92,15 @@ export function CustomerModal({ isOpen, onClose, customer }: CustomerModalProps)
     setIsSubmitting(true);
     try {
       if (customer) {
-        await dispatch({ type: 'UPDATE_CUSTOMER', payload: { ...customer, ...customerData } });
-        sonner.success(t('customer_updated_success', 'Customer Updated'));
+        await useCustomersStore.getState().updateCustomer({ ...customer, ...customerData });
+        sonner.success("Customer Updated");
       } else {
-        await dispatch({ type: 'ADD_CUSTOMER', payload: customerData as Customer });
-        sonner.success(t('customer_added_success', 'Customer Added'));
+        await useCustomersStore.getState().addCustomer(customerData as Customer);
+        sonner.success("Customer Added");
       }
       onClose();
     } catch (error) {
-      sonner.error(t('sync_failure', 'Sync Failure'));
+      sonner.error("Sync Failure");
     } finally {
       setIsSubmitting(false);
     }
@@ -115,7 +114,7 @@ export function CustomerModal({ isOpen, onClose, customer }: CustomerModalProps)
         onClick={onClose}
         className="border border-rose-200 dark:border-rose-900/30 text-[#ff4b6e] hover:bg-rose-50 dark:hover:bg-rose-500/10 shrink-0"
       >
-        {t('discard', 'DISCARD')}
+        {"DISCARD"}
       </Button>
       <Button
         size="md"
@@ -124,7 +123,7 @@ export function CustomerModal({ isOpen, onClose, customer }: CustomerModalProps)
         onClick={handleSubmit}
         className="flex-1 sm:flex-none sm:min-w-[240px]"
       >
-        {customer ? t('update_customer_btn', 'UPDATE CUSTOMER') : t('add_customer_btn', 'ADD CUSTOMER')}
+        {customer ? "UPDATE CUSTOMER" : "ADD CUSTOMER"}
       </Button>
     </div>
   );
@@ -133,7 +132,7 @@ export function CustomerModal({ isOpen, onClose, customer }: CustomerModalProps)
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={customer ? t('edit_customer_title', 'EDIT CUSTOMER') : t('add_new_customer_title', 'ADD NEW CUSTOMER')}
+      title={customer ? "EDIT CUSTOMER" : "ADD NEW CUSTOMER"}
       maxWidth="lg"
       footer={footer}
     >
@@ -142,12 +141,12 @@ export function CustomerModal({ isOpen, onClose, customer }: CustomerModalProps)
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
             <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-            {t('basic_info', 'Basic Info')}
+            {"Basic Info"}
           </h3>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('client_name_req', 'Client Name *')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Client Name *"}</label>
               <input
                 type="text"
                 name="name"
@@ -155,11 +154,11 @@ export function CustomerModal({ isOpen, onClose, customer }: CustomerModalProps)
                 onChange={handleChange}
                 required
                 className="w-full bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all font-medium"
-                placeholder={t('john_doe_placeholder', 'John Doe')}
+                placeholder={"John Doe"}
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('mobile_number_req', 'Mobile Number *')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Mobile Number *"}</label>
               <input
                 type="text"
                 name="phone"
@@ -167,18 +166,18 @@ export function CustomerModal({ isOpen, onClose, customer }: CustomerModalProps)
                 onChange={handleChange}
                 required
                 className="w-full bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all font-medium"
-                placeholder={t('phone_placeholder', '+92 3xx xxxxxxx')}
+                placeholder={"+92 3xx xxxxxxx"}
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('email_address', 'E-Mail Address')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"E-Mail Address"}</label>
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
                 className="w-full bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all font-medium"
-                placeholder={t('email_placeholder', 'client@account.com')}
+                placeholder={"client@account.com"}
               />
             </div>
           </div>
@@ -188,20 +187,20 @@ export function CustomerModal({ isOpen, onClose, customer }: CustomerModalProps)
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
             <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-            {t('billing_details', 'Billing Details')}
+            {"Billing Details"}
           </h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('pricing_tier_req', 'Pricing Tier *')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Pricing Tier *"}</label>
               <Select
                 name="priceTier"
                 value={formData.priceTier}
                 onChange={handleChange}
                 className="!bg-[#f8f9fa] dark:!bg-black/75 !border-none !text-sm !rounded-xl !px-4 !text-gray-900 dark:!text-white !font-medium"
               >
-                <option value="retail" className="dark:bg-surface">{t('standard_retail', 'Standard Retail')}</option>
-                <option value="wholesale" className="dark:bg-surface">{t('wholesale_logic', 'Wholesale Logic')}</option>
+                <option value="retail" className="dark:bg-surface">{"Standard Retail"}</option>
+                <option value="wholesale" className="dark:bg-surface">{"Wholesale Logic"}</option>
               </Select>
             </div>
           </div>
@@ -211,16 +210,16 @@ export function CustomerModal({ isOpen, onClose, customer }: CustomerModalProps)
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
             <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-            {t('preferences', 'Preferences')}
+            {"Preferences"}
           </h3>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('preferred_categories', 'Preferred Categories')}</label>
+            <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Preferred Categories"}</label>
             <div className="flex flex-wrap gap-2">
-              {state.categories.length === 0 ? (
-                <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400">{t('no_categories_available', 'No categories available')}</p>
+              {appCategories.length === 0 ? (
+                <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400">{"No categories available"}</p>
               ) : (
-                state.categories.map(category => {
+                appCategories.map(category => {
                   const isSelected = formData.preferredCategories.includes(category.name);
                   return (
                     <button
@@ -247,28 +246,28 @@ export function CustomerModal({ isOpen, onClose, customer }: CustomerModalProps)
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
             <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-            {t('address_notes', 'Address & Notes')}
+            {"Address & Notes"}
           </h3>
           
           <div className="space-y-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('physical_address', 'Physical Address')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Physical Address"}</label>
               <textarea
                 name="address"
                 value={formData.address}
                 onChange={handleChange}
                 className="w-full bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-emerald-500 transition-all min-h-[80px] resize-none font-medium"
-                placeholder={t('address_placeholder', 'Complete location details...')}
+                placeholder={"Complete location details..."}
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('notes', 'Notes')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Notes"}</label>
               <textarea
                 name="notes"
                 value={formData.notes}
                 onChange={handleChange}
                 className="w-full bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-emerald-500 transition-all min-h-[80px] resize-none font-medium"
-                placeholder={t('notes_placeholder_cust', 'Additional notes about the customer...')}
+                placeholder={"Additional notes about the customer..."}
               />
             </div>
           </div>

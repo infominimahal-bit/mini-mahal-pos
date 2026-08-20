@@ -1,6 +1,5 @@
 import { Keyboard, Search, ShoppingBag, RefreshCw, FileText, Trash2, CreditCard, Check, X, Layers } from 'lucide-react';
 import { Modal } from '../../shared/ui/Modal';
-import { useTranslation } from '../../hooks/useTranslation';
 
 interface ShortcutsModalProps {
   isOpen: boolean;
@@ -8,34 +7,32 @@ interface ShortcutsModalProps {
 }
 
 export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
-  const { t } = useTranslation();
-
   const terminalShortcuts = [
-    { key: 'F3 or /', label: t('focus_search', 'Focus Search'), desc: t('focus_search_desc', 'Instantly focuses the product search bar to start scanning or typing.'), icon: Search },
-    { key: 'F2', label: t('open_checkout', 'Open Checkout'), desc: t('open_checkout_desc', 'Open the checkout and settlement screen when items are in the cart.'), icon: CreditCard },
-    { key: 'F4', label: t('hold_order', 'Hold Order / Save Draft'), desc: t('hold_order_desc', 'Saves the current cart session as a draft to retrieve it later.'), icon: FileText },
-    { key: 'F5', label: t('new_tab', 'New Cart Tab'), desc: t('new_tab_desc', 'Creates a new active cart tab for multitasking multiple clients.'), icon: Layers },
-    { key: 'F6', label: t('toggle_return_mode', 'Toggle Return Mode'), desc: t('toggle_return_mode_desc', 'Switches the POS between standard sales mode and customer return mode.'), icon: RefreshCw },
-    { key: 'F7', label: t('open_drafts', 'Open Draft Archives'), desc: t('open_drafts_desc', 'Opens the list of saved/suspended drafts to resume checkout.'), icon: ShoppingBag },
-    { key: 'Ctrl + Del', label: t('clear_cart', 'Clear Entire Cart'), desc: t('clear_cart_desc', 'Wipes out all items currently inside the active cart session.'), icon: Trash2 },
+    { key: 'F3 or /', label: "Focus Search", desc: "Instantly focuses the product search bar to start scanning or typing.", icon: Search },
+    { key: 'F2', label: "Open Checkout", desc: "Open the checkout and settlement screen when items are in the cart.", icon: CreditCard },
+    { key: 'F4', label: "Hold Order / Save Draft", desc: "Saves the current cart session as a draft to retrieve it later.", icon: FileText },
+    { key: 'F5', label: "New Cart Tab", desc: "Creates a new active cart tab for multitasking multiple clients.", icon: Layers },
+    { key: 'F6', label: "Toggle Return Mode", desc: "Switches the POS between standard sales mode and customer return mode.", icon: RefreshCw },
+    { key: 'F7', label: "Open Draft Archives", desc: "Opens the list of saved/suspended drafts to resume checkout.", icon: ShoppingBag },
+    { key: 'Ctrl + Del', label: "Clear Entire Cart", desc: "Wipes out all items currently inside the active cart session.", icon: Trash2 },
   ];
 
   const checkoutShortcuts = [
-    { key: '1', label: t('method_cash', 'Select Cash'), desc: t('method_cash_desc', 'Select Cash as the payment method for the current sale.'), icon: CreditCard },
-    { key: '2', label: t('method_card', 'Select Card'), desc: t('method_card_desc', 'Select Card payment method for digital terminal swipe.'), icon: CreditCard },
-    { key: '3', label: t('method_online', 'Select Online'), desc: t('method_online_desc', 'Select Online payment method.'), icon: CreditCard },
-    { key: '5', label: t('method_split', 'Select Split Payment'), desc: t('method_split_desc', 'Switch to split/mixed payment modes (e.g. Cash + Card).'), icon: CreditCard },
-    { key: 'E', label: t('exact_amount', 'Exact Amount Match'), desc: t('exact_amount_desc', 'Auto-fill the received amount to match the final net total.'), icon: Check },
-    { key: 'Enter', label: t('process_payment', 'Process & Save Sale'), desc: t('process_payment_desc', 'Complete payment verification and record sale to database.'), icon: Check },
-    { key: 'Esc', label: t('cancel_checkout', 'Cancel / Close'), desc: t('cancel_checkout_desc', 'Dismiss checkout pop-up and return back to POS cart view.'), icon: X },
+    { key: '1', label: "Select Cash", desc: "Select Cash as the payment method for the current sale.", icon: CreditCard },
+    { key: '2', label: "Select Card", desc: "Select Card payment method for digital terminal swipe.", icon: CreditCard },
+    { key: '3', label: "Select Online", desc: "Select Online payment method.", icon: CreditCard },
+    { key: '5', label: "Select Split Payment", desc: "Switch to split/mixed payment modes (e.g. Cash + Card).", icon: CreditCard },
+    { key: 'E', label: "Exact Amount Match", desc: "Auto-fill the received amount to match the final net total.", icon: Check },
+    { key: 'Enter', label: "Process & Save Sale", desc: "Complete payment verification and record sale to database.", icon: Check },
+    { key: 'Esc', label: "Cancel / Close", desc: "Dismiss checkout pop-up and return back to POS cart view.", icon: X },
   ];
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={t('keyboard_shortcuts_guide', 'Keyboard Shortcuts Guide')}
-      subtitle={t('keyboard_shortcuts_subtitle', 'Master these keys for lightning fast checkout speeds')}
+      title={"Keyboard Shortcuts Guide"}
+      subtitle={"Master these keys for lightning fast checkout speeds"}
       maxWidth="lg"
       footer={
         <div className="flex items-center justify-end w-full">
@@ -43,7 +40,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
             onClick={onClose}
             className="w-full sm:w-auto sm:min-w-[240px] px-4 sm:px-8 py-2.5 sm:py-3.5 rounded-2xl text-[9px] sm:text-[11px] font-black uppercase tracking-widest bg-gray-200 dark:bg-white/5 text-gray-700 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white transition-all active:scale-95"
           >
-            {t('dismiss_guide', 'Close Guide')}
+            {"Close Guide"}
           </button>
         </div>
       }
@@ -56,7 +53,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
             <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-white/5">
               <Keyboard className="w-4 h-4 text-primary" />
               <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">
-                {t('pos_terminal_section', 'POS Terminal screen')}
+                {"POS Terminal screen"}
               </h3>
             </div>
             <div className="space-y-3">
@@ -94,7 +91,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
             <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-white/5">
               <CreditCard className="w-4 h-4 text-primary" />
               <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white">
-                {t('checkout_section', 'Checkout & Settlement')}
+                {"Checkout & Settlement"}
               </h3>
             </div>
             <div className="space-y-3">

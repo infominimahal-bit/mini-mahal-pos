@@ -1,3 +1,4 @@
+import { useUsersStore } from '../../stores';
 import { useState } from 'react';
 import { Plus, Edit, Trash2, Users, Crown, CreditCard, Loader2 } from 'lucide-react';
 import { Salesman } from '../../types';
@@ -7,17 +8,16 @@ import { Badge, Button, EmptyState, Pagination, usePagination } from '../../shar
 import { salesmenService } from '../../lib/services';
 import { SalesmanModal } from './SalesmanModal';
 import { sonner } from '../../lib/sonner';
-import { useTranslation } from '../../hooks/useTranslation';
 
 export function SalesmanManager() {
-  const { state, dispatch } = useApp();
-  const { t } = useTranslation();
+  const appSalesmen = useUsersStore(s => s.salesmen);
+const appCurrentUser = useUsersStore(s => s.currentUser);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingSalesman, setEditingSalesman] = useState<Salesman | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const filteredSalesmen = state.salesmen.filter(salesman =>
+  const filteredSalesmen = appSalesmen.filter(salesman =>
     salesman.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (salesman.phone && salesman.phone.toLowerCase().includes(searchTerm.toLowerCase()))
   );
@@ -36,7 +36,7 @@ export function SalesmanManager() {
       sonner.loading('Deleting salesman...');
       try {
         await salesmenService.delete(id);
-        dispatch({ type: 'SET_SALESMEN', payload: state.salesmen.filter(s => s.id !== id) });
+        useUsersStore.getState().setSalesmen(appSalesmen.filter(s => s.id !== id));
         sonner.success('Salesman deleted successfully!');
       } catch (error: any) {
         sonner.error(`Error deleting salesman: ${error.message}`);
@@ -52,7 +52,7 @@ export function SalesmanManager() {
     setShowModal(true);
   };
 
-  const activeSalesmen = state.salesmen.filter(s => s.active).length;
+  const activeSalesmen = appSalesmen.filter(s => s.active).length;
 
   return (
     <div className="main-content-scroll p-1 sm:p-4 lg:p-6 bg-gray-50/50 dark:bg-app space-y-3 lg:space-y-6 max-w-[1400px] mx-auto">
@@ -67,9 +67,9 @@ export function SalesmanManager() {
                 Salesmen <span className="text-gray-400 font-light">Management</span>
               </h1>
               <div className="flex items-center gap-2 mt-1 sm:mt-2">
-                <Badge tone="success" className="!px-2 !py-0.5 !text-[10px] uppercase font-bold tracking-widest">{t('active', 'ACTIVE')}: {activeSalesmen}</Badge>
+                <Badge tone="success" className="!px-2 !py-0.5 !text-[10px] uppercase font-bold tracking-widest">{"ACTIVE"}: {activeSalesmen}</Badge>
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                  {t('total_records', 'TOTAL RECORDS')}: {state.salesmen.length}
+                  {"TOTAL RECORDS"}: {appSalesmen.length}
                 </span>
               </div>
             </div>
@@ -79,19 +79,19 @@ export function SalesmanManager() {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full lg:w-auto shrink-0">
           <div className="w-full sm:w-[280px]">
             <SharedSearchBar
-              placeholder={t('search_salesmen', 'Search salesmen...')}
+              placeholder={"Search salesmen..."}
               value={searchTerm}
               onChange={setSearchTerm}
             />
           </div>
-          {state.currentUser?.role === 'admin' && (
+          {appCurrentUser?.role === 'admin' && (
             <Button
               onClick={handleAdd}
               variant="primary"
               className="!py-3 !px-5 whitespace-nowrap !h-full"
             >
               <Plus className="h-4 w-4 mr-2" />
-              <span className="text-[11px] font-black tracking-widest uppercase">{t('add_salesman', 'Add Salesman')}</span>
+              <span className="text-[11px] font-black tracking-widest uppercase">{"Add Salesman"}</span>
             </Button>
           )}
         </div>
@@ -105,13 +105,13 @@ export function SalesmanManager() {
                 <thead className="bg-gray-50/50 dark:bg-black/20">
                   <tr>
                     <th scope="col" className="px-5 sm:px-8 py-4 sm:py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest w-[40%]">
-                      {t('salesman_info', 'SALESMAN INFO')}
+                      {"SALESMAN INFO"}
                     </th>
                     <th scope="col" className="px-5 sm:px-8 py-4 sm:py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                      {t('status', 'STATUS')}
+                      {"STATUS"}
                     </th>
                     <th scope="col" className="px-5 sm:px-8 py-4 sm:py-5 text-right text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest w-[120px]">
-                      {t('actions', 'ACTIONS')}
+                      {"ACTIONS"}
                     </th>
                   </tr>
                 </thead>
@@ -135,18 +135,18 @@ export function SalesmanManager() {
                       </td>
                       <td className="px-5 sm:px-8 py-4 sm:py-5 whitespace-nowrap">
                         <Badge tone={salesman.active ? 'success' : 'neutral'} className="!px-3 !py-1 !text-[10px] uppercase font-bold tracking-widest">
-                          {salesman.active ? t('active', 'ACTIVE') : t('inactive', 'INACTIVE')}
+                          {salesman.active ? "ACTIVE" : "INACTIVE"}
                         </Badge>
                       </td>
                       <td className="px-5 sm:px-8 py-4 sm:py-5 whitespace-nowrap text-right">
-                        {state.currentUser?.role === 'admin' && (
+                        {appCurrentUser?.role === 'admin' && (
                           <div className="flex items-center justify-end gap-1 sm:gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleEdit(salesman)}
                               className="!h-9 !w-9 !p-0 !rounded-xl !bg-[#f8f9fa] dark:!bg-black/40 hover:!bg-blue-50 dark:hover:!bg-blue-500/20 text-gray-400 hover:text-blue-500 transition-colors"
-                              title={t('edit', 'Edit')}
+                              title={"Edit"}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -155,7 +155,7 @@ export function SalesmanManager() {
                               size="sm"
                               onClick={() => handleDelete(salesman.id)}
                               className="!h-9 !w-9 !p-0 !rounded-xl !bg-[#f8f9fa] dark:!bg-black/40 hover:!bg-rose-50 dark:hover:!bg-rose-500/20 text-gray-400 hover:text-rose-500 transition-colors"
-                              title={t('delete', 'Delete')}
+                              title={"Delete"}
                               disabled={loading}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -170,13 +170,13 @@ export function SalesmanManager() {
                       <td colSpan={3} className="px-8 py-16">
                         <EmptyState
                           icon={<Users className="w-12 h-12" />}
-                          title={t('no_salesmen_found', 'No Salesmen Found')}
-                          subtext={searchTerm ? t('try_adjusting_search', 'Try adjusting your search terms') : t('add_first_salesman', 'Add your first salesman to get started')}
+                          title={"No Salesmen Found"}
+                          subtext={searchTerm ? "Try adjusting your search terms" : "Add your first salesman to get started"}
                           action={
-                            !searchTerm && state.currentUser?.role === 'admin' ? (
+                            !searchTerm && appCurrentUser?.role === 'admin' ? (
                               <Button variant="primary" onClick={handleAdd}>
                                 <Plus className="h-4 w-4 mr-2" />
-                                {t('add_salesman', 'ADD SALESMAN')}
+                                {"ADD SALESMAN"}
                               </Button>
                             ) : undefined
                           }

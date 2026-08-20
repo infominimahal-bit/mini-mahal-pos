@@ -1,16 +1,15 @@
+import { useSettingsStore } from '../../stores';
 import { useApp } from '../../context/SupabaseAppContext';
 import { settingsService } from '../../lib/services';
 import { sonner } from '../../lib/sonner';
 
 export function GridDensityController() {
-  const { state, dispatch } = useApp();
-  const gridCols = state.settings.posGridColumns ?? 4;
+  const appSettings = useSettingsStore(s => s.settings);
+
+  const gridCols = appSettings.posGridColumns ?? 4;
 
   const handleColumnChange = (cols: number) => {
-    dispatch({
-      type: 'SET_SETTINGS',
-      payload: { posGridColumns: cols }
-    });
+    useSettingsStore.getState().setSettings({ posGridColumns: cols });
 
     // Instant sync to DB
     settingsService.update({ posGridColumns: cols })

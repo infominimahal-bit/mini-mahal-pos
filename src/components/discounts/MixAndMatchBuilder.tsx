@@ -1,3 +1,4 @@
+import { useProductsStore } from '../../stores';
 import React, { useMemo, useState } from 'react';
 import { DiscountCondition } from '../../types';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -14,7 +15,8 @@ interface MixAndMatchBuilderProps {
 }
 
 export function MixAndMatchBuilder({ conditions, onChange, currency }: MixAndMatchBuilderProps) {
-  const { state } = useApp();
+  const appProducts = useProductsStore(s => s.products);
+
   const { t } = useTranslation();
   const [pickerSearch, setPickerSearch] = useState('');
 
@@ -44,8 +46,8 @@ export function MixAndMatchBuilder({ conditions, onChange, currency }: MixAndMat
 
   // Get unique categories from products
   const categories = useMemo(
-    () => Array.from(new Set(state.products.map(p => p.category))).filter(Boolean) as string[],
-    [state.products]
+    () => Array.from(new Set(appProducts.map(p => p.category))).filter(Boolean) as string[],
+    [appProducts]
   );
 
   // Shared module picker data — generic item mapping (no niche types hardcoded)
@@ -57,12 +59,12 @@ export function MixAndMatchBuilder({ conditions, onChange, currency }: MixAndMat
         .slice(0, 40)
         .map(c => ({
           id: c,
-          badgeLabel: t('category', 'CATEGORY'),
+          badgeLabel: "CATEGORY",
           title: c,
           sku: '',
         }));
     }
-    return state.products
+    return appProducts
       .filter(p => {
         if (!term) return true;
         return (
@@ -80,7 +82,7 @@ export function MixAndMatchBuilder({ conditions, onChange, currency }: MixAndMat
         title: p.name,
         stock: p.stock,
       }));
-  }, [mmCondition.type, categories, state.products, pickerSearch, t]);
+  }, [mmCondition.type, categories, appProducts, pickerSearch, t]);
 
   return (
     <div className="space-y-6 bg-violet-50 dark:bg-violet-900/10 p-5 rounded-[20px] border border-violet-200 dark:border-violet-500/20">
@@ -127,8 +129,8 @@ export function MixAndMatchBuilder({ conditions, onChange, currency }: MixAndMat
           onChange={setPickerSearch}
           placeholder={
             mmCondition.type === 'category'
-              ? t('search_categories', 'Search categories...')
-              : t('search_products_to_add', 'Search products...')
+              ? "Search categories..."
+              : "Search products..."
           }
         />
         <SharedProductList
@@ -136,9 +138,9 @@ export function MixAndMatchBuilder({ conditions, onChange, currency }: MixAndMat
           selectedIds={Array.isArray(mmCondition.value) ? mmCondition.value : []}
           onItemSelect={(item) => toggleValue(item.id)}
           onClearSearch={() => setPickerSearch('')}
-          headerTitle={mmCondition.type === 'category' ? t('matching_categories', 'Matching Categories') : t('matching_products', 'Matching Products')}
+          headerTitle={mmCondition.type === 'category' ? "Matching Categories" : "Matching Products"}
           maxHeight="220px"
-          emptyStateText={t('nothing_found', 'NOTHING FOUND')}
+          emptyStateText={"NOTHING FOUND"}
           className="rounded-2xl shadow-none"
         />
         <p className="text-[9px] font-bold text-violet-600/70 uppercase tracking-widest">Tap items to toggle them on / off</p>

@@ -1,0 +1,1 @@
+export { ProductAdvanced } from './ProductAdvancedMain';

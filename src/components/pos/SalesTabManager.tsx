@@ -1,3 +1,4 @@
+import { useCartStore } from '../../stores';
 import { useEffect, useRef } from 'react';
 import { Plus, X } from 'lucide-react';
 import { useApp } from '../../context/SupabaseAppContext';
@@ -12,7 +13,11 @@ interface SalesTabManagerProps {
 }
 
 export function SalesTabManager({ showAddButton = true }: SalesTabManagerProps) {
-  const { state, dispatch } = useApp();
+  const appSalesTabs = useCartStore(s => s.salesTabs);
+const appActiveSalesTab = useCartStore(s => s.activeSalesTab);
+const appCart = useCartStore(s => s.cart);
+const appSelectedCustomer = useCartStore(s => s.selectedCustomer);
+
   const { user } = useAuth();
 
   const createNewTabRef = useRef<() => Promise<void>>();
@@ -32,33 +37,30 @@ export function SalesTabManager({ showAddButton = true }: SalesTabManagerProps) 
   const createNewTab = async () => {
     if (!user) return;
 
-    if (state.salesTabs.length >= 3) {
+    if (appSalesTabs.length >= 3) {
       sonner.warning('Maximum 3 Sale tabs allowed. Please close an existing tab first.');
       return;
     }
 
     try {
       // Save current tab's state before creating a new one
-      if (state.activeSalesTab) {
-        const currentTab = state.salesTabs.find(tab => tab.id === state.activeSalesTab);
+      if (appActiveSalesTab) {
+        const currentTab = appSalesTabs.find(tab => tab.id === appActiveSalesTab);
         if (currentTab) {
           const updates = {
-            cart: state.cart,
-            selectedCustomer: state.selectedCustomer,
+            cart: appCart,
+            selectedCustomer: appSelectedCustomer,
           };
 
-          await salesTabsService.update(state.activeSalesTab, updates);
-          dispatch({
-            type: 'UPDATE_SALES_TAB',
-            payload: {
-              id: state.activeSalesTab,
+          await salesTabsService.update(appActiveSalesTab, updates);
+          useCartStore.getState().updateSalesTab({
+              id: appActiveSalesTab,
               updates
-            }
-          });
+            });
         }
       }
 
-      const maxSaleNumber = state.salesTabs.reduce((max, tab) => {
+      const maxSaleNumber = appSalesTabs.reduce((max, tab) => {
         const match = tab.name.match(/^Sale (\d+)$/);
         return match ? Math.max(max, parseInt(match[1], 10)) : max;
       }, 0);
@@ -70,8 +72,8 @@ export function SalesTabManager({ showAddButton = true }: SalesTabManagerProps) 
       };
 
       const newTab = await salesTabsService.create(user.id, newTabData);
-      dispatch({ type: 'ADD_SALES_TAB', payload: newTab });
-      dispatch({ type: 'SET_ACTIVE_SALES_TAB', payload: newTab.id });
+      useCartStore.getState().addSalesTab(newTab);
+      useCartStore.getState().setActiveSalesTab(newTab.id);
       
       // Force immediate cloud sync
       syncNow().catch(null);
@@ -82,28 +84,28 @@ export function SalesTabManager({ showAddButton = true }: SalesTabManagerProps) 
 
   const closeTab = async (tabId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent triggering the parent button
-    if (state.salesTabs.length > 1) {
+    if (appSalesTabs.length > 1) {
       try {
-        const tabIndex = state.salesTabs.findIndex(t => t.id === tabId);
-        const wasActive = state.activeSalesTab === tabId;
+        const tabIndex = appSalesTabs.findIndex(t => t.id === tabId);
+        const wasActive = appActiveSalesTab === tabId;
 
         // If closing the active tab, find a neighbor to switch to
         if (wasActive) {
           // P2: persist the live cart to the closing tab FIRST so it isn't discarded.
-          const currentTab = state.salesTabs.find(tab => tab.id === tabId);
+          const currentTab = appSalesTabs.find(tab => tab.id === tabId);
           if (currentTab) {
-            const updates = { cart: state.cart, selectedCustomer: state.selectedCustomer };
+            const updates = { cart: appCart, selectedCustomer: appSelectedCustomer };
             await salesTabsService.update(tabId, updates);
-            dispatch({ type: 'UPDATE_SALES_TAB', payload: { id: tabId, updates } });
+            useCartStore.getState().updateSalesTab({ id: tabId, updates });
           }
-          const nextTab = state.salesTabs[tabIndex - 1] || state.salesTabs[tabIndex + 1];
+          const nextTab = appSalesTabs[tabIndex - 1] || appSalesTabs[tabIndex + 1];
           if (nextTab) {
-            dispatch({ type: 'SET_ACTIVE_SALES_TAB', payload: nextTab.id });
+            useCartStore.getState().setActiveSalesTab(nextTab.id);
           }
         }
 
         await salesTabsService.delete(tabId);
-        dispatch({ type: 'REMOVE_SALES_TAB', payload: tabId });
+        useCartStore.getState().removeSalesTab(tabId);
         
         // Force immediate cloud sync
         syncNow().catch(null);
@@ -115,30 +117,27 @@ export function SalesTabManager({ showAddButton = true }: SalesTabManagerProps) 
 
   const switchTab = async (tabId: string) => {
     // Save current cart to active tab
-    if (state.activeSalesTab) {
-      const currentTab = state.salesTabs.find(tab => tab.id === state.activeSalesTab);
+    if (appActiveSalesTab) {
+      const currentTab = appSalesTabs.find(tab => tab.id === appActiveSalesTab);
       if (currentTab) {
         try {
           const updates = {
-            cart: state.cart,
-            selectedCustomer: state.selectedCustomer,
+            cart: appCart,
+            selectedCustomer: appSelectedCustomer,
           };
 
-          await salesTabsService.update(state.activeSalesTab, updates);
-          dispatch({
-            type: 'UPDATE_SALES_TAB',
-            payload: {
-              id: state.activeSalesTab,
+          await salesTabsService.update(appActiveSalesTab, updates);
+          useCartStore.getState().updateSalesTab({
+              id: appActiveSalesTab,
               updates
-            }
-          });
+            });
         } catch (error) {
           console.error('Error saving current tab:', error);
         }
       }
     }
 
-    dispatch({ type: 'SET_ACTIVE_SALES_TAB', payload: tabId });
+    useCartStore.getState().setActiveSalesTab(tabId);
   };
 
   const getItemCount = (tab: SalesTab) => {
@@ -159,8 +158,8 @@ export function SalesTabManager({ showAddButton = true }: SalesTabManagerProps) 
 
   return (
     <div className="flex items-center gap-0.5 lg:gap-1.5 py-0.5">
-      {state.salesTabs.map((tab, index) => {
-        const isActive = state.activeSalesTab === tab.id;
+      {appSalesTabs.map((tab, index) => {
+        const isActive = appActiveSalesTab === tab.id;
         const itemCount = getItemCount(tab);
         const tabNumber = index + 1;
 
@@ -181,7 +180,7 @@ export function SalesTabManager({ showAddButton = true }: SalesTabManagerProps) 
                 </span>
               )}
             </button>
-            {state.salesTabs.length > 1 && isActive && (
+            {appSalesTabs.length > 1 && isActive && (
               <button
                 onClick={(e) => closeTab(tab.id, e)}
                 style={{ minHeight: 'unset' }}
@@ -195,7 +194,7 @@ export function SalesTabManager({ showAddButton = true }: SalesTabManagerProps) 
         );
       })}
 
-      {showAddButton && state.salesTabs.length < 3 && (
+      {showAddButton && appSalesTabs.length < 3 && (
         <div className="sticky right-0 bg-white dark:bg-app z-10 pl-1 py-1 flex items-center shrink-0">
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('create-new-tab'))}

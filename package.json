@@ -3,93 +3,39 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "main": "electron.cjs",
   "description": "A modern POS system built with React and Supabase",
   "keywords": [
     "react",
     "supabase",
     "pos",
     "point-of-sale",
-    "system",
-    "ecommerce"
+    "system"
   ],
   "author": "Shoaib zaynah <zaynahspos@gmail.com> (https://zaynahspos.com)",
   "scripts": {
     "dev": "vite --host",
-    "electron:dev": "concurrently \"vite --host\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build",
-    "build:win": "vite build --mode electron && electron-builder --win --x64",
-    "build:mac": "vite build --mode electron && electron-builder --mac",
     "lint": "eslint .",
     "preview": "vite preview"
   },
-  "build": {
-    "appId": "com.zaynah.pos",
-    "productName": "ZaynahsPos",
-    "directories": {
-      "output": "dist-electron"
-    },
-    "files": [
-      "dist/**/*",
-      "electron.cjs",
-      "preload.cjs",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "public/zaynahs-logo.svg",
-        "to": "zaynahs-logo.svg"
-      },
-      {
-        "from": "public/sqlite3.wasm",
-        "to": "sqlite3.wasm"
-      }
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "public/zaynahs-logo.svg",
-      "forceCodeSigning": false,
-      "verifyUpdateCodeSignature": false
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "public/zaynahs-logo.svg"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "installerIcon": "public/zaynahs-logo.svg",
-      "uninstallerIcon": "public/zaynahs-logo.svg",
-      "installerHeaderIcon": "public/zaynahs-logo.svg"
-    }
-  },
   "dependencies": {
-    "@supabase/auth-helpers-nextjs": "^0.10.0",
-    "@supabase/auth-helpers-react": "^0.5.0",
-    "@supabase/auth-ui-react": "^0.4.7",
-    "@supabase/auth-ui-shared": "^0.1.8",
     "@supabase/supabase-js": "^2.103.3",
     "@tanstack/react-virtual": "^3.13.24",
     "@types/jsbarcode": "^3.11.4",
-    "@types/leaflet": "^1.9.21",
     "clsx": "^2.1.1",
     "date-fns": "^2.30.0",
     "dexie": "^4.4.2",
     "dexie-react-hooks": "^4.4.0",
-    "electron-store": "^11.0.2",
     "framer-motion": "^12.38.0",
-    "glob": "^13.0.6",
     "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
-    "leaflet": "^1.9.4",
     "lucide-react": "^0.344.0",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-barcode": "^1.6.1",
     "react-dom": "^18.3.1",
-    "react-leaflet": "^4.2.1",
     "react-router-dom": "^6.20.1",
     "react-to-print": "^3.3.0",
     "recharts": "^2.8.0",
@@ -98,7 +44,8 @@
     "vaul": "^1.1.2",
     "vite-plugin-pwa": "^1.2.0",
     "workbox-window": "^7.4.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
@@ -107,9 +54,6 @@
     "@vitejs/plugin-basic-ssl": "^1.1.0",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.18",
-    "concurrently": "^9.2.1",
-    "electron": "^41.1.1",
-    "electron-builder": "^26.8.1",
     "eslint": "^9.9.1",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.11",
@@ -118,7 +62,6 @@
     "tailwindcss": "^3.4.19",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.3.0",
-    "vite": "^6.4.3",
-    "wait-on": "^9.0.4"
+    "vite": "^6.4.3"
   }
 }

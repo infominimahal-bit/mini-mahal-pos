@@ -32,7 +32,7 @@
     var _settings = {};
     try { if (_settingsStr) _settings = JSON.parse(_settingsStr); } catch (e) {}
     var _theme = _settings.theme || localStorage.getItem('theme') || 'dark';
-    var _isDark = _theme === 'dark';
+    var _isDark = _theme === 'dark' || (_theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
     // ─── Apply background color IMMEDIATELY (before CSS loads) ───
     // This is the root cause fix for iOS PWA black screen on launch/refresh.

@@ -1,3 +1,4 @@
+import { useSettingsStore } from '../stores';
 import { useCallback, useRef } from 'react';
 import { useApp } from '../context/SupabaseAppContext';
 
@@ -11,8 +12,9 @@ export type SoundType =
 export function useSoundFeedback() {
   const ctxRef = useRef<AudioContext | null>(null);
   const masterRef = useRef<GainNode | null>(null);
-  const { state } = useApp();
-  const soundEnabled = state.settings?.soundEnabled ?? true;
+  const appSettings = useSettingsStore(s => s.settings);
+
+  const soundEnabled = appSettings?.soundEnabled ?? true;
 
   function boot() {
     if (ctxRef.current) return;

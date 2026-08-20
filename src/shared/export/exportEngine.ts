@@ -39,6 +39,7 @@ export interface ReportExportConfig {
   brand?: { name: string; logo?: string };
   filename?: string;
   currencySymbol?: string;
+  paperSize?: string;
 }
 
 export const DEFAULT_BRAND = { name: 'Zaynahs POS', logo: '/zaynahs-logo.svg' };
@@ -159,39 +160,46 @@ export function exportToExcel(config: ReportExportConfig) {
 /* ─── PDF (jsPDF v4 — native table support) ─── */
 
 export async function exportToPDF(config: ReportExportConfig) {
-  const doc = new jsPDF({ orientation: 'landscape' });
+  const paperSize = config.paperSize || 'A4';
+  const isThermal = paperSize === '80mm' || paperSize === '58mm';
+  
+  const orientation = isThermal ? 'portrait' : 'landscape';
+  // Note: For thermal PDFs we use a fixed long height (e.g., 297mm or 400mm) as jsPDF needs a fixed page size
+  const format = paperSize === '58mm' ? [58, 400] : paperSize === '80mm' ? [80, 400] : 'a4';
+
+  const doc = new jsPDF({ orientation, format });
   const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 12;
+  const margin = isThermal ? 4 : 12;
   const brand = config.brand || DEFAULT_BRAND;
 
   // Branded header
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
+  doc.setFontSize(isThermal ? 10 : 15);
   doc.setTextColor(16, 185, 129); // --color-primary
-  doc.text(brand.name, margin, 16);
+  doc.text(brand.name, margin, isThermal ? 8 : 16);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
+  doc.setFontSize(isThermal ? 8 : 11);
   doc.setTextColor(15, 23, 42);
-  doc.text(config.title, margin, 23);
+  doc.text(config.title, margin, isThermal ? 13 : 23);
 
-  doc.setFontSize(8);
+  doc.setFontSize(isThermal ? 6 : 8);
   doc.setTextColor(107, 114, 128);
-  let metaY = 28;
+  let metaY = isThermal ? 17 : 28;
   doc.text(`Generated: ${new Date().toLocaleString()}`, margin, metaY);
   if (config.filtersSummary) {
-    metaY += 4;
+    metaY += (isThermal ? 3 : 4);
     doc.text(config.filtersSummary, margin, metaY);
   }
   if (config.subtitle) {
-    metaY += 4;
+    metaY += (isThermal ? 3 : 4);
     doc.text(config.subtitle, margin, metaY);
   }
 
   // Brand rule line
   doc.setDrawColor(16, 185, 129);
   doc.setLineWidth(0.6);
-  doc.line(margin, metaY + 3, pageWidth - margin, metaY + 3);
+  doc.line(margin, metaY + (isThermal ? 2 : 3), pageWidth - margin, metaY + (isThermal ? 2 : 3));
 
   // Table — keyed by header label (jsPDF v4 signature)
   const headers = config.columns.map(c => c.label);
@@ -203,22 +211,22 @@ export async function exportToPDF(config: ReportExportConfig) {
     return obj;
   });
 
-  doc.table(margin, metaY + 7, rowsForTable, headers, {
-    fontSize: 7.5,
-    padding: 1.5,
+  doc.table(margin, metaY + (isThermal ? 5 : 7), rowsForTable, headers, {
+    fontSize: isThermal ? 5 : 7.5,
+    padding: isThermal ? 1 : 1.5,
     headerBackgroundColor: '#10b981',
     headerTextColor: '#ffffff',
     autoSize: true,
-    margins: { top: metaY + 7, bottom: 12, left: margin, width: pageWidth - margin * 2 },
+    margins: { top: metaY + (isThermal ? 5 : 7), bottom: isThermal ? 4 : 12, left: margin, width: pageWidth - margin * 2 },
   });
 
   // Footer
   const pageCount = doc.getNumberOfPages();
-  doc.setFontSize(7);
+  doc.setFontSize(isThermal ? 5 : 7);
   doc.setTextColor(156, 163, 175);
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
-    doc.text(`${brand.name} — ${config.title} — Page ${i} of ${pageCount}`, margin, doc.internal.pageSize.getHeight() - 6);
+    doc.text(`${brand.name} — ${config.title} — Page ${i} of ${pageCount}`, margin, doc.internal.pageSize.getHeight() - (isThermal ? 3 : 6));
   }
 
   doc.save(config.filename || defaultFilename(config.title, 'pdf'));
@@ -229,6 +237,10 @@ export async function exportToPDF(config: ReportExportConfig) {
 export function printReport(config: ReportExportConfig) {
   const brand = config.brand || DEFAULT_BRAND;
   const currencySymbol = config.currencySymbol || '';
+  const paperSize = config.paperSize || 'A4';
+  const isThermal = paperSize === '80mm' || paperSize === '58mm';
+  const cssWidth = paperSize === '58mm' ? '58mm' : paperSize === '80mm' ? '80mm' : '100%';
+  
   const headers = config.columns.map(c => c.label).map(l => `<th>${escapeHtml(l)}</th>`).join('');
   const body = config.rows.map(row => {
     const tds = config.columns.map(c => `<td>${escapeHtml(formatValue(c, row, currencySymbol))}</td>`).join('');
@@ -238,24 +250,49 @@ export function printReport(config: ReportExportConfig) {
   const win = window.open('', '_blank', 'width=1024,height=768');
   if (!win) return;
 
+  const thermalCss = isThermal ? `
+    body { width: ${cssWidth}; padding: 4px; font-size: ${paperSize === '58mm' ? '9px' : '11px'}; color: #000; }
+    .brand-header { flex-direction: column; text-align: center; border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 8px; }
+    .brand-name { font-size: ${paperSize === '58mm' ? '12px' : '16px'}; color: #000; }
+    h1 { font-size: ${paperSize === '58mm' ? '10px' : '12px'}; color: #000; margin-top: 4px; }
+    .meta { font-size: ${paperSize === '58mm' ? '8px' : '9px'}; color: #000; }
+    table { font-size: ${paperSize === '58mm' ? '8px' : '9px'}; margin-top: 8px; }
+    th { background: transparent; color: #000; border-bottom: 1px solid #000; padding: 4px 2px; }
+    td { padding: 4px 2px; border-bottom: 1px dotted #ccc; color: #000; }
+    .footer { margin-top: 12px; font-size: ${paperSize === '58mm' ? '7px' : '8px'}; color: #000; }
+  ` : `
+    body { padding: 24px; color: #0f172a; }
+    .brand-header { flex-direction: row; align-items: center; gap: 12px; border-bottom: 3px solid #10b981; padding-bottom: 12px; margin-bottom: 16px; }
+    .brand-name { font-size: 18px; color: #10b981; }
+    h1 { font-size: 14px; }
+    .meta { font-size: 10px; color: #6b7280; }
+    table { margin-top: 14px; }
+    th { background: #10b981; color: #fff; font-size: 9px; padding: 7px 8px; }
+    td { font-size: 9.5px; padding: 6px 8px; border-bottom: 1px solid #e5e7eb; }
+    tr:nth-child(even) td { background: #f9fafb; }
+    .footer { margin-top: 18px; font-size: 8px; color: #9ca3af; }
+  `;
+
   win.document.write(`<!DOCTYPE html>
 <html>
 <head>
   <title>${escapeHtml(config.title)}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #0f172a; padding: 24px; }
-    .brand-header { display: flex; align-items: center; gap: 12px; border-bottom: 3px solid #10b981; padding-bottom: 12px; margin-bottom: 16px; }
+    body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; }
+    .brand-header { display: flex; }
     .brand-header img { height: 36px; width: auto; }
-    .brand-name { font-size: 18px; font-weight: 900; letter-spacing: 0.05em; color: #10b981; text-transform: uppercase; }
-    h1 { font-size: 14px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
-    .meta { font-size: 10px; color: #6b7280; margin-bottom: 2px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 14px; }
-    th { background: #10b981; color: #fff; font-size: 9px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; padding: 7px 8px; text-align: left; }
-    td { font-size: 9.5px; padding: 6px 8px; border-bottom: 1px solid #e5e7eb; }
-    tr:nth-child(even) td { background: #f9fafb; }
-    .footer { margin-top: 18px; font-size: 8px; color: #9ca3af; text-align: center; }
-    @media print { body { padding: 0; } }
+    .brand-name { font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; }
+    h1 { font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+    .meta { margin-bottom: 2px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; }
+    .footer { text-align: center; }
+    ${thermalCss}
+    @media print { 
+      body { padding: 0; ${isThermal ? `width: ${cssWidth};` : ''} } 
+      ${isThermal ? `@page { margin: 0; size: ${cssWidth} auto; }` : ''}
+    }
   </style>
 </head>
 <body>

@@ -1,0 +1,79 @@
+import { supabase, adminUserAction } from '../supabase';
+import {
+  Product,
+  Customer,
+  Sale,
+  Discount,
+  User,
+  AppSettings,
+  SalesTab,
+  Expense,
+  Category,
+  Supplier,
+  PurchaseRecord,
+  ProductBatch,
+  SupplierTransaction,
+  StockHistory,
+  Payment,
+  PurchaseOrder,
+  Bundle,
+  BundleItem,
+  CartItem,
+  RefundRequest,
+  Topping,
+  ExtraTopping,
+  VariantStockHistory,
+  ProductAddon,
+} from '../../types';
+import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
+import { generateBarcodeValue } from '../../utils/barcode';
+import { signAction, withActor } from '../actionToken';
+import { fetchAllPages } from './utils';
+import { mapSettings, toRemoteSettings } from './settingsMappers';
+
+export const settingsService = {
+  async get(): Promise<AppSettings | null> {
+    const local = await localDb.appSettings.get(SETTINGS_ID);
+    if (local) return local;
+    return await this.fetchRemote();
+  },
+  async fetchRemote(lastSyncTime?: Date): Promise<AppSettings | null> {
+    const queryFn = () => {
+      let q = supabase.from('app_settings').select('*').eq('id', SETTINGS_ID);
+      if (lastSyncTime) q = q.gte('updated_at', lastSyncTime.toISOString());
+      return q;
+    };
+    const data = await fetchAllPages(queryFn);
+    if (!data || data.length === 0) return null;
+    return mapSettings(data[0]);
+  },
+  async update(updates: Partial<AppSettings>): Promise<void> {
+    const existing = await this.get();
+    const now = new Date();
+    const updated = {
+      ...(existing || {}),
+      ...updates,
+      id: SETTINGS_ID,
+      updatedAt: now
+    } as AppSettings;
+
+    // Safety: ensure timestamps are updated
+    if (!updated.createdAt) updated.createdAt = now;
+
+    // 1. Update local cache immediately
+    await localDb.appSettings.put(updated);
+
+    // 2. Map for remote sync
+    const remotePayload = toRemoteSettings(updated);
+    remotePayload.id = SETTINGS_ID;
+
+    // 3. Queue for cloud sync
+    await queueOp('app_settings', 'update', SETTINGS_ID, remotePayload);
+  }
+};
+
+export { mapSettings, toRemoteSettings } from './settingsMappers';
+
+/**
+ * Expenses Service
+ */

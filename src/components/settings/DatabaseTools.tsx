@@ -1,42 +1,11 @@
-import React, { useRef, useState } from 'react';
-import {
-  Download,
-  Upload,
-  Database,
-  ShieldAlert,
-  CheckCircle2,
-  FileJson,
-  Loader2,
-  RefreshCw,
-  History,
-  Package,
-  Users,
-  ShoppingCart,
-  Receipt,
-  Tag,
-  Settings,
-  Layers,
-  Truck,
-  ClipboardList,
-  CheckSquare,
-  Square
-} from 'lucide-react';
-import { localDb, queueOp, purgeLocalData, SETTINGS_ID } from '../../lib/localDb';
-import { generateBarcodeValue } from '../../utils/barcode';
-import { useApp } from '../../context/SupabaseAppContext';
+import React, { useState } from 'react';
+import { Database, ShieldAlert, CheckCircle2, RefreshCw, History, Package, Users, ShoppingCart, Receipt, Tag, Settings, Layers, Truck, ClipboardList, CheckSquare, Square } from 'lucide-react';
+import { purgeLocalData } from '../../lib/localDb';
 import { useAuth } from '../../context/AuthContext';
 import { can } from '../../lib/permissions';
 import { sonner } from '../../lib/sonner';
 import { Button } from '../../shared/ui';
-
-interface ImportSummary {
-  table: string;
-  total: number;
-  imported: number;
-  skipped: number;
-  failed: number;
-  duplicate: number;
-}
+import { DataExportTools } from './DataExportTools';
 
 const STORE_OPTIONS = [
   { key: 'products', label: 'Products', icon: Package, color: 'text-primary' },
@@ -65,39 +34,10 @@ const STORE_OPTIONS = [
   { key: 'productAddons', label: 'Product Addons', icon: Package, color: 'text-teal-500' },
 ];
 
-const DISPATCH_MAP: Record<string, string> = {
-  products: 'SET_PRODUCTS',
-  customers: 'SET_CUSTOMERS',
-  sales: 'SET_SALES',
-  discounts: 'SET_DISCOUNTS',
-  users: 'SET_USERS',
-  salesTabs: 'SET_SALES_TABS',
-  expenses: 'SET_EXPENSES',
-  purchaseRecords: 'SET_PURCHASE_RECORDS',
-  categories: 'SET_CATEGORIES',
-  suppliers: 'SET_SUPPLIERS',
-  productBatches: 'SET_PRODUCT_BATCHES',
-  supplier_transactions: 'SET_SUPPLIER_TRANSACTIONS',
-  payments: 'SET_PAYMENTS',
-  purchase_orders: 'SET_PURCHASE_ORDERS',
-  purchase_order_items: 'SET_PURCHASE_ORDER_ITEMS',
-  stock_history: 'SET_STOCK_HISTORY',
-  variant_stock_history: 'SET_VARIANT_STOCK_HISTORY',
-  bundles: 'SET_BUNDLES',
-  toppings: 'SET_TOPPINGS',
-  productAddons: 'SET_PRODUCT_ADDONS',
-};
-
 export function DatabaseTools() {
-  const { state, dispatch } = useApp();
   const { profile } = useAuth();
   const canExportDb = can(profile?.role, 'export_database');
-  const [isExporting, setIsExporting] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
   const [selectedStores, setSelectedStores] = useState<Set<string>>(new Set(STORE_OPTIONS.map(s => s.key)));
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const allSelected = selectedStores.size === STORE_OPTIONS.length;
 
   const toggleStore = (key: string) => {
@@ -117,461 +57,11 @@ export function DatabaseTools() {
     }
   };
 
-  // ─── EXPORT ───
-  const handleExport = async () => {
-    if (!canExportDb) { sonner.error('You do not have permission to export the database.'); return; }
-    if (selectedStores.size === 0) {
-      sonner.error('Please select at least one table to export.');
-      return;
-    }
-    setIsExporting(true);
-    try {
-      sonner.loading('Generating System Backup...');
-      const backup: any = {
-        version: '2.0',
-        platform: 'POS',
-        timestamp: new Date().toISOString(),
-        selectedTables: Array.from(selectedStores),
-        tables: {}
-      };
-
-      for (const store of selectedStores) {
-        // Map snake_case keys to camelCase localDb property names
-        const dbKeyMap: Record<string, string> = {
-          settings: 'appSettings',
-          purchase_orders: 'purchaseOrders',
-          purchase_order_items: 'purchaseOrderItems',
-          supplier_transactions: 'supplierTransactions',
-          stock_history: 'stockHistory',
-          variant_stock_history: 'variantStockHistory',
-          bundles: 'bundles',
-          bundle_items: 'bundleItems',
-          bundle_slots: 'bundleSlots',
-          bundle_slot_options: 'bundleSlotOptions',
-        };
-        const dbKey = dbKeyMap[store] || store;
-        const table = (localDb as any)[dbKey];
-        if (!table || typeof table.toArray !== 'function') {
-          console.warn(`[Export] Skipping unknown store: ${store} (dbKey: ${dbKey})`);
-          backup.tables[store] = [];
-          continue;
-        }
-        backup.tables[store] = await table.toArray();
-      }
-
-      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `pos_backup_${new Date().toLocaleDateString('en-CA')}_${Date.now()}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      const tableList = Array.from(selectedStores).map(s => s.toUpperCase()).join(', ');
-      sonner.success(`Exported ${selectedStores.size} tables: ${tableList}`);
-    } catch (err: any) {
-      console.error('Export failed:', err);
-      sonner.error(`Backup failed: ${err.message}`);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  // ─── FILE SELECT ───
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedFile(e.target.files?.[0] || null);
-  };
-
-  // ─── IMPORT ───
-  const handleImport = async () => {
-    if (!canExportDb) { sonner.error('You do not have permission to import or restore data.'); return; }
-    if (!selectedFile) {
-      sonner.error('Please select a backup file first.');
-      return;
-    }
-    if (selectedStores.size === 0) {
-      sonner.error('Please select at least one table to import.');
-      return;
-    }
-
-    const isDark = document.documentElement.classList.contains('dark');
-    const bgColor = isDark ? '#171717' : '#fff';
-    const textColor = isDark ? '#fff' : '#000';
-
-    const result = await sonner.confirm(
-      'Import System Data?',
-      `This will merge ${selectedStores.size} selected tables. Duplicates will be skipped.`
-    );
-
-    if (!result.isConfirmed) return;
-
-    setIsImporting(true);
-    const summaries: ImportSummary[] = [];
-
-    try {
-      // Open ONE persistent loading dialog — update title per step
-      sonner.loading('📂 Reading backup file...');
-
-      const text = await selectedFile.text();
-      let backup: any;
-      try {
-        backup = JSON.parse(text);
-      } catch {
-        throw new Error('Invalid JSON file. Please select a valid POS backup file.');
-      }
-
-      if (!backup.tables || typeof backup.tables !== 'object') {
-        throw new Error('Invalid backup format. Missing "tables" object.');
-      }
-
-      const storeKeys = Array.from(selectedStores);
-
-      for (let i = 0; i < storeKeys.length; i++) {
-        const storeKey = storeKeys[i];
-        const records = backup.tables[storeKey];
-
-        sonner.update(`⏳ Processing ${storeKey.toUpperCase()} (${i + 1} / ${storeKeys.length})...`);
-
-        // Table not in backup
-        if (records === undefined || records === null) {
-          summaries.push({ table: storeKey.toUpperCase(), total: 0, imported: 0, skipped: 0, failed: 0, duplicate: 0 });
-          continue;
-        }
-
-        // ── SETTINGS SINGLETON ──
-        if (storeKey === 'settings') {
-          const settingsData = Array.isArray(records) ? records[0] : records;
-          if (!settingsData) {
-            summaries.push({ table: 'SETTINGS', total: 0, imported: 0, skipped: 0, failed: 0, duplicate: 0 });
-          } else {
-            const existing = await localDb.appSettings.get(SETTINGS_ID);
-            try {
-              const mergedSettings = existing ? { ...existing, ...settingsData, id: SETTINGS_ID } : { ...settingsData, id: SETTINGS_ID };
-              await localDb.appSettings.put(mergedSettings);
-              try {
-                await queueOp('settings', 'upsert', 'singleton', mergedSettings);
-              } catch (qErr) {
-                console.warn('Could not queue op for settings sync:', qErr);
-              }
-              dispatch({ type: 'SET_SETTINGS', payload: mergedSettings } as any);
-              summaries.push({ table: 'SETTINGS', total: 1, imported: 1, skipped: 0, failed: 0, duplicate: 0 });
-            } catch (e) {
-              summaries.push({ table: 'SETTINGS', total: 1, imported: 0, skipped: 0, failed: 1, duplicate: 0 });
-            }
-          }
-          continue;
-        }
-
-        // ── ARRAY STORES ──
-        if (!Array.isArray(records) || records.length === 0) {
-          summaries.push({ table: storeKey.toUpperCase(), total: 0, imported: 0, skipped: 0, failed: 0, duplicate: 0 });
-          continue;
-        }
-
-        let imported = 0, skipped = 0, failed = 0, duplicate = 0;
-        const total = records.length;
-
-        // Map snake_case store keys to camelCase localDb property names
-        const dbKeyMap: Record<string, string> = {
-          settings: 'appSettings',
-          purchase_orders: 'purchaseOrders',
-          purchase_order_items: 'purchaseOrderItems',
-          supplier_transactions: 'supplierTransactions',
-          stock_history: 'stockHistory',
-          variant_stock_history: 'variantStockHistory',
-          bundles: 'bundles',
-          bundle_items: 'bundleItems',
-          bundle_slots: 'bundleSlots',
-          bundle_slot_options: 'bundleSlotOptions',
-        };
-        const dbKey = dbKeyMap[storeKey] || storeKey;
-        const table = (localDb as any)[dbKey];
-
-        // Pre-fetch existing data ONCE (avoids O(N²) reads)
-        let existingRecords: any[] = [];
-        try {
-          existingRecords = await table.toArray();
-        } catch {
-          existingRecords = [];
-        }
-
-        const existingIdSet = new Set(existingRecords.map((r: any) => String(r.id)));
-
-        // Build field-based duplicate sets
-        const dupSets: any = {};
-        if (storeKey === 'products') {
-          dupSets.skus = new Set(existingRecords.filter((p: any) => p.sku).map((p: any) => p.sku));
-          dupSets.barcodes = new Set(existingRecords.filter((p: any) => p.barcode).map((p: any) => p.barcode));
-          // F1: enforce unique product names during bulk import too (matches productsService.create)
-          dupSets.names = new Set(existingRecords.filter((p: any) => p.name).map((p: any) => p.name));
-        } else if (storeKey === 'customers') {
-          dupSets.phones = new Set(existingRecords.filter((c: any) => c.phone).map((c: any) => c.phone));
-          dupSets.emails = new Set(existingRecords.filter((c: any) => c.email).map((c: any) => c.email));
-        } else if (storeKey === 'sales') {
-          dupSets.invoices = new Set(existingRecords.filter((s: any) => s.invoiceNumber).map((s: any) => s.invoiceNumber));
-        } else if (storeKey === 'discounts') {
-          dupSets.names = new Set(existingRecords.filter((d: any) => d.name).map((d: any) => d.name));
-        } else if (storeKey === 'users') {
-          dupSets.emails = new Set(existingRecords.filter((u: any) => u.email).map((u: any) => u.email));
-        } else if (storeKey === 'categories' || storeKey === 'suppliers') {
-          dupSets.names = new Set(existingRecords.filter((x: any) => x.name).map((x: any) => x.name));
-        } else if (storeKey === 'purchase_orders') {
-          dupSets.poNumbers = new Set(existingRecords.filter((x: any) => x.poNumber).map((x: any) => x.poNumber));
-        }
-
-        for (const record of records) {
-          try {
-            // Skip if same ID already exists
-            if (existingIdSet.has(String(record.id))) {
-              skipped++;
-              duplicate++;
-              continue;
-            }
-
-            // Skip field-based duplicates
-            let isDuplicate = false;
-            if (storeKey === 'products') {
-              isDuplicate = !!(record.sku && dupSets.skus.has(record.sku)) || !!(record.barcode && dupSets.barcodes.has(record.barcode)) || !!(record.name && dupSets.names.has(record.name));
-            } else if (storeKey === 'customers') {
-              isDuplicate = !!(record.phone && dupSets.phones.has(record.phone)) || !!(record.email && dupSets.emails.has(record.email));
-            } else if (storeKey === 'sales') {
-              isDuplicate = !!(record.invoiceNumber && dupSets.invoices.has(record.invoiceNumber));
-            } else if (storeKey === 'discounts') {
-              isDuplicate = !!(record.name && dupSets.names.has(record.name));
-            } else if (storeKey === 'users') {
-              isDuplicate = !!(record.email && dupSets.emails.has(record.email));
-            } else if (storeKey === 'categories' || storeKey === 'suppliers') {
-              isDuplicate = !!(record.name && dupSets.names.has(record.name));
-            } else if (storeKey === 'purchase_orders') {
-              isDuplicate = !!(record.poNumber && dupSets.poNumbers.has(record.poNumber));
-            }
-
-            if (isDuplicate) {
-              skipped++;
-              duplicate++;
-              continue;
-            }
-
-            // Assign a barcode for products so they sync without colliding on the UNIQUE index
-            if (storeKey === 'products' && !record.barcode) {
-              record.barcode = generateBarcodeValue(record.name || record.id, record.id);
-            }
-
-            // Save locally
-            await (localDb as any)[dbKey].put(record);
-            imported++;
-
-            // Queue for sync to Supabase
-            try {
-              // Convert camelCase JS object to snake_case for Supabase
-              const dbPayload: any = {};
-              for (const key in record) {
-                const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-                dbPayload[snakeKey] = record[key];
-              }
-
-              // Map localDb store keys to Supabase table names
-              const entityMapping: Record<string, string> = {
-                productBatches: 'product_batches',
-                purchaseRecords: 'purchase_records',
-                salesTabs: 'sales_tabs'
-              };
-              const entityName = entityMapping[storeKey] || storeKey;
-
-              // Remove local-only joined properties before pushing to Supabase
-              delete dbPayload.batches;
-              delete dbPayload.product_batches;
-
-              await queueOp(entityName as any, 'upsert', String(record.id), dbPayload);
-            } catch (qErr) {
-              console.warn(`Could not queue op for sync in ${storeKey}:`, qErr);
-            }
-
-            // Update in-memory dedup sets
-            existingIdSet.add(String(record.id));
-            if (storeKey === 'products') {
-              if (record.sku) dupSets.skus.add(record.sku);
-              if (record.barcode) dupSets.barcodes.add(record.barcode);
-              if (record.name) dupSets.names.add(record.name);
-            } else if (storeKey === 'customers') {
-              if (record.phone) dupSets.phones.add(record.phone);
-              if (record.email) dupSets.emails.add(record.email);
-            } else if (storeKey === 'sales') {
-              if (record.invoiceNumber) dupSets.invoices.add(record.invoiceNumber);
-            } else if (storeKey === 'discounts') {
-              if (record.name) dupSets.names.add(record.name);
-            } else if (storeKey === 'users') {
-              if (record.email) dupSets.emails.add(record.email);
-            } else if (storeKey === 'categories' || storeKey === 'suppliers') {
-              if (record.name) dupSets.names.add(record.name);
-            } else if (storeKey === 'purchase_orders') {
-              if (record.poNumber) dupSets.poNumbers.add(record.poNumber);
-            }
-          } catch (itemErr) {
-            console.error(`Failed record in ${storeKey}:`, itemErr);
-            failed++;
-          }
-          
-          // Update progress every 50 records
-          const processed = imported + skipped + failed;
-          if (processed % 50 === 0 || processed === total) {
-            sonner.update(`⏳ Processing ${storeKey.toUpperCase()} (${processed} / ${total})...`);
-            // Yield to main thread so UI can update
-            await new Promise(resolve => setTimeout(resolve, 0));
-          }
-        }
-
-        summaries.push({ table: storeKey.toUpperCase(), total, imported, skipped, failed, duplicate });
-      }
-
-      // ── REFRESH REACT STATE FROM LOCAL DB (NO SUPABASE) ──
-      // We must NOT call loadData() — it fetches from Supabase and overwrites what we just imported.
-      // Instead, read each store directly from IndexedDB and dispatch to React state.
-      sonner.update('Refresh app state...');
-
-      for (const storeKey of storeKeys) {
-        const actionType = DISPATCH_MAP[storeKey];
-        if (!actionType) continue;
-
-        try {
-          const dbKeyMap: Record<string, string> = {
-            settings: 'appSettings',
-            purchase_orders: 'purchaseOrders',
-            purchase_order_items: 'purchaseOrderItems',
-            supplier_transactions: 'supplierTransactions',
-            stock_history: 'stockHistory',
-            bundles: 'bundles',
-            bundle_items: 'bundleItems',
-            bundle_slots: 'bundleSlots',
-            bundle_slot_options: 'bundleSlotOptions',
-          };
-          const dbKey = dbKeyMap[storeKey] || storeKey;
-          const table = (localDb as any)[dbKey];
-
-          if (table && typeof table.toArray === 'function') {
-            const freshData = await table.toArray();
-            dispatch({ type: actionType, payload: storeKey === 'salesTabs' ? freshData.slice(0, 3) : freshData } as any);
-          }
-        } catch (dispatchErr) {
-          console.warn(`Could not refresh ${storeKey} in React state:`, dispatchErr);
-        }
-      }
-
-      // Update in-memory dedup sets
-      const totalRecords = summaries.reduce((s, r) => s + r.total, 0);
-      const totalImported = summaries.reduce((s, r) => s + r.imported, 0);
-      const totalSkipped = summaries.reduce((s, r) => s + r.skipped, 0);
-      const totalFailed = summaries.reduce((s, r) => s + r.failed, 0);
-      const totalDuplicate = summaries.reduce((s, r) => s + r.duplicate, 0);
-
-      // Filter out tables with 0 total (not in backup)
-      const activeSummaries = summaries.filter(s => s.total > 0);
-
-      // ── BUILD SUMMARY HTML ──
-      const summaryHTML = `
-        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:14px 0 18px">
-          <div style="text-align:center;min-width:52px">
-            <div style="font-size:22px;font-weight:900;color:#6B7280">${totalRecords}</div>
-            <div style="font-size:9px;font-weight:800;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px">Total</div>
-          </div>
-          <div style="text-align:center;min-width:52px">
-            <div style="font-size:22px;font-weight:900;color:#10B981">${totalImported}</div>
-            <div style="font-size:9px;font-weight:800;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px">Imported</div>
-          </div>
-          <div style="text-align:center;min-width:52px">
-            <div style="font-size:22px;font-weight:900;color:#F59E0B">${totalSkipped}</div>
-            <div style="font-size:9px;font-weight:800;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px">Skipped</div>
-          </div>
-          <div style="text-align:center;min-width:52px">
-            <div style="font-size:22px;font-weight:900;color:#8B5CF6">${totalDuplicate}</div>
-            <div style="font-size:9px;font-weight:800;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px">Duplicate</div>
-          </div>
-          <div style="text-align:center;min-width:52px">
-            <div style="font-size:22px;font-weight:900;color:#EF4444">${totalFailed}</div>
-            <div style="font-size:9px;font-weight:800;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px">Failed</div>
-          </div>
-        </div>
-        ${activeSummaries.length > 0 ? `
-        <div style="max-height:200px;overflow-y:auto;border-radius:12px;border:1px solid rgba(128,128,128,0.2)">
-          <table style="width:100%;border-collapse:collapse;font-size:11px;font-weight:700">
-            <thead>
-              <tr style="background:rgba(128,128,128,0.1)">
-                <th style="padding:7px 10px;text-align:left;color:${isDark ? '#D1D5DB' : '#374151'}">TABLE</th>
-                <th style="padding:7px 6px;text-align:center;color:#6B7280">TOTAL</th>
-                <th style="padding:7px 6px;text-align:center;color:#10B981">NEW</th>
-                <th style="padding:7px 6px;text-align:center;color:#F59E0B">SKIP</th>
-                <th style="padding:7px 6px;text-align:center;color:#8B5CF6">DUP</th>
-                <th style="padding:7px 6px;text-align:center;color:#EF4444">FAIL</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${activeSummaries.map(s => `
-                <tr style="border-top:1px solid rgba(128,128,128,0.1)">
-                  <td style="padding:6px 10px;color:${isDark ? '#E5E7EB' : '#1F2937'}">${s.table}</td>
-                  <td style="padding:6px;text-align:center;color:#6B7280">${s.total}</td>
-                  <td style="padding:6px;text-align:center;color:${s.imported > 0 ? '#10B981' : (isDark ? '#4B5563' : '#9CA3AF')};font-weight:${s.imported > 0 ? '900' : '700'}">${s.imported}</td>
-                  <td style="padding:6px;text-align:center;color:${s.skipped > 0 ? '#F59E0B' : (isDark ? '#4B5563' : '#9CA3AF')}">${s.skipped}</td>
-                  <td style="padding:6px;text-align:center;color:${s.duplicate > 0 ? '#8B5CF6' : (isDark ? '#4B5563' : '#9CA3AF')}">${s.duplicate}</td>
-                  <td style="padding:6px;text-align:center;color:${s.failed > 0 ? '#EF4444' : (isDark ? '#4B5563' : '#9CA3AF')}">${s.failed}</td>
-                </tr>`).join('')}
-              <tr style="border-top:2px solid rgba(128,128,128,0.25);background:rgba(128,128,128,0.06)">
-                <td style="padding:7px 10px;font-weight:900;color:${isDark ? '#fff' : '#111827'}">TOTAL</td>
-                <td style="padding:7px 6px;text-align:center;font-weight:900;color:#6B7280">${totalRecords}</td>
-                <td style="padding:7px 6px;text-align:center;font-weight:900;color:#10B981">${totalImported}</td>
-                <td style="padding:7px 6px;text-align:center;font-weight:900;color:#F59E0B">${totalSkipped}</td>
-                <td style="padding:7px 6px;text-align:center;font-weight:900;color:#8B5CF6">${totalDuplicate}</td>
-                <td style="padding:7px 6px;text-align:center;font-weight:900;color:#EF4444">${totalFailed}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>` : `<p style="color:#9CA3AF;font-size:12px;font-weight:600">No matching tables found in backup file for selected tables.</p>`}
-      `;
-
-      await sonner.alert(
-        totalImported > 0
-          ? '✅ Import Complete!'
-          : activeSummaries.length === 0
-            ? '⚠️ Nothing to Import'
-            : '🔁 No New Records',
-        `
-          <div style="font-size:12px;color:${isDark ? '#9CA3AF' : '#6B7280'};font-weight:600;margin-top:4px;margin-bottom:12px;text-align:center">
-            ${totalImported > 0
-          ? `${totalImported} new records added across ${activeSummaries.filter(s => s.imported > 0).length} table(s)`
-          : totalDuplicate > 0
-            ? `All ${totalDuplicate} records already exist — nothing was imported`
-            : 'No records were processed'}
-          </div>
-          ${summaryHTML}`
-      );
-
-      // ── TRIGGER AUTO-SYNC ──
-      try {
-        const { syncNow } = await import('../../lib/syncEngine');
-        syncNow({ resetRetries: true }).catch(e => console.warn('Post-import sync failed:', e));
-      } catch (e) {
-        console.warn('Sync engine not available for post-import trigger');
-      }
-
-      setSelectedFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-
-    } catch (err: any) {
-      console.error('Import failed:', err);
-      sonner.close();
-      sonner.error(`Import failed: ${err.message}`);
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
   const handlePurgeAll = async () => {
     const result = await sonner.confirm(
       'System Reset?',
       'This will wipe ALL local data for this workspace and force a fresh synchronization. Are you sure?'
     );
-
     if (result.isConfirmed) {
       sonner.loading('Purging...');
       await purgeLocalData();
@@ -580,7 +70,6 @@ export function DatabaseTools() {
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-      {/* Header */}
       <div className="flex items-center gap-3 pb-4 border-b border-gray-50 dark:border-white/5">
         <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
           <Database className="w-5 h-5 text-primary" />
@@ -591,13 +80,8 @@ export function DatabaseTools() {
         </div>
       </div>
 
-      {/* MAIN GRID: Table Selection + Auto Maintenance (left 7) | Export/Import + System Reset (right 5) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
-        {/* LEFT COLUMN (7 Cols) */}
         <div className="lg:col-span-7 space-y-6">
-
-          {/* Table Selection */}
           <div className="bg-white dark:bg-black/20 p-5 rounded-[2rem] border border-gray-200 dark:border-white/5 shadow-md space-y-4">
             <div className="flex items-center justify-between border-b border-gray-200/50 dark:border-white/5 pb-2">
               <h3 className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-wider">Select Tables</h3>
@@ -637,7 +121,6 @@ export function DatabaseTools() {
             </div>
           </div>
 
-          {/* Auto Maintenance (runs automatically after every sync — no manual action needed) */}
           <div className="bg-emerald-50/40 dark:bg-emerald-950/10 p-5 rounded-[2rem] border border-emerald-100 dark:border-emerald-950/20 shadow-sm flex flex-col justify-between space-y-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/20 rounded-xl flex items-center justify-center shrink-0">
@@ -646,95 +129,16 @@ export function DatabaseTools() {
               <div>
                 <h3 className="text-xs font-black text-emerald-950 dark:text-emerald-300 uppercase tracking-tight">Auto Maintenance</h3>
                 <p className="text-emerald-800/60 dark:text-emerald-400/50 text-[9px] mt-1 font-bold leading-relaxed uppercase tracking-wider">
-                  Barcode seeding &amp; stock reconciliation now run automatically after each sync. Stock stays accurate and all items keep valid barcodes with no manual steps.
+                  Barcode seeding &amp; stock accuracy now run automatically after each sync. Stock stays accurate and all items keep valid barcodes with no manual steps.
                 </p>
               </div>
             </div>
           </div>
-
         </div>
 
-        {/* RIGHT COLUMN (5 Cols) */}
         <div className="lg:col-span-5 space-y-6">
+          <DataExportTools selectedStores={selectedStores} canExportDb={canExportDb} />
 
-          {/* Export / Import */}
-          <div className="bg-white dark:bg-black/20 p-5 rounded-[2rem] border border-gray-200 dark:border-white/5 shadow-md space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              
-              {/* Export Panel */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Download className="w-4 h-4 text-blue-500" />
-                  <h4 className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-wider">Export</h4>
-                </div>
-                <p className="text-[10px] text-gray-500 font-medium">Backup selected tables to JSON file.</p>
-                <Button
-                  type="button"
-                  onClick={handleExport}
-                  disabled={isExporting || selectedStores.size === 0 || !canExportDb}
-                  className="w-full !py-2.5 !rounded-xl !text-[9px] !font-black !gap-1.5 !bg-blue-600 hover:!bg-blue-700 !shadow-md disabled:!opacity-40"
-                >
-                  {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileJson className="h-3.5 h-3.5" />}
-                  {isExporting ? 'Exporting...' : 'Export'}
-                </Button>
-              </div>
-
-              {/* Import Panel */}
-              <div className="space-y-3 border-t sm:border-t-0 sm:border-l border-gray-100 dark:border-white/5 sm:pl-4 pt-3 sm:pt-0">
-                <div className="flex items-center gap-2">
-                  <Upload className="w-4 h-4 text-primary" />
-                  <h4 className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-wider">Import</h4>
-                </div>
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`flex items-center gap-2 p-2 rounded-xl border border-dashed cursor-pointer transition-all ${selectedFile
-                    ? 'border-emerald-300 dark:border-primary/40 bg-emerald-50/50 dark:bg-primary/5'
-                    : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.02]'
-                    }`}
-                >
-                  <FileJson className={`w-4 h-4 shrink-0 ${selectedFile ? 'text-primary' : 'text-gray-400'}`} />
-                  <span className={`text-[10px] font-bold truncate ${selectedFile ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-400'}`}>
-                    {selectedFile ? selectedFile.name : 'Select file'}
-                  </span>
-                </div>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileSelect}
-                  accept=".json"
-                  className="hidden"
-                />
-                <Button
-                  type="button"
-                  onClick={handleImport}
-                  disabled={isImporting || !selectedFile || selectedStores.size === 0 || !canExportDb}
-                  className="w-full !py-2.5 !rounded-xl !text-[9px] !font-black !gap-1.5 !shadow-md hover:!bg-emerald-700 disabled:!opacity-40"
-                >
-                  {isImporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 h-3.5" />}
-                  {isImporting ? 'Importing...' : 'Import'}
-                </Button>
-              </div>
-
-            </div>
-
-            {/* Nested Safety Notice */}
-            <div className="p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/25 rounded-xl flex items-start gap-2">
-              <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-[9px] text-amber-800/80 dark:text-amber-400/60 font-bold leading-relaxed uppercase tracking-wider">
-                Import merges records. Duplicates are auto-skipped by ID/SKU/Barcode/Invoice.
-              </p>
-            </div>
-            {!canExportDb && (
-              <div className="p-3 bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/25 rounded-xl flex items-start gap-2">
-                <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                <p className="text-[9px] text-rose-800/80 dark:text-rose-400/60 font-bold leading-relaxed uppercase tracking-wider">
-                  Database export / import / reset is admin-only.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* System Reset */}
           <div className="bg-red-50/40 dark:bg-red-950/10 p-5 rounded-[2rem] border border-red-100 dark:border-red-950/20 shadow-sm space-y-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 bg-red-100 dark:bg-red-900/20 rounded-xl flex items-center justify-center shrink-0">
@@ -757,9 +161,7 @@ export function DatabaseTools() {
               Purge Local Database
             </Button>
           </div>
-
         </div>
-
       </div>
     </div>
   );

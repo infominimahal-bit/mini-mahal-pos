@@ -4,7 +4,6 @@ import { Supplier } from '../../../types';
 import { Modal } from '../../../shared/ui/Modal';
 import { Button, Select } from '../../../shared/ui';
 import { cn } from '../../../lib/utils';
-import { useTranslation } from '../../../hooks/useTranslation';
 
 interface SupplierModalProps {
   isOpen: boolean;
@@ -14,7 +13,6 @@ interface SupplierModalProps {
 }
 
 export function SupplierModal({ isOpen, onClose, onSave, supplier }: SupplierModalProps) {
-  const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<Partial<Supplier>>({
     name: '',
@@ -70,7 +68,7 @@ export function SupplierModal({ isOpen, onClose, onSave, supplier }: SupplierMod
         onClick={onClose}
         className="!bg-transparent !border-rose-200 dark:!border-rose-900/30 !text-[#ff4b6e] hover:!bg-rose-50 dark:hover:!bg-rose-500/10 !px-4 sm:!px-6 !py-2.5 sm:!py-3.5 !text-[9px] sm:!text-[10px] !font-black !rounded-2xl shrink-0"
       >
-        {t('discard_upper', 'DISCARD')}
+        {"DISCARD"}
       </Button>
       <Button
         type="submit"
@@ -84,7 +82,7 @@ export function SupplierModal({ isOpen, onClose, onSave, supplier }: SupplierMod
           <Save className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
         )}
         <span className="leading-none ml-2">
-          {supplier ? t('update_partner', 'UPDATE PARTNER') : t('register_partner', 'REGISTER PARTNER')}
+          {supplier ? "UPDATE PARTNER" : "REGISTER PARTNER"}
         </span>
       </Button>
     </div>
@@ -94,7 +92,7 @@ export function SupplierModal({ isOpen, onClose, onSave, supplier }: SupplierMod
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={supplier ? t('edit_supplier_account', 'EDIT SUPPLIER ACCOUNT') : t('register_new_partner', 'REGISTER NEW PARTNER')}
+      title={supplier ? "EDIT SUPPLIER ACCOUNT" : "REGISTER NEW PARTNER"}
       maxWidth="lg"
       footer={footer}
     >
@@ -103,12 +101,12 @@ export function SupplierModal({ isOpen, onClose, onSave, supplier }: SupplierMod
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
             <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-            {t('business_profile', 'Business Profile')}
+            {"Business Profile"}
           </h3>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('legal_entity', 'Legal Entity *')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Legal Entity *"}</label>
               <input
                 type="text"
                 required
@@ -119,7 +117,7 @@ export function SupplierModal({ isOpen, onClose, onSave, supplier }: SupplierMod
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('lead_contact', 'Lead Contact')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Lead Contact"}</label>
               <input
                 type="text"
                 className="w-full bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all font-medium"
@@ -129,7 +127,7 @@ export function SupplierModal({ isOpen, onClose, onSave, supplier }: SupplierMod
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('business_mobile', 'Business Mobile *')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Business Mobile *"}</label>
               <input
                 type="text"
                 required
@@ -146,12 +144,12 @@ export function SupplierModal({ isOpen, onClose, onSave, supplier }: SupplierMod
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
             <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-            {t('operational_data', 'Operational Data')}
+            {"Operational Data"}
           </h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('operational_email', 'Operational Email')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Operational Email"}</label>
               <input
                 type="email"
                 className="w-full bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all font-medium"
@@ -161,7 +159,7 @@ export function SupplierModal({ isOpen, onClose, onSave, supplier }: SupplierMod
               />
             </div>
              <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('tax_identity_ntn', 'Tax Identity (NTN)')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Tax Identity (NTN)"}</label>
               <input
                 type="text"
                 className="w-full bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all font-medium"
@@ -177,27 +175,27 @@ export function SupplierModal({ isOpen, onClose, onSave, supplier }: SupplierMod
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
             <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-            {t('classification_terms', 'Classification & Terms')}
+            {"Classification & Terms"}
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('business_type', 'Business Type')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Business Type"}</label>
               <Select
                 value={formData.businessType || ''}
                 onChange={e => setFormData({ ...formData, businessType: e.target.value })}
               >
-                <option value="">{t('select_type', 'Select type')}</option>
-                <option value="Manufacturer">{t('manufacturer', 'Manufacturer')}</option>
-                <option value="Distributor">{t('distributor', 'Distributor')}</option>
-                <option value="Wholesaler">{t('wholesaler', 'Wholesaler')}</option>
-                <option value="Retailer">{t('retailer', 'Retailer')}</option>
-                <option value="Agent">{t('agent', 'Agent')}</option>
-                <option value="Other">{t('other', 'Other')}</option>
+                <option value="">{"Select type"}</option>
+                <option value="Manufacturer">{"Manufacturer"}</option>
+                <option value="Distributor">{"Distributor"}</option>
+                <option value="Wholesaler">{"Wholesaler"}</option>
+                <option value="Retailer">{"Retailer"}</option>
+                <option value="Agent">{"Agent"}</option>
+                <option value="Other">{"Other"}</option>
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('payment_terms', 'Payment Terms')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Payment Terms"}</label>
               <input
                 type="text"
                 className="w-full bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all font-medium"
@@ -207,16 +205,16 @@ export function SupplierModal({ isOpen, onClose, onSave, supplier }: SupplierMod
               />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('rating', 'Rating')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Rating"}</label>
               <Select
                 value={String(formData.rating ?? 5)}
                 onChange={e => setFormData({ ...formData, rating: Number(e.target.value) })}
               >
-                <option value="5">{t('rating_5', '5 — Excellent')}</option>
-                <option value="4">{t('rating_4', '4 — Good')}</option>
-                <option value="3">{t('rating_3', '3 — Average')}</option>
-                <option value="2">{t('rating_2', '2 — Poor')}</option>
-                <option value="1">{t('rating_1', '1 — Bad')}</option>
+                <option value="5">{"5 — Excellent"}</option>
+                <option value="4">{"4 — Good"}</option>
+                <option value="3">{"3 — Average"}</option>
+                <option value="2">{"2 — Poor"}</option>
+                <option value="1">{"1 — Bad"}</option>
               </Select>
             </div>
           </div>
@@ -226,12 +224,12 @@ export function SupplierModal({ isOpen, onClose, onSave, supplier }: SupplierMod
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
             <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-            {t('logistics_initial_state', 'Logistics & Initial State')}
+            {"Logistics & Initial State"}
           </h3>
           
           <div className="space-y-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{t('distribution_hub_address', 'Distribution Hub Address')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Distribution Hub Address"}</label>
               <textarea
                 className="w-full bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl p-4 focus:ring-2 focus:ring-emerald-500 transition-all font-medium min-h-[80px] resize-none"
                 placeholder="Complete location for logistics..."
@@ -242,7 +240,7 @@ export function SupplierModal({ isOpen, onClose, onSave, supplier }: SupplierMod
 
             {!supplier && (
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-rose-500 uppercase tracking-wider">{t('initial_debt_balance', 'Initial Debt Balance')}</label>
+                <label className="text-[10px] font-black text-rose-500 uppercase tracking-wider">{"Initial Debt Balance"}</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -252,7 +250,7 @@ export function SupplierModal({ isOpen, onClose, onSave, supplier }: SupplierMod
                     placeholder="0.00"
                     inputMode="decimal"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-rose-600/50 dark:text-rose-400/50 font-bold text-[10px] uppercase tracking-widest">{t('opening_debt', 'Opening Debt')}</span>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-rose-600/50 dark:text-rose-400/50 font-bold text-[10px] uppercase tracking-widest">{"Opening Debt"}</span>
                 </div>
               </div>
             )}

@@ -1,0 +1,125 @@
+import { BundleCardDesktop } from './BundleCardDesktop';
+import { BundleCardMobile } from './BundleCardMobile';
+import { BundleCardExpanded } from './BundleCardExpanded';
+import type { Bundle, Product } from '../../../types';
+
+interface BundleCardProps {
+  bundle: Bundle;
+  products: Product[];
+  appSettings: any;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  canManage: boolean;
+  onEdit: () => void;
+  onToggleActive: () => void;
+  onDelete: () => void;
+  actionMenuOpen: boolean;
+  menuUpward: boolean;
+  onToggleMenu: (bundleId: string, e: React.MouseEvent) => void;
+  onCloseMenu: () => void;
+}
+
+export function BundleCard({
+  bundle,
+  products,
+  appSettings,
+  isExpanded,
+  onToggleExpand,
+  canManage,
+  onEdit,
+  onToggleActive,
+  onDelete,
+  actionMenuOpen,
+  menuUpward,
+  onToggleMenu,
+  onCloseMenu,
+}: BundleCardProps) {
+  const isExpandedLocal = isExpanded;
+  let totalPrice = 0;
+  let itemCount = 0;
+  let productImages: { bi: any; product: any }[] = [];
+
+  if (bundle.isCombo && bundle.slots) {
+    totalPrice = bundle.slots.reduce((sum: number, slot: any) => {
+      const maxPriceOpt = slot.options.reduce((max: number, opt: any) => {
+        const p = products.find(pr => pr.id === opt.productId);
+        return Math.max(max, p ? p.price : 0);
+      }, 0);
+      return sum + (maxPriceOpt * slot.requiredQuantity);
+    }, 0);
+    itemCount = bundle.slots.reduce((s, slot: any) => s + (slot.requiredQuantity || 1), 0);
+    productImages = bundle.slots.reduce((acc: any[], slot: any) => {
+      const opts = slot.options.map((opt: any) => ({
+        bi: { id: opt.id, quantity: 1 },
+        product: products.find(p => p.id === opt.productId)
+      })).filter(x => !!x.product);
+      return [...acc, ...opts];
+    }, []);
+  } else {
+    totalPrice = (bundle.items || []).reduce((sum, bi) => {
+      const p = products.find(pr => pr.id === bi.productId);
+      return sum + (p ? p.price * bi.quantity : 0);
+    }, 0);
+    itemCount = (bundle.items || []).reduce((s, bi) => s + (bi.quantity || 1), 0);
+    productImages = (bundle.items || [])
+      .map(bi => ({ bi, product: products.find(p => p.id === bi.productId) }))
+      .filter((x): x is { bi: typeof bi; product: NonNullable<typeof x.product> } => !!x.product);
+  }
+
+  const discAmt = bundle.discountType === 'percentage'
+    ? (totalPrice * bundle.discountValue) / 100
+    : Math.min(bundle.discountValue, totalPrice);
+  const finalAmt = totalPrice - discAmt;
+
+  return (
+    <div
+      key={bundle.id}
+      className={`bg-white dark:bg-surface rounded-2xl border transition-all ${bundle.active ? 'border-gray-200 dark:border-white/5' : 'border-gray-100 dark:border-white/[0.02] opacity-60'} overflow-visible shadow-sm`}
+    >
+      <BundleCardDesktop
+        bundle={bundle}
+        appSettings={appSettings}
+        isExpandedLocal={isExpandedLocal}
+        canManage={canManage}
+        onToggleExpand={onToggleExpand}
+        onEdit={onEdit}
+        onToggleActive={onToggleActive}
+        onDelete={onDelete}
+        itemCount={itemCount}
+        discAmt={discAmt}
+        totalPrice={totalPrice}
+        finalAmt={finalAmt}
+      />
+
+      <BundleCardMobile
+        bundle={bundle}
+        appSettings={appSettings}
+        isExpandedLocal={isExpandedLocal}
+        canManage={canManage}
+        onToggleExpand={onToggleExpand}
+        onEdit={onEdit}
+        onToggleActive={onToggleActive}
+        onDelete={onDelete}
+        actionMenuOpen={actionMenuOpen}
+        menuUpward={menuUpward}
+        onToggleMenu={onToggleMenu}
+        onCloseMenu={onCloseMenu}
+        itemCount={itemCount}
+        discAmt={discAmt}
+        totalPrice={totalPrice}
+        finalAmt={finalAmt}
+        productImages={productImages}
+      />
+
+      {isExpandedLocal && (
+        <BundleCardExpanded
+          bundle={bundle}
+          products={products}
+          appSettings={appSettings}
+          totalPrice={totalPrice}
+          finalAmt={finalAmt}
+        />
+      )}
+    </div>
+  );
+}

@@ -3,13 +3,10 @@ import { Users, CreditCard } from 'lucide-react';
 import { SubTabBar, SubTab } from '../../shared/ui';
 import { UserManager } from './UserManager';
 import { SalesmanManager } from './SalesmanManager';
-import { useTranslation } from '../../hooks/useTranslation';
 
 export function UsersPage() {
   const { subTab } = useParams<{ subTab: string }>();
   const navigate = useNavigate();
-  const { t } = useTranslation();
-
   // Route /users to /users/staff by default
   if (!subTab || !['staff', 'salesmen'].includes(subTab)) {
     return <Navigate to="/users/staff" replace />;
@@ -18,12 +15,12 @@ export function UsersPage() {
   const tabs: SubTab[] = [
     {
       id: 'staff',
-      label: t('system_users', 'SYSTEM USERS'),
+      label: "SYSTEM USERS",
       icon: <Users className="w-3.5 h-3.5" />,
     },
     {
       id: 'salesmen',
-      label: t('salesmen', 'SALESMEN'),
+      label: "SALESMEN",
       icon: <CreditCard className="w-3.5 h-3.5" />,
     }
   ];

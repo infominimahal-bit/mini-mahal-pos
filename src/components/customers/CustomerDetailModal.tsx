@@ -1,3 +1,4 @@
+import { useCustomersStore, useSalesStore, useSettingsStore } from '../../stores';
 import { useState, useMemo, useEffect } from 'react';
 import { Phone, CreditCard, ShoppingBag, Receipt, MessageCircle, ChevronRight, User } from 'lucide-react';
 import { Customer, Sale } from '../../types';
@@ -6,10 +7,9 @@ import { formatCurrency } from '../../lib/currencies';
 import { formatAppDateTime } from '../../lib/dateUtils';
 import { Modal } from '../../shared/ui/Modal';
 import { cn } from '../../lib/utils';
-import { useTranslation } from '../../hooks/useTranslation';
 import { TransactionDetailModal } from '../transactions/TransactionDetailModal';
 import { Badge, Button, EmptyState, Pagination, usePagination } from '../../shared/ui';
-import { getEffectiveTotal } from '../reports/ReportsManager';
+import { getEffectiveTotal } from '../reports/useReportsData';
 
 interface CustomerDetailModalProps {
   customer: Customer;
@@ -17,22 +17,23 @@ interface CustomerDetailModalProps {
 }
 
 export function CustomerDetailModal({ customer: initialCustomer, onClose }: CustomerDetailModalProps) {
-  const { state, dispatch } = useApp();
-  const { t } = useTranslation();
+  const appCustomers = useCustomersStore(s => s.customers);
+const appSales = useSalesStore(s => s.sales);
+const appSettings = useSettingsStore(s => s.settings);
   const [activeTab, setActiveTab] = useState<'details' | 'transactions'>('details');
   const [viewingTransaction, setViewingTransaction] = useState<Sale | null>(null);
 
   // Always read fresh customer from state
   const customer = useMemo(() =>
-    state.customers.find(c => c.id === initialCustomer.id) || initialCustomer,
-    [state.customers, initialCustomer]
+    appCustomers.find(c => c.id === initialCustomer.id) || initialCustomer,
+    [appCustomers, initialCustomer]
   );
 
   const customerTransactions = useMemo(() => {
-    return state.sales
+    return appSales
       .filter(sale => sale.customerId === customer.id)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [state.sales, customer.id]);
+  }, [appSales, customer.id]);
 
   const totalTransactions = customerTransactions.length;
   const totalSpent = customerTransactions.reduce((sum, sale) => sum + getEffectiveTotal(sale), 0);
@@ -46,13 +47,13 @@ export function CustomerDetailModal({ customer: initialCustomer, onClose }: Cust
         onClick={onClose}
         className="!min-h-0 !ml-auto !px-4 sm:!px-8 !py-2.5 sm:!py-3 !text-[9px] sm:!text-[11px] !font-black !rounded-2xl sm:!rounded-full !border-gray-200 dark:!border-white/10 !shrink-0"
       >
-        {t('close')}
+        {"close"}
       </Button>
     </div>
   );
 
   const tabs = [
-    { id: 'details', label: t('details'), icon: User },
+    { id: 'details', label: "details", icon: User },
     { id: 'transactions', label: `Sales (${totalTransactions})`, icon: Receipt },
   ];
 
@@ -85,18 +86,18 @@ export function CustomerDetailModal({ customer: initialCustomer, onClose }: Cust
               {/* Stats Grid */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="bg-primary/5 border border-primary/10 p-5 rounded-[1.5rem] relative overflow-hidden">
-                  <p className="text-primary/60 dark:text-emerald-400/60 text-[9px] font-black uppercase tracking-[0.2em] mb-1">{t('total_spent')}</p>
-                  <p className="text-xl font-black text-primary dark:text-emerald-400">{formatCurrency(totalSpent, state.settings.currency)}</p>
+                  <p className="text-primary/60 dark:text-emerald-400/60 text-[9px] font-black uppercase tracking-[0.2em] mb-1">{"total_spent"}</p>
+                  <p className="text-xl font-black text-primary dark:text-emerald-400">{formatCurrency(totalSpent, appSettings.currency)}</p>
                   <ShoppingBag className="absolute -bottom-2 -right-2 h-12 w-12 text-primary/10" />
                 </div>
                 <div className="bg-blue-500/5 border border-blue-500/10 p-5 rounded-[1.5rem] relative overflow-hidden">
-                  <p className="text-blue-600/60 dark:text-blue-400/60 text-[9px] font-black uppercase tracking-[0.2em] mb-1">{t('total_orders')}</p>
+                  <p className="text-blue-600/60 dark:text-blue-400/60 text-[9px] font-black uppercase tracking-[0.2em] mb-1">{"total_orders"}</p>
                   <p className="text-xl font-black text-blue-600 dark:text-blue-400">{totalTransactions}</p>
                   <Receipt className="absolute -bottom-2 -right-2 h-12 w-12 text-blue-500/10" />
                 </div>
                 <div className="bg-indigo-500/5 border border-indigo-500/10 p-5 rounded-[1.5rem] relative overflow-hidden">
-                  <p className="text-indigo-600/60 dark:text-indigo-400/60 text-[9px] font-black uppercase tracking-[0.2em] mb-1">{t('average_sale')}</p>
-                  <p className="text-xl font-black text-indigo-600 dark:text-indigo-400">{formatCurrency(averageTransaction, state.settings.currency)}</p>
+                  <p className="text-indigo-600/60 dark:text-indigo-400/60 text-[9px] font-black uppercase tracking-[0.2em] mb-1">{"average_sale"}</p>
+                  <p className="text-xl font-black text-indigo-600 dark:text-indigo-400">{formatCurrency(averageTransaction, appSettings.currency)}</p>
                   <CreditCard className="absolute -bottom-2 -right-2 h-12 w-12 text-indigo-500/10" />
                 </div>
               </div>
@@ -106,7 +107,7 @@ export function CustomerDetailModal({ customer: initialCustomer, onClose }: Cust
                 <div className="space-y-4">
                   <h3 className="text-[11px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
                     <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-                    {t('contact_info')}
+                    {"contact_info"}
                   </h3>
                   <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-black/20 rounded-2xl border border-gray-200 dark:border-white/5">
                     <div className="flex items-center gap-4">
@@ -137,7 +138,7 @@ export function CustomerDetailModal({ customer: initialCustomer, onClose }: Cust
                 <div className="space-y-4">
                   <h3 className="text-[11px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
                     <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-                    {t('details')}
+                    {"details"}
                   </h3>
                   <div className="bg-gray-50 dark:bg-black/20 p-6 rounded-[24px] space-y-4">
                     <div className="flex justify-between items-end">
@@ -169,10 +170,10 @@ export function CustomerDetailModal({ customer: initialCustomer, onClose }: Cust
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="text-[10px] font-black text-gray-900 dark:text-white uppercase">#{tx.invoiceNumber || tx.receiptNumber || 'N/A'}</p>
-                            <p className="text-[8px] font-bold text-gray-500 mt-0.5">{formatAppDateTime(tx.timestamp, state.settings.country)}</p>
+                            <p className="text-[8px] font-bold text-gray-500 mt-0.5">{formatAppDateTime(tx.timestamp, appSettings.country)}</p>
                           </div>
                           <div className="flex items-center gap-2">
-                            <p className="text-lg font-black text-blue-600">{formatCurrency(tx.total, state.settings.currency)}</p>
+                            <p className="text-lg font-black text-blue-600">{formatCurrency(tx.total, appSettings.currency)}</p>
                             <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
                           </div>
                         </div>

@@ -1,3 +1,4 @@
+import { useAppStore, useSettingsStore } from '../../stores';
 import React, { useEffect, useRef } from 'react';
 import { Sale } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
@@ -9,8 +10,10 @@ interface KOTPrintProps {
 }
 
 export function KOTPrint({ sale }: KOTPrintProps) {
-  const { state } = useApp();
-  const settings = state.settings;
+  const appSettings = useSettingsStore(s => s.settings);
+const appBundles = useAppStore(s => s.bundles);
+
+  const settings = appSettings;
   const { play } = useSoundFeedback();
 
   const isPrintingRef = useRef(false);
@@ -143,7 +146,7 @@ export function KOTPrint({ sale }: KOTPrintProps) {
         if (firstCartItem) {
           const bundleIdFull = firstCartItem.bundleId || firstCartItem.bundle_id;
           const originalBundleDefId = bundleIdFull?.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/)?.[0] || bundleIdFull;
-          const bundleDef = state.bundles?.find(bd => bd.id === originalBundleDefId);
+          const bundleDef = appBundles?.find(bd => bd.id === originalBundleDefId);
           
           if (bundleDef && bundleDef.items && bundleDef.items.length > 0) {
             const firstBi = bundleDef.items[0];

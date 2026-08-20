@@ -1,0 +1,113 @@
+import { supabase } from '../../lib/supabase'
+import { User } from '../../types'
+import { can } from '../../lib/permissions'
+import { sonner } from '../../lib/sonner'
+import { localDb } from '../../lib/localDb'
+import { hashPasswordString, getAuthErrorMessage } from '../../lib/authUtils'
+import { AuthMethodDeps } from './context'
+
+export async function signUpImpl(email: string, password: string, name: string, username: string, deps: AuthMethodDeps) {
+  deps.setLoading(true);
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name, username } }
+    });
+
+    if (error) throw error;
+
+    if (data.user && !data.session) {
+      deps.setLoading(false);
+      sonner.success(
+        'Account created! ✅ Please check your email and click the confirmation link to activate your account.'
+      );
+      return;
+    }
+
+    if (data.user) {
+      const { count } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true });
+      const isFirstUser = (count ?? 1) === 0;
+      const userRole = isFirstUser ? 'admin' : 'cashier';
+
+      const profilePayload: any = {
+        id: data.user.id,
+        username,
+        name,
+        email,
+        role: userRole,
+        permissions: isFirstUser
+          ? ['pos_access', 'view_reports', 'manage_inventory', 'manage_users', 'manage_settings']
+          : ['pos_access', 'view_reports'],
+        can_edit_price: isFirstUser,
+        can_give_discount: true,
+        can_delete_sale: isFirstUser,
+        can_view_profit: isFirstUser,
+        can_manage_stock: false,
+        can_manage_po: false,
+        can_view_records: true,
+        active: true,
+      };
+
+      const { data: profileData, error: profileError } = await supabase
+        .from('users')
+        .upsert(profilePayload, { onConflict: 'id' })
+        .select()
+        .maybeSingle();
+
+      if (profileError) {
+        console.warn('[Auth] Profile upsert warning (non-fatal):', profileError);
+      }
+
+      const pData = profileData || profilePayload;
+      try {
+        const hash = await hashPasswordString(password);
+        localStorage.setItem(`offline_hash_${email}`, hash);
+        (pData as any).offlineHash = hash;
+        await localDb.users.put(pData);
+      } catch (e) {
+        console.warn('[Auth] Failed to cache offline credentials:', e);
+      }
+
+      if (pData) {
+        deps.setProfile({
+          id: pData.id,
+          username: pData.username,
+          name: pData.name,
+          email: pData.email,
+          role: pData.role as any,
+          permissions: pData.permissions || [],
+          canEditPrice: can(pData.role, 'edit_price'),
+          canGiveDiscount: can(pData.role, 'give_discount'),
+          canDeleteSale: can(pData.role, 'delete_sale'),
+          canViewProfit: can(pData.role, 'view_profit'),
+          canManageStock: can(pData.role, 'manage_stock'),
+          canManagePO: can(pData.role, 'manage_po'),
+          canViewRecords: can(pData.role, 'view_records'),
+          active: pData.active ?? true,
+          lastLogin: pData.last_login ? new Date(pData.last_login) : undefined,
+          avatar: pData.avatar || undefined,
+        });
+        localStorage.setItem('pos_offline_profile', JSON.stringify(pData));
+      }
+      deps.setLoading(false);
+      sonner.success('Welcome! ✅ Account created successfully as Admin.');
+      localStorage.setItem('pos_session_start', new Date().toISOString());
+    }
+
+    deps.setLoading(false);
+  } catch (error: any) {
+    deps.setLoading(false);
+    const msg = error.message || error.toString();
+    if (msg.includes('User already registered') || msg.includes('already been registered')) {
+      sonner.error('This email is already registered. Please sign in instead.');
+    } else if (msg.toLowerCase().includes('email')) {
+      sonner.error('Please enter a valid email address.');
+    } else {
+      sonner.error(`Sign Up Failed: ${getAuthErrorMessage(msg)}`);
+    }
+    throw error;
+  }
+}

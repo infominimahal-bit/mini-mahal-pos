@@ -1,10 +1,9 @@
+import { useSalesStore, useSettingsStore } from '../../stores';
 import { FileText, Trash2, X, ShoppingCart } from 'lucide-react';
 import { Sale } from '../../types';
 import { formatCurrency } from '../../lib/currencies';
 import { salesService } from '../../lib/services';
 import { useApp } from '../../context/SupabaseAppContext';
-import { useTranslation } from '../../hooks/useTranslation';
-
 import { Modal } from '../../shared/ui/Modal';
 
 interface DraftsModalProps {
@@ -14,10 +13,9 @@ interface DraftsModalProps {
 }
 
 export function DraftsModal({ isOpen, onClose, onLoadDraft }: DraftsModalProps) {
-    const { state, dispatch } = useApp();
-    const { t } = useTranslation();
-
-    const drafts = state.sales
+    const appSales = useSalesStore(s => s.sales);
+const appSettings = useSettingsStore(s => s.settings);
+    const drafts = appSales
         .filter(sale => sale.notes?.includes('DRAFT_SALE'))
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
@@ -26,7 +24,7 @@ export function DraftsModal({ isOpen, onClose, onLoadDraft }: DraftsModalProps) 
         try {
             await salesService.delete(id);
             // Update global state so draft count badge and modal list updates instantly
-            dispatch({ type: 'DELETE_SALE', payload: id });
+            useSalesStore.getState().deleteSale(id);
         } catch (error) {
             console.error('Error deleting draft:', error);
         }
@@ -36,8 +34,8 @@ export function DraftsModal({ isOpen, onClose, onLoadDraft }: DraftsModalProps) 
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title={t('draft_archives', 'Draft Archives')}
-            subtitle={t('suspended_sessions', 'Suspended Protocol • {count} Sessions').replace('{count}', drafts.length.toString())}
+            title={"Draft Archives"}
+            subtitle={"Suspended Protocol • {count} Sessions".replace('{count}', drafts.length.toString())}
             maxWidth="lg"
             footer={
                 <div className="flex items-center justify-end w-full">
@@ -45,7 +43,7 @@ export function DraftsModal({ isOpen, onClose, onLoadDraft }: DraftsModalProps) 
                         onClick={onClose}
                         className="w-full sm:w-auto sm:min-w-[240px] px-4 sm:px-8 py-2.5 sm:py-3.5 rounded-2xl text-[9px] sm:text-[11px] font-black uppercase tracking-widest bg-gray-200 dark:bg-white/5 text-gray-700 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white transition-all active:scale-95"
                     >
-                        {t('close_archive', 'Close Archive')}
+                        {"Close Archive"}
                     </button>
                 </div>
             }
@@ -57,9 +55,9 @@ export function DraftsModal({ isOpen, onClose, onLoadDraft }: DraftsModalProps) 
                             <FileText className="h-12 w-12 text-gray-600 dark:text-gray-500" />
                         </div>
                         <div>
-                            <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">{t('vault_empty', 'Vault Empty')}</h3>
+                            <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">{"Vault Empty"}</h3>
                             <p className="text-[10px] text-gray-600 dark:text-gray-400 max-w-sm mx-auto mt-2 font-black uppercase tracking-widest leading-relaxed">
-                                {t('no_suspended_sessions', 'No suspended sales sessions registered.')}
+                                {"No suspended sales sessions registered."}
                             </p>
                         </div>
                     </div>
@@ -78,7 +76,7 @@ export function DraftsModal({ isOpen, onClose, onLoadDraft }: DraftsModalProps) 
                                         </div>
                                         <div className="min-w-0">
                                             <p className="text-[11px] font-black uppercase tracking-widest text-gray-900 dark:text-white truncate">
-                                                {draft.customerName || t('walk_in_client', 'Walk-in Client')}
+                                                {draft.customerName || "Walk-in Client"}
                                             </p>
                                             <p className="text-[9px] text-gray-600 dark:text-gray-500 font-bold uppercase tracking-widest mt-1">
                                                 {new Date(draft.timestamp).toLocaleString()}
@@ -94,10 +92,10 @@ export function DraftsModal({ isOpen, onClose, onLoadDraft }: DraftsModalProps) 
                                 </div>
                                 <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-white/5">
                                     <span className="text-[9px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest">
-                                        {draft.items.length} {t('items_captured', 'Items Captured')}
+                                        {draft.items.length} {"Items Captured"}
                                     </span>
                                     <span className="text-xl font-black text-primary dark:text-emerald-400">
-                                        {formatCurrency(draft.total, state.settings.currency)}
+                                        {formatCurrency(draft.total, appSettings.currency)}
                                     </span>
                                 </div>
                             </div>

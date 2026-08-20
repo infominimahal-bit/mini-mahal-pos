@@ -1,3 +1,4 @@
+import { useAppStore, useProductsStore, useSettingsStore } from '../stores';
 import { useMemo, useRef } from 'react';
 import { X, Image as ImageIcon, MousePointer2, Package, Trash2, Plus, Upload } from 'lucide-react';
 import { useApp } from '../context/SupabaseAppContext';
@@ -16,7 +17,10 @@ interface MediaLibraryProps {
 }
 
 export function MediaLibrary({ isOpen, onClose, onSelect, standalone }: MediaLibraryProps) {
-  const { state, dispatch } = useApp();
+  const appSettings = useSettingsStore(s => s.settings);
+const appProducts = useProductsStore(s => s.products);
+const appBundles = useAppStore(s => s.bundles);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUploadClick = () => {
@@ -51,7 +55,7 @@ export function MediaLibrary({ isOpen, onClose, onSelect, standalone }: MediaLib
     e.stopPropagation();
 
     // Check if it's the store logo
-    if (imageUrl === state.settings?.storeLogo) {
+    if (imageUrl === appSettings?.storeLogo) {
       sonner.alert('System Asset', 'Store Logo cannot be deleted from Media Library.');
       return;
     }
@@ -63,18 +67,18 @@ export function MediaLibrary({ isOpen, onClose, onSelect, standalone }: MediaLib
 
     if (isConfirmed) {
       try {
-        const productsToUpdate = state.products.filter((p: any) => p.image === imageUrl);
+        const productsToUpdate = appProducts.filter((p: any) => p.image === imageUrl);
         const idsToUpdate = productsToUpdate.map((p: any) => p.id);
 
         if (idsToUpdate.length > 0) {
           // Use 'image: null' for deletion in DB update (Supabase may prefer null to undefined)
           await productsService.bulkUpdate(idsToUpdate, { image: null as any });
 
-          const updatedProducts = state.products.map((p: any) =>
+          const updatedProducts = appProducts.map((p: any) =>
             idsToUpdate.includes(p.id) ? { ...p, image: undefined, updatedAt: new Date() } : p
           );
 
-          dispatch({ type: 'SET_PRODUCTS', payload: updatedProducts });
+          useProductsStore.getState().setProducts(updatedProducts);
 
           sonner.success(`Image removed from ${idsToUpdate.length} product(s).`);
         }
@@ -90,17 +94,17 @@ export function MediaLibrary({ isOpen, onClose, onSelect, standalone }: MediaLib
     const uniqueImages = new Map<string, any>();
 
     // Add store logo first
-    if (state.settings?.storeLogo && (state.settings.storeLogo.startsWith('http') || state.settings.storeLogo.startsWith('data:image'))) {
-      uniqueImages.set(state.settings.storeLogo, {
+    if (appSettings?.storeLogo && (appSettings.storeLogo.startsWith('http') || appSettings.storeLogo.startsWith('data:image'))) {
+      uniqueImages.set(appSettings.storeLogo, {
         id: 'logo',
         name: 'Store Logo',
         sku: 'SYSTEM',
-        image: state.settings.storeLogo,
+        image: appSettings.storeLogo,
         isSystem: true
       });
     }
 
-    state.products
+    appProducts
       .filter((p: any) => !!p.image && typeof p.image === 'string' && (p.image.startsWith('http') || p.image.startsWith('data:image')))
       .forEach((p: any) => {
         if (!uniqueImages.has(p.image)) {
@@ -115,8 +119,8 @@ export function MediaLibrary({ isOpen, onClose, onSelect, standalone }: MediaLib
       });
 
     // Scan bundles (deals) for custom banners to enable image reuse
-    if (state.bundles) {
-      state.bundles
+    if (appBundles) {
+      appBundles
         .filter((b: any) => !!b.image && typeof b.image === 'string' && (b.image.startsWith('http') || b.image.startsWith('data:image')))
         .forEach((b: any) => {
           if (!uniqueImages.has(b.image)) {
@@ -132,7 +136,7 @@ export function MediaLibrary({ isOpen, onClose, onSelect, standalone }: MediaLib
     }
 
     return Array.from(uniqueImages.values());
-  }, [state.products, state.settings?.storeLogo, state.bundles]);
+  }, [appProducts, appSettings?.storeLogo, appBundles]);
 
   if (!isOpen) return null;
 

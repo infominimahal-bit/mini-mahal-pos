@@ -33,12 +33,12 @@ export type Permission =
   | 'manage_discounts'
   | 'view_customers'
   | 'manage_customers'
-  | 'view_online_orders'
   | 'view_settings'
   | 'manage_settings'
   | 'view_users'
   | 'manage_users'
   | 'edit_price'
+  | 'edit_sale'
   | 'give_discount'
   | 'delete_sale'
   | 'refund_sale'
@@ -68,12 +68,12 @@ export const PERMISSIONS: Record<Role, Record<Permission, boolean>> = {
     manage_discounts: true,
     view_customers: true,
     manage_customers: true,
-    view_online_orders: true,
     view_settings: true,
     manage_settings: true,
     view_users: true,
     manage_users: true,
     edit_price: true,
+    edit_sale: true,
     give_discount: true,
     delete_sale: true,
     refund_sale: true,
@@ -101,12 +101,12 @@ export const PERMISSIONS: Record<Role, Record<Permission, boolean>> = {
     manage_discounts: true,
     view_customers: true,
     manage_customers: true,
-    view_online_orders: true,
     view_settings: true,
     manage_settings: true,
     view_users: true,
     manage_users: true,
     edit_price: true,
+    edit_sale: true,
     give_discount: true,
     delete_sale: true,
     refund_sale: true,
@@ -134,12 +134,12 @@ export const PERMISSIONS: Record<Role, Record<Permission, boolean>> = {
     manage_discounts: false,
     view_customers: true,
     manage_customers: false,
-    view_online_orders: true,
     view_settings: false, // cannot open Settings page
     manage_settings: false,
     view_users: false, // cannot open Users page
     manage_users: false,
     edit_price: false,
+    edit_sale: false,
     give_discount: true,
     delete_sale: false, // server-guarded: only admin/manager
     refund_sale: true, // limited (refund_unlimited = false)
@@ -167,12 +167,12 @@ export const PERMISSIONS: Record<Role, Record<Permission, boolean>> = {
     manage_discounts: false,
     view_customers: true,
     manage_customers: false,
-    view_online_orders: false,
     view_settings: false,
     manage_settings: false,
     view_users: false,
     manage_users: false,
     edit_price: false,
+    edit_sale: false,
     give_discount: true,
     delete_sale: false,
     refund_sale: false, // server-guarded: cashier+ only, salesman excluded

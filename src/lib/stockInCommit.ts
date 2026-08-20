@@ -1,5 +1,7 @@
 import { generateId, purchaseRecordsService, suppliersService } from './services';
 import { localDb } from './localDb';
+import { useInventoryStore } from '../stores/inventoryStore';
+import { useProductsStore } from '../stores/productsStore';
 
 /**
  * Shared single source of truth for committing stock-in entries to inventory.
@@ -10,9 +12,9 @@ import { localDb } from './localDb';
  * Per item:
  *  1. Creates a Purchase Record via purchaseRecordsService.create
  *     (handles product stock update, last-cost update + stock_history internally)
- *  2. Dispatches ADD_PURCHASE_RECORD to global state
+ *  2. Updates the inventory store (ADD_PURCHASE_RECORD)
  *  3. Optionally records the supplier ledger bill (when toggle is ON + supplier matched)
- *  4. Re-reads the fresh product from localDb and dispatches UPDATE_PRODUCT
+ *  4. Re-reads the fresh product from localDb and updates the products store (UPDATE_PRODUCT)
  */
 
 export interface StockInCommitItem {
@@ -33,7 +35,6 @@ interface StockInCommitParams {
   recordAsSupplierBill?: boolean;
   suppliers: { id: string; name: string }[];
   profile?: { email?: string | null } | null;
-  dispatch: (action: { type: string; payload?: any }) => void;
   date?: Date;
 }
 
@@ -69,7 +70,7 @@ export async function commitStockInToInventory({
       notes: item.notes || `Stock In | ${date.toLocaleDateString()}`
     });
 
-    dispatch({ type: 'ADD_PURCHASE_RECORD', payload: newRecord });
+    useInventoryStore.getState().addPurchaseRecord(newRecord);
 
     // Record supplier ledger transaction if toggle is ON and a supplier is associated
     if (recordAsSupplierBill && supplier !== 'PO TRANSIT' && supplier !== 'DIRECT ENTRY') {
@@ -95,7 +96,7 @@ export async function commitStockInToInventory({
     const freshProduct = await localDb.products.get(item.id);
     if (freshProduct) {
       lastProduct = freshProduct;
-      dispatch({ type: 'UPDATE_PRODUCT', payload: freshProduct });
+      useProductsStore.getState().updateProduct(freshProduct);
     }
   }
 

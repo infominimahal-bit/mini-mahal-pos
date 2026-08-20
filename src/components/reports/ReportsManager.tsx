@@ -1,1012 +1,52 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
-import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Wallet, Package, Users, DollarSign, Clock, FileText, PieChart as PieIcon, Truck, LayoutGrid, Store, BarChart3, RefreshCw, Zap, Coffee, Fuel, Home, Megaphone, Wrench, ShieldCheck, MoreHorizontal, ChevronLeft, Briefcase } from 'lucide-react';
-
-import { useApp } from '../../context/SupabaseAppContext';
-import { subDays, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from 'date-fns';
-import { formatCurrency, formatNumberWithPrecision } from '../../lib/currencies';
-import { formatAppDate, formatAppDateTime, formatAppDateChart, getTimezone, getStartOfDayInTimezone, getEndOfDayInTimezone, getStartOfInputDayInTimezone, getEndOfInputDayInTimezone } from '../../lib/dateUtils';
-import { EXPENSE_CATEGORIES, Sale, Expense } from '../../types';
-import InventoryReportManager from '../inventory/InventoryReportManager';
-import { supabase } from '../../lib/supabase';
-import { sonner } from '../../lib/sonner';
-import {
-  salesService,
-  expensesService,
-  categoriesService,
-  customersService,
-  getAmountByMethod
-} from '../../lib/services';
+import React, { useState, useEffect } from 'react';
+import { LayoutGrid, TrendingUp, Store, Truck, Users, Wallet, Briefcase } from 'lucide-react';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
+import { SkeletonLoader } from '../../shared/ui/SkeletonLoader';
+import { DateRangePicker } from '../../shared/ui';
+
 import { SalesReport } from './tabs/SalesReport';
 import { ExpensesReport } from './tabs/ExpensesReport';
 import { CustomersReport } from './tabs/CustomersReport';
 import { FinancialReport } from './tabs/FinancialReport';
 import { InventoryReport } from './tabs/InventoryReport';
-import { SkeletonLoader } from '../../shared/ui/SkeletonLoader';
 import { SuppliersReport } from './tabs/SuppliersReport';
 import { SalesmenReport } from './tabs/SalesmenReport';
-import { DateRangePicker, Button } from '../../shared/ui';
+import { ReportHeader } from './shared/ReportHeader';
 
-import { useNavigate, useParams } from 'react-router-dom';
+import { useReportsData } from './useReportsData';
+import { useParams } from 'react-router-dom';
 import { useTranslation } from '../../hooks/useTranslation';
 
-export const getItemCOGS = (item: any): { cost: number; isEstimated: boolean } => {
-  // Priority 1: FIFO cost saved at sale time (most accurate)
-  if (item.purchaseCost && item.purchaseCost > 0) {
-    return { cost: item.purchaseCost, isEstimated: false };
-  }
-
-  // Priority 2: Current product cost (fallback, less accurate for old sales)
-  if (item.product?.cost && item.product.cost > 0) {
-    const qty = item.weight ? item.weight : (item.quantity || 1);
-    return { cost: item.product.cost * qty, isEstimated: true };
-  }
-
-  // Priority 3: Missing cost — return 0 but don't spam console
-  return { cost: 0, isEstimated: true };
-};
-
-
-export function getEffectiveTotal(sale: any): number {
-  if (sale.status === 'refunded' || sale.status === 'deleted') return 0;
-  if (sale.status === 'partially_refunded') return (sale.total || 0) - (sale.refundedAmount || 0);
-  return sale.total || 0;
-}
-
-// Net units actually sold for an item, subtracting returned units so partially
-// refunded sales don't over-count inventory/quantity moved.
-export function netItemQty(item: any): number {
-  const base = item?.weight ? Number(item.weight) : (Number(item?.quantity) || 0);
-  return Math.max(0, base - (Number(item?.refundedQuantity) || 0));
-}
-
-export function getItemRevenue(item: any, sale: Sale): number {
-  const extraChargesTotal = (sale.extraCharges || []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-  // Net Bill Total = Total - Tax - Extra Charges (This is the amount actually paid for products)
-  const netBillTotal = (getEffectiveTotal(sale)) - (Number(sale.taxAmount) || 0) - extraChargesTotal;
-
-  // Total of all item subtotals (price * qty - line_discount)
-  const saleItemsSubtotal = sale.items?.reduce((sum, i) => sum + (Number(i.subtotal) || 0), 0) || 0;
-
-  // Distribution ratio accounts for bill-level discounts
-  const distributionRatio = saleItemsSubtotal > 0 ? netBillTotal / saleItemsSubtotal : 1;
-
-  return (Number(item.subtotal) || 0) * distributionRatio;
-}
-
-
-
-const CATEGORY_ICONS: Record<string, any> = {
-  'Utilities': Zap,
-  'Food': Coffee,
-  'Fuel': Fuel,
-  'Rent': Home,
-  'Salaries': Users,
-  'Supplies': Package,
-  'Marketing': Megaphone,
-  'Maintenance': Wrench,
-  'Insurance': ShieldCheck,
-  'Taxes': FileText,
-  'Other': MoreHorizontal
-};
-
 export function ReportsManager() {
-  const navigate = useNavigate();
   const { subTab } = useParams();
-  const { state } = useApp();
   const { t } = useTranslation();
-
-  const [dateRange, setDateRange] = useState('today');
-  const userRole = state.currentUser?.role;
-  const userPerms = state.currentUser?.permissions || [];
-  const hasFullAccess = userRole === 'admin' || userRole === 'manager' || userPerms.includes('access_reports');
 
   const validReportTypes = ['sales', 'inventory', 'customers', 'expenses', 'financial', 'suppliers', 'salesmen'] as const;
   type ReportType = typeof validReportTypes[number];
-  const reportType = (validReportTypes.includes(subTab as ReportType) ? subTab : 'sales') as ReportType;
-  const [repairing, setRepairing] = useState(false);
-  const [repairProgress, setRepairProgress] = useState<number | null>(null);
+  const reportTypeParam = (validReportTypes.includes(subTab as ReportType) ? subTab : 'sales') as ReportType;
 
-  const handleRepairData = async () => {
-    const confirmed = await sonner.confirm(
-      'Repair Legacy Data?',
-      'This will audit all legacy sales and backfill missing cost data for precise reporting. Proceed?',
-      'YES, REPAIR'
-    );
-    if (!confirmed.isConfirmed) return;
+  const data = useReportsData(reportTypeParam);
 
-    setRepairing(true);
-    setRepairProgress(0);
-    sonner.loading('Auditing Data... 0%');
-    try {
-      const count = await salesService.patchLegacySales((percent) => {
-        setRepairProgress(percent);
-        sonner.update('Auditing Data...', `${percent}% Complete`);
-      });
-      sonner.close();
-      await sonner.alert('Data Audit Complete', `Patched ${count} legacy sales records.`);
-      window.location.reload();
-    } catch (error) {
-      console.error('Repair failed:', error);
-      sonner.close();
-      await sonner.alert('Repair Failed', 'Failed to repair data. Check console for details.');
-    } finally {
-      setRepairing(false);
-      setRepairProgress(null);
-    }
-  };
+  const {
+    dateRange, setDateRange, startDateInput, setStartDateInput, endDateInput, setEndDateInput,
+    selectedSupplier, setSelectedSupplier, selectedCategory, setSelectedCategory,
+    selectedCashier, setSelectedCashier, selectedSalesman, setSelectedSalesman,
+    selectedSaleType, setSelectedSaleType, selectedPayment, setSelectedPayment,
+    reportType, validStartDate, validEndDate, isDataLoading, filteredSales, filteredExpenses,
+    salesData, categoryData, saleTypeData, topProducts, featureAnalytics, totalRevenue,
+    totalTransactions, averageTransaction, totalCostOfGoods, grossProfit, totalExpenseAmount,
+    netProfit, walletStats, customerData, salesmanData, expensesTrendData, expenseCategoryData,
+    suppliers, categories, cashiers, salesmenList, paymentMethods, appSettings, appUsers,
+    appCurrentUser
+  } = data;
 
-  const isDraftSale = (sale: any) =>
-    sale.invoiceNumber?.startsWith('DRAFT-') ||
-    sale.notes?.includes('Draft sale') ||
-    sale.notes?.includes('DRAFT_SALE');
-
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-
-  const checkScroll = () => {
-    if (scrollRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-      const hasOverflow = scrollWidth > clientWidth + 1;
-      setCanScrollLeft(hasOverflow && scrollLeft > 2);
-      setCanScrollRight(hasOverflow && scrollLeft + clientWidth < scrollWidth - 2);
-    }
-  };
-
-  useEffect(() => {
-    checkScroll();
-    window.addEventListener('resize', checkScroll);
-    return () => window.removeEventListener('resize', checkScroll);
-  }, [reportType]);
-
-  const scrollTabs = (direction: 'left' | 'right') => {
-    if (scrollRef.current) {
-      const scrollAmount = 200;
-      scrollRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
-      });
-      setTimeout(checkScroll, 300);
-    }
-  };
-  const [startDateInput, setStartDateInput] = useState('');
-  const [endDateInput, setEndDateInput] = useState('');
-  const [selectedSupplier, setSelectedSupplier] = useState('All');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedCashier, setSelectedCashier] = useState('All');
-  const [selectedSalesman, setSelectedSalesman] = useState('All');
-
-  const [selectedSaleType, setSelectedSaleType] = useState<'all' | 'retail' | 'wholesale' | 'estore'>('all');
-  const [selectedPayment, setSelectedPayment] = useState('All');
-
-  // Performance: Defer heavy content to prevent navigation jitter
-  const [isRendered, setIsRendered] = useState(true);
+  const [isRendered, setIsRendered] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setIsRendered(true), 150);
     return () => clearTimeout(timer);
   }, []);
 
-  const { validStartDate, validEndDate } = useMemo(() => {
-    const timezone = getTimezone(state?.settings?.country ?? 'US');
-    const now = new Date();
-    let startDate: Date;
-    let endDate: Date;
-
-    if (dateRange === 'custom') {
-      startDate = startDateInput
-        ? new Date(getStartOfInputDayInTimezone(startDateInput, timezone).getTime())
-        : new Date(getStartOfDayInTimezone(now, timezone).getTime());
-      endDate = endDateInput
-        ? new Date(getEndOfInputDayInTimezone(endDateInput, timezone).getTime())
-        : new Date(getEndOfDayInTimezone(now, timezone).getTime());
-    } else if (dateRange === 'today') {
-      startDate = getStartOfDayInTimezone(now, timezone);
-      endDate = getEndOfDayInTimezone(now, timezone);
-    } else if (dateRange === 'yesterday') {
-      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      startDate = getStartOfDayInTimezone(yesterday, timezone);
-      endDate = getEndOfDayInTimezone(yesterday, timezone);
-    } else if (dateRange === 'last7') {
-      const last7 = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
-      startDate = getStartOfDayInTimezone(last7, timezone);
-      endDate = getEndOfDayInTimezone(now, timezone);
-    } else if (dateRange === 'thisMonth') {
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      startDate = getStartOfDayInTimezone(startOfMonth, timezone);
-      endDate = getEndOfDayInTimezone(now, timezone);
-    } else if (dateRange === 'lastMonth') {
-      const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lmEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-      startDate = getStartOfDayInTimezone(lm, timezone);
-      endDate = getEndOfDayInTimezone(lmEnd, timezone);
-    } else if (dateRange === 'all') {
-      startDate = new Date(Date.UTC(2000, 0, 1));
-      endDate = getEndOfDayInTimezone(now, timezone);
-    } else {
-      // Fallback
-      startDate = getStartOfDayInTimezone(now, timezone);
-      endDate = getEndOfDayInTimezone(now, timezone);
-    }
-
-    return { validStartDate: startDate, validEndDate: endDate };
-  }, [dateRange, startDateInput, endDateInput, state?.settings?.country]);
-
-  // Report-specific data (fetched from localDb based on range)
-  const [reportSales, setReportSales] = useState<Sale[]>([]);
-  const [reportRefunds, setReportRefunds] = useState<Sale[]>([]);
-  const [reportExpenses, setReportExpenses] = useState<Expense[]>([]);
-  const [isDataLoading, setIsDataLoading] = useState(false);
-
-  // Performance: Cache report data to avoid redundant fetches
-  const reportCache = useRef<Record<string, { sales: any[], refunds: any[], expenses: any[], timestamp: number }>>({});
-  const [reportRefreshKey, setReportRefreshKey] = useState(0);
-
-  // Invalidate cache on sync events OR realtime state changes so reports reflect latest data
-  useEffect(() => {
-    const handleSync = () => {
-      reportCache.current = {};
-      setReportRefreshKey(k => k + 1);
-    };
-    window.addEventListener('pendingops-changed', handleSync);
-    // Force-refresh on window focus / tab visible so figures never go stale
-    const handleFocus = () => { reportCache.current = {}; setReportRefreshKey(k => k + 1); };
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') handleFocus();
-    });
-    return () => {
-      window.removeEventListener('pendingops-changed', handleSync);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, []);
-
-  // Invalidate cache immediately when local state changes via realtime events
-  useEffect(() => {
-    reportCache.current = {};
-  }, [state.sales, state.expenses, state.payments]);
-
-  useEffect(() => {
-    const fetchReportData = async () => {
-      const cacheKey = `${validStartDate.toISOString()}-${validEndDate.toISOString()}`;
-
-      // 1. Check Memory Cache (Instant)
-      if (reportCache.current[cacheKey] && Date.now() - reportCache.current[cacheKey].timestamp < 10000) {
-        console.log('[Reports] Using cached data for range:', cacheKey);
-        setReportSales(reportCache.current[cacheKey].sales);
-        setReportRefunds(reportCache.current[cacheKey].refunds);
-        setReportExpenses(reportCache.current[cacheKey].expenses);
-        return;
-      }
-
-      // 2. Try Local DB Load (Instant-ish, unblocks UI)
-      try {
-        const [lSales, lRefunds, lExpenses] = await Promise.all([
-          salesService.getReportSalesLocal(validStartDate, validEndDate),
-          salesService.getReportRefundsLocal(validStartDate, validEndDate),
-          expensesService.getReportExpensesLocal(validStartDate, validEndDate)
-        ]);
-
-        setReportSales(lSales);
-        setReportRefunds(lRefunds);
-        setReportExpenses(lExpenses);
-      } catch (e) {
-        console.warn('[Reports] Local fetch failed:', e);
-      }
-
-      // 3. Background Sync (Remote fetch)
-      setIsDataLoading(true);
-      try {
-        const [sales, refunds, expenses] = await Promise.all([
-          salesService.getReportSales(validStartDate, validEndDate),
-          salesService.getReportRefunds(validStartDate, validEndDate),
-          expensesService.getReportExpenses(validStartDate, validEndDate)
-        ]);
-
-        // Update cache
-        reportCache.current[cacheKey] = {
-          sales,
-          refunds,
-          expenses,
-          timestamp: Date.now()
-        };
-
-        setReportSales(sales);
-        setReportRefunds(refunds);
-        setReportExpenses(expenses);
-      } catch (e) {
-        console.error("Report data fetch failed:", e);
-      } finally {
-        setIsDataLoading(false);
-      }
-    };
-    fetchReportData();
-  }, [validStartDate, validEndDate, state.sales, state.expenses, reportRefreshKey]);
-
-  useEffect(() => {
-    const missingCostItems = reportSales
-      .flatMap(s => s.items || [])
-      .filter(i => !i.purchaseCost || i.purchaseCost === 0);
-
-    if (missingCostItems.length > 0) {
-      console.warn(
-        `[COGS] ${missingCostItems.length} items using fallback cost. ` +
-        `These are pre-FIFO sales — cost accuracy is estimated.`
-      );
-    }
-  }, [reportSales]);
-
-  const cashiers = useMemo(() => {
-    const userNames = state.users.map(u => u.name).filter(c => c && c.toUpperCase() !== 'UNKNOWN');
-    const saleCashiers = reportSales.map(s => s.cashier).filter(c => c && c.toUpperCase() !== 'UNKNOWN');
-    const combined = new Set([...userNames, ...saleCashiers]);
-    if (state.currentUser?.name && state.currentUser.name.toUpperCase() !== 'UNKNOWN') combined.add(state.currentUser.name);
-    return ['All', ...Array.from(combined).sort()];
-  }, [reportSales, state.users, state.currentUser]);
-
-  const salesmenList = useMemo(() => {
-    const activeNames = state.salesmen?.map(s => s.name).filter(Boolean) || [];
-    const userNames = state.users.map(u => u.name).filter(Boolean);
-    const saleSalesmen = reportSales.map(s => s.salesmanName).filter(Boolean);
-    const combined = new Set([...activeNames, ...userNames, ...saleSalesmen]);
-    return ['All', ...Array.from(combined).sort()];
-  }, [reportSales, state.salesmen, state.users]);
-
-  const suppliers = useMemo(() => {
-    // Show all registered suppliers to ensure visibility, even if no products are assigned yet
-    const registeredSuppliers = state.suppliers.map(s => s.name).filter(Boolean);
-    const productSuppliers = state.products.map(p => p.supplier).filter(Boolean);
-    return ['All', ...Array.from(new Set([...registeredSuppliers, ...productSuppliers])).sort()];
-  }, [state.suppliers, state.products]);
-
-  const categories = useMemo(() => {
-    if (reportType === 'expenses') {
-      return ['All', ...EXPENSE_CATEGORIES];
-    }
-
-    // For Sales report, only show categories that have actually been sold
-    if (reportType === 'sales') {
-      const soldCategories = new Set<string>();
-      reportSales.forEach(sale => {
-        sale.items?.forEach(item => {
-          if (item.product?.category) soldCategories.add(item.product.category);
-        });
-      });
-      return ['All', ...Array.from(soldCategories).sort()];
-    }
-
-    // For other reports (Inventory/Suppliers), show categories that have products
-    const activeProductCategories = new Set(state.products.map(p => p.category).filter(Boolean));
-    return ['All', ...Array.from(activeProductCategories).sort()];
-  }, [state.products, reportSales, reportType]);
-
-  const paymentMethods = useMemo(() => {
-    const methods = new Set<string>(['cash', 'card', 'online']);
-    reportSales.forEach(s => { if (s.paymentMethod) methods.add(s.paymentMethod) });
-    reportExpenses.forEach(e => { if (e.paymentMethod) methods.add(e.paymentMethod) });
-    return ['All', ...Array.from(methods).sort()];
-  }, [reportSales, reportExpenses]);
-
-  const filteredSales = useMemo(() => {
-    // PARTIAL-REFUND DEDUPE (universal rule): getReportSales includes 'partially_refunded'
-    // AND getReportRefunds includes it — without dedupe the refund amount is subtracted
-    // TWICE from revenue. Merge by id, reportSales copy wins, refunds only add NEW ids.
-    const salesById = new Map<string, any>();
-    reportSales.forEach(s => { if (s && s.id) salesById.set(s.id, s); });
-    reportRefunds.forEach(s => { if (s && s.id && !salesById.has(s.id)) salesById.set(s.id, s); });
-
-    const allSalesRaw = Array.from(salesById.values());
-
-    // Unroll addonItems into separate line items for accurate reporting
-    const allSales = allSalesRaw.map(sale => {
-      if (!sale || !sale.items) return sale;
-      let hasAddons = false;
-
-      const unrolledItems = sale.items.flatMap(item => {
-        if (!item.addonItems || item.addonItems.length === 0) return [item];
-        hasAddons = true;
-
-        let addonSubtotalSum = 0;
-        let addonCostSum = 0;
-
-        const parentQty = Math.abs(Number(item.weight || item.quantity) || 0);
-        const addonsAsItems = item.addonItems.map(addon => {
-          const addonSubtotal = (addon.price || 0) * (addon.quantity || 1) * parentQty;
-          addonSubtotalSum += addonSubtotal;
-
-          const actualAddonProd = state.products.find(p => p.id === addon.addon.addonProductId);
-          const addonCost = (actualAddonProd?.cost || 0) * (addon.quantity || 1) * parentQty;
-          addonCostSum += addonCost;
-
-          return {
-            id: `${item.id}-addon-${addon.addon.id}`,
-            product: actualAddonProd || { id: addon.addon.addonProductId, name: addon.name, category: 'Add-ons' },
-            quantity: (addon.quantity || 1) * parentQty,
-            // Propagate the parent's refunded quantity so partially-refunded addons
-            // don't over-count COGS/revenue (B8).
-            refundedQuantity: (addon.quantity || 1) * (item.refundedQuantity || 0),
-            subtotal: addonSubtotal,
-            purchaseCost: addonCost, // Approximate fallback cost
-            isAddon: true
-          };
-        });
-
-        return [
-          {
-            ...item,
-            subtotal: Math.max(0, (item.subtotal || 0) - addonSubtotalSum),
-            purchaseCost: Math.max(0, (item.purchaseCost || 0) - addonCostSum)
-          },
-          ...addonsAsItems
-        ];
-      });
-
-      if (hasAddons) {
-        return { ...sale, items: unrolledItems };
-      }
-      return sale;
-    });
-
-    return allSales.filter(sale => {
-      if (!sale || !sale.items || isDraftSale(sale)) return false;
-
-      if (selectedSupplier !== 'All') {
-        const hasSupplier = sale.items.some(item => item.product?.supplier === selectedSupplier);
-        if (!hasSupplier) return false;
-      }
-
-      if (selectedCategory !== 'All') {
-        const hasCategory = sale.items.some(item => item.product?.category === selectedCategory);
-        if (!hasCategory) return false;
-      }
-
-      if (selectedCashier !== 'All') {
-        if (sale.cashier !== selectedCashier) return false;
-      }
-
-      if (selectedSalesman !== 'All') {
-        if (sale.salesmanName !== selectedSalesman) return false;
-      }
-
-      if (selectedSaleType !== 'all') {
-        const type = sale.saleType || 'retail';
-        if (type !== selectedSaleType) return false;
-      }
-
-      if (selectedPayment !== 'All') {
-        if (sale.paymentMethod !== selectedPayment.toLowerCase()) return false;
-      }
-
-      return true;
-    });
-  }, [reportSales, reportRefunds, selectedSupplier, selectedCategory, selectedCashier, selectedSalesman, selectedSaleType, selectedPayment, state.products]);
-
-  const filteredExpenses = useMemo(() => {
-    return reportExpenses.filter(expense => {
-      if (selectedCategory !== 'All' && expense.category !== selectedCategory) return false;
-
-      if (selectedPayment !== 'All') {
-        if (expense.paymentMethod !== selectedPayment.toLowerCase()) return false;
-      }
-
-      if (selectedSaleType !== 'all') {
-        if (expense.storeType !== selectedSaleType) return false;
-      }
-
-      if (selectedCashier !== 'All') {
-        const cashierUser = state.users.find(u => u.name === selectedCashier || u.username === selectedCashier);
-        const expenseUserId = (expense as any).userId || (expense as any).cashierId || (expense as any).addedBy;
-        if (expenseUserId !== selectedCashier && expenseUserId !== cashierUser?.id) return false;
-      }
-
-      return true;
-    });
-  }, [reportExpenses, selectedCategory, selectedPayment, selectedSaleType, selectedCashier, state.users]);
-
-  // Sales Analytics
-  const salesData = useMemo(() => {
-    const salesByDay: Record<string, { date: string; sales: number; transactions: number }> = {};
-    // Derive the day span from the actual (already-correct) date range instead of
-    // parseInt(dateRange) — dateRange is a keyword ('today'/'last7'/'thisMonth'/'all'),
-    // so parseInt() was always NaN → 1 day, hiding all historical data.
-    const days = Math.max(1, Math.round((validEndDate.getTime() - validStartDate.getTime()) / 86400000) + 1);
-
-    for (let i = days - 1; i >= 0; i--) {
-      const date = formatAppDateChart(subDays(validEndDate, i), state.settings?.country);
-      salesByDay[date] = { date, sales: 0, transactions: 0 };
-    }
-
-    filteredSales.filter(s => s.status === 'completed' || s.status === 'partially_refunded').forEach(sale => {
-      if (!sale?.timestamp) return;
-      const saleDate = new Date(sale.timestamp);
-      if (isNaN(saleDate.getTime())) return;
-      const date = formatAppDateChart(saleDate, state.settings?.country);
-      if (salesByDay[date]) {
-        salesByDay[date].sales += getEffectiveTotal(sale);
-        // Count returns as negative transactions or just don't increment as a positive sale
-        salesByDay[date].transactions += (sale.total < 0 ? -1 : 1);
-      }
-    });
-
-
-    return Object.values(salesByDay);
-  }, [filteredSales, dateRange, validEndDate]);
-
-  // Top Products
-  const topProducts = useMemo(() => {
-    const productSales: Record<string, { name: string; quantity: number; revenue: number }> = {};
-
-    filteredSales.filter(s => s.status === 'completed' || s.status === 'partially_refunded').forEach(sale => {
-      sale.items.forEach(item => {
-        const productId = item.product?.id || 'deleted';
-        if (!productSales[productId]) {
-          productSales[productId] = {
-            name: item.product?.name || 'Deleted Product',
-            quantity: 0,
-            revenue: 0,
-          };
-        }
-        productSales[productId].quantity += netItemQty(item);
-        productSales[productId].revenue += getItemRevenue(item, sale);
-      });
-    });
-
-    return Object.values(productSales)
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 5);
-  }, [filteredSales]);
-
-  // Feature Analytics (Services, Modifiers, Variants)
-  const featureAnalytics = useMemo(() => {
-    let serviceRevenue = 0;
-    let productRevenue = 0;
-    let modifiersRevenue = 0;
-    const variantSales: Record<string, { name: string; quantity: number; revenue: number }> = {};
-
-    filteredSales.filter(s => s.status === 'completed' || s.status === 'partially_refunded').forEach(sale => {
-      sale.items.forEach(item => {
-        const itemRev = getItemRevenue(item, sale);
-
-        if (item.product?.isService) {
-          serviceRevenue += itemRev;
-        } else {
-          productRevenue += itemRev;
-        }
-
-        if (item.selectedModifiers && item.selectedModifiers.length > 0) {
-          item.selectedModifiers.forEach(mod => {
-            const modRev = (mod.price || 0) * netItemQty(item);
-            modifiersRevenue += modRev;
-          });
-        }
-        if (item.addonItems && item.addonItems.length > 0) {
-          item.addonItems.forEach(addon => {
-            const modRev = addon.subtotal || 0;
-            modifiersRevenue += modRev;
-          });
-        }
-        if (item.toppings && item.toppings.length > 0) {
-          item.toppings.forEach(topping => {
-            const modRev = (topping.price || 0) * netItemQty(item);
-            modifiersRevenue += modRev;
-          });
-        }
-
-        if (item.selectedVariant) {
-          const varKey = `${item.product?.name} (${item.selectedVariant})`;
-          if (!variantSales[varKey]) {
-            variantSales[varKey] = { name: varKey, quantity: 0, revenue: 0 };
-          }
-          variantSales[varKey].quantity += netItemQty(item);
-          variantSales[varKey].revenue += itemRev;
-        }
-      });
-    });
-
-    return {
-      serviceRevenue,
-      productRevenue,
-      modifiersRevenue,
-      topVariants: Object.values(variantSales).sort((a, b) => b.revenue - a.revenue).slice(0, 5)
-    };
-  }, [filteredSales]);
-
-  // Category Distribution
-  const categoryData = useMemo(() => {
-    const categories: Record<string, { name: string; value: number }> = {};
-
-    filteredSales.filter(s => s.status === 'completed' || s.status === 'partially_refunded').forEach(sale => {
-      sale.items.forEach(item => {
-        const category = item.product?.category || 'Uncategorized';
-        if (!categories[category]) {
-          categories[category] = { name: category, value: 0 };
-        }
-        categories[category].value += item.subtotal;
-      });
-    });
-
-    return Object.values(categories);
-  }, [filteredSales]);
-
-  // Sale Type Distribution (New)
-  const saleTypeData = useMemo(() => {
-    const types: Record<string, { name: string; value: number }> = {
-      retail: { name: 'Retail', value: 0 },
-      wholesale: { name: 'Wholesale', value: 0 },
-      estore: { name: 'E-Store', value: 0 }
-    };
-
-    filteredSales.filter(s => s.status === 'completed' || s.status === 'partially_refunded').forEach(sale => {
-      if (!sale) return;
-      const type = sale.saleType || 'retail';
-      if (types[type]) {
-        types[type].value += getEffectiveTotal(sale);
-      }
-    });
-
-    const retailEnabled = state?.settings?.retailEnabled ?? true;
-    const wholesaleEnabled = state?.settings?.wholesaleEnabled ?? false;
-    const estoreEnabled = state?.settings?.estoreEnabled ?? false;
-
-    return Object.values(types).filter(t => {
-      if (t.name === 'Retail' && !retailEnabled) return false;
-      if (t.name === 'Wholesale' && !wholesaleEnabled) return false;
-      if (t.name === 'E-Store' && !estoreEnabled) return false;
-      return t.value > 0;
-    });
-  }, [filteredSales, state.settings]);
-
-  // Expense Analytics
-  const expensesTrendData = useMemo(() => {
-    const expensesByDay: Record<string, { date: string; amount: number; count: number }> = {};
-    // Derive span from the actual date range (same fix as salesData B3) — dateRange
-    // is a keyword ('today'/'last7'/...), so parseInt() was always NaN → 1 day,
-    // collapsing the expense trend to a single day regardless of selection.
-    const days = Math.max(1, Math.round((validEndDate.getTime() - validStartDate.getTime()) / 86400000) + 1);
-
-    for (let i = days - 1; i >= 0; i--) {
-      const date = formatAppDateChart(subDays(validEndDate, i), state?.settings?.country ?? 'US');
-      expensesByDay[date] = { date, amount: 0, count: 0 };
-    }
-
-    filteredExpenses.forEach(expense => {
-      const date = formatAppDateChart(expense.date, state?.settings?.country ?? 'US');
-      if (expensesByDay[date]) {
-        expensesByDay[date].amount += Number(expense.amount);
-        expensesByDay[date].count += 1;
-      }
-    });
-
-    return Object.values(expensesByDay);
-  }, [filteredExpenses, dateRange, validEndDate]);
-
-  const expenseCategoryData = useMemo(() => {
-    const categories: Record<string, { name: string; value: number }> = {};
-
-    filteredExpenses.forEach(expense => {
-      const category = expense.category;
-      if (!categories[category]) {
-        categories[category] = { name: category, value: 0 };
-      }
-      categories[category].value += Number(expense.amount);
-    });
-
-    return Object.values(categories);
-  }, [filteredExpenses]);
-
-  // Top Expenses
-  const topExpensesList = useMemo(() => {
-    return [...filteredExpenses]
-      .sort((a, b) => Number(b.amount) - Number(a.amount))
-      .slice(0, 5);
-  }, [filteredExpenses]);
-
-  // Summary Stats - Net Revenue (Completed minus Refunds), NET OF TAX (B1).
-  // Tax is a liability, not profit — previously it was counted into gross profit,
-  // overstating profit by the full tax collected in the period.
-  const totalRevenue = filteredSales.reduce((sum, s) => {
-    const eff = getEffectiveTotal(s);
-    const tax = Number(s.taxAmount) || 0;
-    return sum + Math.max(0, eff - tax);
-  }, 0);
-
-  const totalTransactions = filteredSales.filter(s => s.status === 'completed' || s.status === 'partially_refunded').length;
-  const averageTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
-
-
-  // Profit Analytics
-  const totalCostOfGoods = useMemo(() => {
-    return filteredSales.filter(s => s.status === 'completed' || s.status === 'partially_refunded').reduce((sum, sale) => {
-      const itemsCost = sale.items.reduce((itemSum, item) => {
-        const baseQty = item.weight ? Number(item.weight) : (Number(item.quantity) || 0);
-        const net = netItemQty(item);
-        const ratio = baseQty > 0 ? net / baseQty : 0;
-        const { cost } = getItemCOGS(item);
-        return itemSum + cost * ratio;
-      }, 0);
-      // A6: free gifts have no sale revenue but DO carry cost → include so profit
-      // isn't overstated by the gifted product's cost.
-      const giftsCost = (sale.freeGifts || []).reduce((gSum: number, g: any) => gSum + (Number(g.purchaseCost) || 0), 0);
-      return sum + itemsCost + giftsCost;
-    }, 0);
-  }, [filteredSales]);
-
-  const grossProfit = totalRevenue - totalCostOfGoods;
-  const totalExpenseAmount = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
-  const netProfit = grossProfit - totalExpenseAmount;
-
-  const walletStats = useMemo(() => {
-    return ['cash', 'card', 'online'].map(method => {
-      // Amount from regular sales (including refunded so we get the initial collection before refund subtraction)
-      const validSales = filteredSales.filter(s => s.status === 'completed' || s.status === 'partially_refunded' || s.status === 'refunded' || s.status === 'partially_refunded');
-      const sales = validSales.reduce((a, x) => a + getAmountByMethod(x, method), 0);
-
-      // Breakdown of sales by type
-      const retailSales = validSales.filter(s => (!s.saleType || s.saleType === 'retail')).reduce((a, x) => a + getAmountByMethod(x, method), 0);
-      const wholesaleSales = validSales.filter(s => s.saleType === 'wholesale').reduce((a, x) => a + getAmountByMethod(x, method), 0);
-      const estoreSales = validSales.filter(s => s.saleType === 'estore').reduce((a, x) => a + getAmountByMethod(x, method), 0);
-
-      const expenses = filteredExpenses.filter(e => e.paymentMethod === method).reduce((a, x) => a + Number(x.amount), 0);
-      const refunds = filteredSales.reduce((a, x) => {
-        if (x.status === 'refunded') return a + getAmountByMethod(x, method);
-        if (x.status === 'partially_refunded') {
-          // Approximate proportional refund for split, or direct for others
-          if (x.paymentMethod === 'split') {
-            const ratio = getAmountByMethod(x, method) / (x.total || 1);
-            return a + (x.refundedAmount || 0) * ratio;
-          } else if (x.paymentMethod === method || (!x.paymentMethod && method === 'cash')) {
-            return a + (x.refundedAmount || 0);
-          }
-        }
-        return a;
-      }, 0);
-
-      return {
-        method,
-        sales,
-        expenses,
-        refunds,
-        net: sales - refunds - expenses,
-        retailSales,
-        wholesaleSales,
-        estoreSales
-      };
-    });
-  }, [filteredSales, filteredExpenses]);
-
-  const totalExpenseTransactions = filteredExpenses.length;
-  const averageExpense = totalExpenseTransactions > 0 ? totalExpenseAmount / totalExpenseTransactions : 0;
-
-  // Customer Analytics
-  const customerData = useMemo(() => {
-    const customerStats: Record<string, {
-      id: string;
-      name: string;
-      totalSpent: number;
-      periodSpent: number;
-      lifetimeSpent: number;
-      totalTransactions: number;
-      totalItems: number;
-      avgTransactionValue: number;
-      lastPurchase: Date;
-    }> = {};
-
-    // Add all customers first to include those with no purchases
-    state.customers.forEach(customer => {
-      customerStats[customer.id] = {
-        id: customer.id,
-        name: customer.name,
-        totalSpent: 0,
-        periodSpent: 0,
-        lifetimeSpent: customer.totalPurchases || 0,
-        totalTransactions: 0,
-        totalItems: 0,
-        avgTransactionValue: 0,
-        lastPurchase: new Date(customer.createdAt)
-      };
-    });
-
-    // Add walk-in customers
-    customerStats['walk-in'] = {
-      id: 'walk-in',
-      name: 'Walk-in Customers',
-      totalSpent: 0,
-      periodSpent: 0,
-      lifetimeSpent: 0,
-      totalTransactions: 0,
-      totalItems: 0,
-      avgTransactionValue: 0,
-      lastPurchase: new Date()
-    };
-
-    filteredSales.filter(s => s.status === 'completed' || s.status === 'partially_refunded').forEach(sale => {
-      if (!sale) return;
-      const customerId = sale.customerId || 'walk-in';
-      if (customerStats[customerId]) {
-        customerStats[customerId].totalSpent += getEffectiveTotal(sale);
-        customerStats[customerId].periodSpent += getEffectiveTotal(sale);
-        customerStats[customerId].totalTransactions += 1;
-        customerStats[customerId].totalItems += (sale.items || []).reduce((sum: number, item: any) => sum + netItemQty(item), 0);
-        const sTime = new Date(sale.timestamp);
-        if (!isNaN(sTime.getTime())) {
-          customerStats[customerId].lastPurchase = sTime;
-        }
-      }
-    });
-
-    // Calculate average transaction value
-    Object.values(customerStats).forEach(customer => {
-      customer.avgTransactionValue = customer.totalTransactions > 0
-        ? customer.totalSpent / customer.totalTransactions
-        : 0;
-    });
-
-    return Object.values(customerStats).sort((a, b) => b.totalSpent - a.totalSpent);
-  }, [filteredSales, state.customers]);
-
-
-  // Salesman Analytics
-  const salesmanData = useMemo(() => {
-    const salesmanStats: Record<string, {
-      id: string;
-      name: string;
-      totalSales: number;
-      totalTransactions: number;
-      totalItems: number;
-      avgTransactionValue: number;
-    }> = {};
-
-    // Add all salesmen and users first to include those with no sales
-    [...state.salesmen, ...state.users].forEach(person => {
-      salesmanStats[person.id] = {
-        id: person.id,
-        name: person.name,
-        totalSales: 0,
-        totalTransactions: 0,
-        totalItems: 0,
-        avgTransactionValue: 0
-      };
-    });
-
-    // Add "Unassigned" for sales with no salesman
-    salesmanStats['unassigned'] = {
-      id: 'unassigned',
-      name: 'Unassigned',
-      totalSales: 0,
-      totalTransactions: 0,
-      totalItems: 0,
-      avgTransactionValue: 0
-    };
-
-    filteredSales.filter(s => s.status === 'completed' || s.status === 'partially_refunded').forEach(sale => {
-      if (!sale) return;
-      const salesmanId = sale.salesmanId || 'unassigned';
-      if (salesmanStats[salesmanId]) {
-        salesmanStats[salesmanId].totalSales += getEffectiveTotal(sale);
-        salesmanStats[salesmanId].totalTransactions += 1;
-        salesmanStats[salesmanId].totalItems += (sale.items || []).reduce((sum: number, item: any) => sum + netItemQty(item), 0);
-      } else {
-        // Fallback for sales where salesman was deleted
-        salesmanStats[salesmanId] = {
-          id: salesmanId,
-          name: sale.salesmanName || 'Deleted Salesman',
-          totalSales: getEffectiveTotal(sale),
-          totalTransactions: 1,
-          totalItems: (sale.items || []).reduce((sum: number, item: any) => sum + netItemQty(item), 0),
-          avgTransactionValue: 0
-        };
-      }
-    });
-
-    // Calculate average transaction value
-    Object.values(salesmanStats).forEach(salesman => {
-      salesman.avgTransactionValue = salesman.totalTransactions > 0
-        ? salesman.totalSales / salesman.totalTransactions
-        : 0;
-    });
-
-    return Object.values(salesmanStats).sort((a, b) => b.totalSales - a.totalSales);
-  }, [filteredSales, state.salesmen, state.users]);
-
-
-  // Reset sub-type when main report type changes
-  useEffect(() => {
-    if (reportType !== 'sales') {
-      setSelectedSaleType('all');
-    }
-  }, [reportType]);
-
-  // Inventory Analytics
-  const inventoryData = useMemo(() => {
-    let productsToProcess = state.products;
-
-    if (selectedSupplier !== 'All') {
-      productsToProcess = productsToProcess.filter(p =>
-        p.supplier?.toLowerCase().trim() === selectedSupplier.toLowerCase().trim()
-      );
-    }
-
-    if (selectedCategory !== 'All') {
-      productsToProcess = productsToProcess.filter(p => p.category === selectedCategory);
-    }
-
-    const inventoryStats = productsToProcess.map(product => {
-      const soldQuantity = filteredSales
-        .filter(s => s.status === 'completed' || s.status === 'partially_refunded')
-        .reduce((sum, sale) => {
-          return sum + sale.items
-            .filter(item => item.product?.id === product.id)
-            .reduce((itemSum, item) => itemSum + netItemQty(item), 0);
-        }, 0);
-
-      const revenue = filteredSales
-        .filter(s => s.status === 'completed' || s.status === 'partially_refunded')
-        .reduce((sum, sale) => {
-          return sum + sale.items
-            .filter(item => item.product?.id === product.id)
-            .reduce((itemSum, item) => itemSum + getItemRevenue(item, sale), 0);
-        }, 0);
-
-      const isInfinite = product.trackInventory === false || product.stock >= 990000;
-
-      const batchQtySum = (product.batches || []).reduce((sum, b) => sum + (b.qtyRemaining || 0), 0);
-      const isBatchSyncOk = batchQtySum === product.stock;
-
-      const stockValue = isInfinite
-        ? 0
-        : ((product.batches && product.batches.length > 0 && isBatchSyncOk)
-          ? product.batches.reduce((sum, b) => sum + ((b.qtyRemaining || 0) * b.costPrice), 0)
-          : (product.stock * (product.cost || 0)));
-
-      const potentialRevenue = isInfinite
-        ? 0
-        : (product.stock * (product.isWeightBased ? (product.pricePerUnit || 0) : product.price));
-
-      const turnoverRatio = (!isInfinite && product.stock > 0) ? soldQuantity / product.stock : 0;
-
-      return {
-        id: product.id,
-        name: product.name,
-        sku: product.sku,
-        category: product.category,
-        currentStock: isInfinite ? '∞' : product.stock,
-        minStock: product.minStock,
-        stockStatus: isInfinite ? 'Infinity Mode' : (product.stock <= 0 ? 'Out of Stock' :
-          product.stock <= (product.minStock || 5) ? 'Low Stock' : 'In Stock'),
-        isInfinite,
-        costPrice: product.cost || 0,
-        sellingPrice: product.isWeightBased ? (product.pricePerUnit || 0) : product.price,
-        stockValue: stockValue,
-        potentialRevenue: potentialRevenue,
-        soldQuantity: soldQuantity,
-        revenue: revenue,
-        turnoverRatio: turnoverRatio,
-        profitMargin: product.cost ? (
-          product.isWeightBased
-            ? (((product.pricePerUnit || 0) - product.cost) / (product.pricePerUnit || 1) * 100)
-            : ((product.price - product.cost) / product.price * 100)
-        ) : 0,
-        active: product.active
-      };
-    });
-
-    return inventoryStats.sort((a, b) => {
-      if (reportType === 'inventory') {
-        // Sort by stock status (out of stock first, then low stock)
-        if (a.stockStatus !== b.stockStatus) {
-          const statusOrder = { 'Out of Stock': 0, 'Low Stock': 1, 'In Stock': 2 };
-          return statusOrder[a.stockStatus as keyof typeof statusOrder] - statusOrder[b.stockStatus as keyof typeof statusOrder];
-        }
-      }
-      return b.revenue - a.revenue;
-    });
-  }, [state.products, filteredSales, reportType, selectedSupplier, selectedCategory]);
-
-  const COLORS = ['#2563EB', '#059669', '#D97706', '#DC2626', '#7C3AED', '#EC4899'];
-
-  // Safety check to prevent black screen if settings haven't loaded yet
-  if (!state?.settings) {
+  if (!appSettings) {
     return (
       <div className="p-6 bg-gray-50 dark:bg-transparent">
         <SkeletonLoader type="list" count={6} />
@@ -1032,154 +72,85 @@ export function ReportsManager() {
 
   return (
     <div className="main-content-scroll p-1 lg:p-6 bg-gray-50/50 dark:bg-app space-y-4 lg:space-y-6 max-w-[1400px] mx-auto">
+      
+      <ReportHeader
+        validStartDate={validStartDate}
+        validEndDate={validEndDate}
+        appSettings={appSettings}
+        isDataLoading={isDataLoading}
+        appCurrentUser={appCurrentUser}
+        reportType={reportType}
+      />
 
-      {/* Premium Header Layout */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6">
-        <div className="flex flex-col md:flex-row md:items-center gap-4 sm:gap-6 xl:gap-10">
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="ghost"
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent('navigate', { detail: 'pos' }))}
-              icon={<ChevronLeft className="h-4 w-4" />}
-              className="!min-h-0 !p-2 !rounded-xl !gap-1 !text-gray-600 dark:!text-gray-400 mr-1 !hover:bg-gray-100 dark:!hover:bg-white/5"
-            >
-              <span className="hidden sm:inline text-[8px] font-black uppercase tracking-widest">{t("back", "Back")}</span>
-            </Button>
-            <div className="h-6 w-px bg-gray-200 dark:bg-white/10 mx-1 hidden sm:block" />
-
-
-            <div className="h-6 w-px bg-gray-200 dark:bg-white/10 mx-1 hidden sm:block" />
-            <div className="h-8 w-8 bg-primary/10 rounded-lg flex items-center justify-center shadow-inner border border-primary/10">
-              <PieIcon className="h-4 w-4 text-primary" />
-            </div>
-            <div className="shrink-0 flex items-center gap-3">
-              <div>
-                <h1 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">{t("reports", "Intelligence")}</h1>
-                <p className="hidden sm:block text-gray-600 dark:text-gray-400 text-[7px] font-black uppercase tracking-[0.2em] mt-0.5 opacity-60">
-                  {formatAppDate(validStartDate, state.settings?.country)} - {formatAppDate(validEndDate, state.settings?.country)}
-                </p>
-              </div>
-              {isDataLoading && (
-                <div className="flex items-center gap-2 px-2 py-1 bg-primary/10 border border-primary/20 rounded-lg animate-in fade-in zoom-in duration-300">
-                  <RefreshCw className="h-2.5 w-2.5 text-primary animate-spin" />
-                  <span className="text-[8px] font-black text-primary uppercase tracking-widest">Live Sync</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="chip-nav-container flex-1 lg:flex-none">
-            {[
-              { id: 'sales', label: t("dashboard", "DASHBOARD"), icon: TrendingUp, color: 'bg-primary', show: true },
-              { id: 'inventory', label: t("inventory", "INVENTORY"), icon: Package, color: 'bg-blue-600', show: true },
-              { id: 'customers', label: t("customers", "CUSTOMERS"), icon: Users, color: 'bg-teal-600', show: true },
-              { id: 'expenses', label: t("expenses", "EXPENSES"), icon: FileText, color: 'bg-rose-600', show: true },
-              { id: 'financial', label: t("payments", "PAYMENTS"), icon: DollarSign, color: 'bg-indigo-600', show: true },
-              { id: 'salesmen', label: t("salesmen", "SALESMEN"), icon: Briefcase, color: 'bg-cyan-600', show: true },
-              { id: 'suppliers', label: t("suppliers", "SUPPLIERS"), icon: Truck, color: 'bg-amber-600', show: true },
-            ].filter(tab => {
-              const role = state.currentUser?.role;
-              const perms = state.currentUser?.permissions || [];
-              const hasFullAccess = role === 'admin' || role === 'manager' || perms.includes('access_reports');
-              if (tab.id === 'closing') return false;
-              return hasFullAccess;
-            }).map(tab => {
-              const isActive = reportType === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => navigate('/reports/' + tab.id)}
-                  className={`chip-nav-item ${isActive ? `${tab.color} text-white shadow-lg` : 'text-gray-600'}`}
-                >
-                  <tab.icon className="w-3.5 h-3.5" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-      </div>
-
-      {/* Layer 2: Filter Toolbar (Smart Context) */}
       <div className="relative z-30 bg-white/50 dark:bg-black/20 p-2 lg:p-3 rounded-2xl border border-gray-200/50 dark:border-white/5 shadow-xl ring-1 ring-black/5 dark:ring-white/5">
         <div className="flex flex-col xl:flex-row gap-4">
-          {/* Date Selector Row */}
           <DateRangePicker
             preset={dateRange}
             presets={[
-              { id: 'today', label: t("today", "TODAY") },
-              { id: 'yesterday', label: t("yesterday", "YESTERDAY") },
-              { id: 'last7', label: t("last7", "LAST 7 DAYS") },
-              { id: 'thisMonth', label: t("this_month", "THIS MONTH") },
-              { id: 'lastMonth', label: t("last_month", "PREVIOUS MONTH") },
-              { id: 'custom', label: t("custom", "CUSTOM RANGE") },
-              { id: 'all', label: t("all", "ALL TIME") }
+              { id: 'today', label: "TODAY" },
+              { id: 'yesterday', label: "YESTERDAY" },
+              { id: 'last7', label: "LAST 7 DAYS" },
+              { id: 'thisMonth', label: "THIS MONTH" },
+              { id: 'lastMonth', label: "PREVIOUS MONTH" },
+              { id: 'custom', label: "CUSTOM RANGE" },
+              { id: 'all', label: "ALL TIME" }
             ]}
             onPresetChange={setDateRange}
             startDate={startDateInput}
             endDate={endDateInput}
             onStartDateChange={setStartDateInput}
             onEndDateChange={setEndDateInput}
-            label={t("range", "RANGE")}
+            label={"RANGE"}
             icon={TrendingUp}
           />
 
           <div className="hidden xl:block h-8 w-px bg-gray-200 dark:bg-white/10" />
 
-          {/* Contextual Selectors Grid/Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:flex xl:items-center gap-1.5 lg:gap-2">
             {reportType !== 'customers' && (
               <>
                 <SearchableSelect
-                  label={t("supplier", "SUPPLIER")}
-                  options={[{ id: 'All', label: t("all", "ALL") }, ...suppliers.filter(s => s !== 'All').map(s => ({ id: s, label: s }))]}
+                  label={"SUPPLIER"}
+                  options={[{ id: 'All', label: "ALL" }, ...suppliers.filter(s => s !== 'All').map(s => ({ id: s, label: s }))]}
                   value={selectedSupplier}
                   onChange={setSelectedSupplier}
                   icon={Truck}
                 />
-
                 <SearchableSelect
-                  label={t("category", "CATEGORY")}
-                  options={[{ id: 'All', label: t("all", "ALL") }, ...categories.filter(c => c !== 'All').map(c => ({ id: c, label: c }))]}
+                  label={"CATEGORY"}
+                  options={[{ id: 'All', label: "ALL" }, ...categories.filter(c => c !== 'All').map(c => ({ id: c, label: c }))]}
                   value={selectedCategory}
                   onChange={setSelectedCategory}
                   icon={LayoutGrid}
                 />
-
                 <SearchableSelect
-                  label={t("cashier", "CASHIER")}
-                  options={[{ id: 'All', label: t("all", "ALL") }, ...cashiers.filter(c => c !== 'All').map(c => ({ id: c, label: c }))]}
+                  label={"CASHIER"}
+                  options={[{ id: 'All', label: "ALL" }, ...cashiers.filter(c => c !== 'All').map(c => ({ id: c, label: c }))]}
                   value={selectedCashier}
                   onChange={setSelectedCashier}
                   icon={Users}
                 />
-
                 <SearchableSelect
-                  label={t("salesman", "SALESMAN")}
-                  options={[{ id: 'All', label: t("all", "ALL") }, ...salesmenList.filter(s => s !== 'All').map(s => ({ id: s, label: s }))]}
+                  label={"SALESMAN"}
+                  options={[{ id: 'All', label: "ALL" }, ...salesmenList.filter(s => s !== 'All').map(s => ({ id: s, label: s }))]}
                   value={selectedSalesman}
                   onChange={setSelectedSalesman}
                   icon={Briefcase}
                 />
-
                 <SearchableSelect
-                  label={t("payment", "PAYMENT")}
-                  options={[{ id: 'All', label: t("all", "ALL") }, ...paymentMethods.filter(m => m !== 'All').map(m => ({ id: m, label: t(m, m).toUpperCase() }))]}
+                  label={"PAYMENT"}
+                  options={[{ id: 'All', label: "ALL" }, ...paymentMethods.filter(m => m !== 'All').map(m => ({ id: m, label: t(m, m).toUpperCase() }))]}
                   value={selectedPayment}
                   onChange={setSelectedPayment}
                   icon={Wallet}
                   align="right"
                 />
-
                 <SearchableSelect
-                  label={t("store", "STORE")}
+                  label={"STORE"}
                   options={[
-                    { id: 'all', label: t("all", "ALL") },
-                    { id: 'retail', label: t("retail", "RETAIL"), enabled: state.settings.retailEnabled },
-                    { id: 'wholesale', label: t("wholesale", "WHOLESALE"), enabled: state.settings.wholesaleEnabled },
-                    { id: 'estore', label: t("estore", "E-STORE"), enabled: state.settings.estoreEnabled }
+                    { id: 'all', label: "ALL" },
+                    { id: 'retail', label: "RETAIL", enabled: appSettings.retailEnabled },
+                    { id: 'wholesale', label: "WHOLESALE", enabled: appSettings.wholesaleEnabled }
                   ].filter(o => o.id === 'all' || o.enabled)}
                   value={selectedSaleType}
                   onChange={setSelectedSaleType}
@@ -1191,7 +162,7 @@ export function ReportsManager() {
           </div>
         </div>
       </div>
-      {/* Premium Dashboard summary row */}
+
       {reportType === 'sales' && (
         <div className="relative z-20 mt-2 sm:mt-4">
           <SalesReport
@@ -1209,26 +180,23 @@ export function ReportsManager() {
             totalExpenseAmount={totalExpenseAmount}
             netProfit={netProfit}
             walletStats={walletStats}
-            currency={state.settings.currency}
-            theme={state.settings.theme}
-            country={state.settings.country}
-            users={state.users}
-            retailEnabled={state.settings.retailEnabled ?? true}
-            wholesaleEnabled={state.settings.wholesaleEnabled}
-            estoreEnabled={state.settings.estoreEnabled}
+            currency={appSettings.currency}
+            theme={appSettings.theme}
+            country={appSettings.country}
+            users={appUsers}
+            retailEnabled={appSettings.retailEnabled ?? true}
+            wholesaleEnabled={appSettings.wholesaleEnabled}
           />
         </div>
       )}
-
-
 
       {reportType === 'customers' && (
         <div className="relative z-20 mt-2 sm:mt-4">
           <CustomersReport
             customerData={customerData}
-            currency={state.settings.currency}
-            theme={state.settings.theme}
-            country={state.settings.country}
+            currency={appSettings.currency}
+            theme={appSettings.theme}
+            country={appSettings.country}
           />
         </div>
       )}
@@ -1237,8 +205,8 @@ export function ReportsManager() {
         <div className="relative z-20 mt-2 sm:mt-4">
           <SalesmenReport
             salesmanData={salesmanData}
-            currency={state.settings.currency}
-            theme={state.settings.theme}
+            currency={appSettings.currency}
+            theme={appSettings.theme}
           />
         </div>
       )}
@@ -1250,9 +218,9 @@ export function ReportsManager() {
             expensesTrendData={expensesTrendData}
             expenseCategoryData={expenseCategoryData}
             totalExpenseAmount={totalExpenseAmount}
-            currency={state.settings.currency}
-            theme={state.settings.theme}
-            country={state.settings.country}
+            currency={appSettings.currency}
+            theme={appSettings.theme}
+            country={appSettings.country}
           />
         </div>
       )}
@@ -1268,11 +236,10 @@ export function ReportsManager() {
             filteredExpensesCount={filteredExpenses.length}
             netProfit={netProfit}
             walletStats={walletStats}
-            currency={state.settings.currency}
+            currency={appSettings.currency}
           />
         </div>
       )}
-
 
       {reportType === 'inventory' && (
         <div className="relative z-20 mt-2 sm:mt-4">
@@ -1286,15 +253,15 @@ export function ReportsManager() {
           />
         </div>
       )}
+
       {reportType === 'suppliers' && (
         <div className="relative z-20 mt-2 sm:mt-4">
           <SuppliersReport
-            currency={state.settings.currency}
-            country={state.settings.country}
+            currency={appSettings.currency}
+            country={appSettings.country}
           />
         </div>
       )}
-
     </div>
   );
 }

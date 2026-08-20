@@ -38,12 +38,12 @@ export function ExpensesReport({
   const itemStyle = { color: theme === 'dark' ? '#e5e7eb' : '#374151' };
 
   const exportColumns = [
-    { key: 'date', label: t('date', 'Date') },
-    { key: 'description', label: t('description', 'Description') },
-    { key: 'notes', label: t('notes', 'Notes') },
-    { key: 'category', label: t('category', 'Category') },
-    { key: 'paymentMethod', label: t('payment_method', 'Wallet') },
-    { key: 'amount', label: t('amount', 'Amount'), format: 'currency' as const },
+    { key: 'date', label: "Date" },
+    { key: 'description', label: "Description" },
+    { key: 'notes', label: "Notes" },
+    { key: 'category', label: "Category" },
+    { key: 'paymentMethod', label: "Wallet" },
+    { key: 'amount', label: "Amount", format: 'currency' as const },
   ];
 
   const exportRows = useMemo(() => [...filteredExpenses]
@@ -74,9 +74,9 @@ export function ExpensesReport({
           return (
             <div key={method} className={`stat-card bg-gradient-to-br ${item.gradient} group`}>
               <div className="stat-card-inner">
-                <span className="stat-card-label">{t(method, method)} {t('expenses', 'Expenses')}</span>
+                <span className="stat-card-label">{t(method, method)} {"Expenses"}</span>
                 <span className="stat-card-value">{formatCurrency(walletExpenses, currency)}</span>
-                <p className="text-[7px] font-black text-white/40 uppercase tracking-[0.2em] mt-1">{walletCount} {t('records', 'entries')}</p>
+                <p className="text-[7px] font-black text-white/40 uppercase tracking-[0.2em] mt-1">{walletCount} {"entries"}</p>
               </div>
               <Icon className="stat-card-icon" />
             </div>
@@ -88,31 +88,31 @@ export function ExpensesReport({
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="card p-6">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center">
-            <TrendingDown className="h-5 w-5 mr-2 text-rose-500" />{t('expense_trend', 'Expense Trend')}
+            <TrendingDown className="h-5 w-5 mr-2 text-rose-500" />{"Expense Trend"}
           </h3>
           <ResponsiveContainer width="100%" height={window.innerWidth < 768 ? 240 : 300}>
             <LineChart data={expensesTrendData}>
               <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#333' : '#f0f0f0'} />
               <XAxis dataKey="date" stroke={theme === 'dark' ? '#9ca3af' : '#6b7280'} fontSize={12} />
               <YAxis stroke={theme === 'dark' ? '#9ca3af' : '#6b7280'} fontSize={12} />
-              <Tooltip formatter={(value: any, name: string) => [name === 'amount' ? formatCurrency(Number(value), currency) : value, name === 'amount' ? t('amount', 'Amount') : t('records', 'Entries')]} contentStyle={tooltipStyle} itemStyle={itemStyle} />
+              <Tooltip formatter={(value: any, name: string) => [name === 'amount' ? formatCurrency(Number(value), currency) : value, name === 'amount' ? "Amount" : "Entries"]} contentStyle={tooltipStyle} itemStyle={itemStyle} />
               <Legend />
-              <Line type="monotone" dataKey="amount" stroke="#ef4444" strokeWidth={3} name={t('amount', 'Amount')} dot={{ fill: '#ef4444', strokeWidth: 2, r: 4 }} activeDot={{ r: 6, stroke: '#ef4444', strokeWidth: 2 }} />
-              <Line type="monotone" dataKey="count" stroke="#f97316" strokeWidth={3} name={t('records', 'Entries')} dot={{ fill: '#f97316', strokeWidth: 2, r: 4 }} activeDot={{ r: 6, stroke: '#f97316', strokeWidth: 2 }} />
+              <Line type="monotone" dataKey="amount" stroke="#ef4444" strokeWidth={3} name={"Amount"} dot={{ fill: '#ef4444', strokeWidth: 2, r: 4 }} activeDot={{ r: 6, stroke: '#ef4444', strokeWidth: 2 }} />
+              <Line type="monotone" dataKey="count" stroke="#f97316" strokeWidth={3} name={"Entries"} dot={{ fill: '#f97316', strokeWidth: 2, r: 4 }} activeDot={{ r: 6, stroke: '#f97316', strokeWidth: 2 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
         <div className="card p-6">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center">
-            <BarChart3 className="h-5 w-5 mr-2 text-rose-500" />{t('expenses_by_category', 'Expenses by Category')}
+            <BarChart3 className="h-5 w-5 mr-2 text-rose-500" />{"Expenses by Category"}
           </h3>
           <ResponsiveContainer width="100%" height={window.innerWidth < 768 ? 240 : 300}>
             <PieChart>
               <Pie data={expenseCategoryData} cx="50%" cy="50%" labelLine={false} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} outerRadius={100} fill="#ef4444" dataKey="value">
                 {expenseCategoryData.map((_, index) => (<Cell key={`cell-${index}`} fill={['#ef4444','#f97316','#fbbf24','#10b981','#3b82f6','#8b5cf6'][index % 6]} />))}
               </Pie>
-              <Tooltip formatter={(value: any) => [formatCurrency(Number(value), currency), t('amount', 'Amount')]} contentStyle={tooltipStyle} itemStyle={itemStyle} />
+              <Tooltip formatter={(value: any) => [formatCurrency(Number(value), currency), "Amount"]} contentStyle={tooltipStyle} itemStyle={itemStyle} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -122,14 +122,14 @@ export function ExpensesReport({
       <div className="bg-white dark:bg-surface rounded-3xl border border-gray-200 dark:border-white/10 overflow-hidden shadow-sm">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between">
           <h3 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
-            <TrendingDown className="h-4 w-4 text-rose-600" />{t('all_expenses_count', 'All Expenses — {count} Entries').replace('{count}', filteredExpenses.length.toString())}
+            <TrendingDown className="h-4 w-4 text-rose-600" />{"All Expenses — {count} Entries".replace('{count}', filteredExpenses.length.toString())}
           </h3>
           <div className="flex items-center gap-3">
             <span className="text-xs font-black text-rose-500">{formatCurrency(totalExpenseAmount, currency)}</span>
             <ExportButton
               data={exportRows}
               columns={exportColumns}
-              title={t('expenses_report', 'Expenses Report')}
+              title={"Expenses Report"}
               currencySymbol={getCurrencySymbol(currency)}
               className="!min-h-0 !px-4 !py-2.5 !rounded-xl !text-[10px] !font-black !bg-gray-100 dark:!bg-white/5 !text-gray-600 dark:!text-gray-400 !border-gray-200 dark:!border-white/5 hover:!text-primary"
             />
@@ -141,16 +141,16 @@ export function ExpensesReport({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/50 dark:bg-white/[0.02] border-b border-gray-200 dark:border-white/5">
-                <th className="px-4 py-3 text-[9px] font-black text-gray-700 dark:text-gray-400 uppercase tracking-widest">{t('date', 'Date')}</th>
-                <th className="px-4 py-3 text-[9px] font-black text-gray-700 dark:text-gray-400 uppercase tracking-widest">{t('description', 'Description')}</th>
-                <th className="px-4 py-3 text-[9px] font-black text-gray-700 dark:text-gray-400 uppercase tracking-widest">{t('category', 'Category')}</th>
-                <th className="px-4 py-3 text-[9px] font-black text-gray-700 dark:text-gray-400 uppercase tracking-widest">{t('payment_method', 'Wallet')}</th>
-                <th className="px-4 py-3 text-[9px] font-black text-gray-700 dark:text-gray-400 uppercase tracking-widest text-right">{t('amount', 'Amount')}</th>
+                <th className="px-4 py-3 text-[9px] font-black text-gray-700 dark:text-gray-400 uppercase tracking-widest">{"Date"}</th>
+                <th className="px-4 py-3 text-[9px] font-black text-gray-700 dark:text-gray-400 uppercase tracking-widest">{"Description"}</th>
+                <th className="px-4 py-3 text-[9px] font-black text-gray-700 dark:text-gray-400 uppercase tracking-widest">{"Category"}</th>
+                <th className="px-4 py-3 text-[9px] font-black text-gray-700 dark:text-gray-400 uppercase tracking-widest">{"Wallet"}</th>
+                <th className="px-4 py-3 text-[9px] font-black text-gray-700 dark:text-gray-400 uppercase tracking-widest text-right">{"Amount"}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
               {filteredExpenses.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-600 text-xs">{t('no_expenses_period', 'No expenses in this period')}</td></tr>
+                <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-600 text-xs">{"No expenses in this period"}</td></tr>
               ) : pageItems.map((expense, idx) => (
                 <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
                   <td className="px-4 py-3 text-xs text-gray-600 font-bold">{formatAppDate(expense.date, country)}</td>
@@ -177,7 +177,7 @@ export function ExpensesReport({
             {filteredExpenses.length > 0 && (
               <tfoot>
                 <tr className="bg-gray-50 dark:bg-white/[0.04] border-t-2 border-gray-200 dark:border-white/10">
-                  <td colSpan={4} className="px-4 py-3 text-[9px] font-black text-gray-600 uppercase tracking-widest">{t('total_entries_count', 'TOTAL ({count} entries)').replace('{count}', filteredExpenses.length.toString())}</td>
+                  <td colSpan={4} className="px-4 py-3 text-[9px] font-black text-gray-600 uppercase tracking-widest">{"TOTAL ({count} entries)".replace('{count}', filteredExpenses.length.toString())}</td>
                   <td className="px-4 py-3 text-right font-black text-rose-600 dark:text-rose-400 text-sm">-{formatCurrency(totalExpenseAmount, currency)}</td>
                 </tr>
               </tfoot>
@@ -188,7 +188,7 @@ export function ExpensesReport({
         {/* Mobile Card View */}
         <div className="lg:hidden divide-y divide-gray-100 dark:divide-white/[0.05]">
           {filteredExpenses.length === 0 ? (
-            <div className="px-6 py-12 text-center text-gray-600 font-bold uppercase tracking-widest text-[10px]">{t('no_expenses_found', 'No expenses found')}</div>
+            <div className="px-6 py-12 text-center text-gray-600 font-bold uppercase tracking-widest text-[10px]">{"No expenses found"}</div>
           ) : pageItems.map((expense, idx) => (
             <div key={idx} className="p-4 active:bg-gray-50 dark:active:bg-white/5 transition-colors">
               <div className="flex justify-between items-start mb-2">

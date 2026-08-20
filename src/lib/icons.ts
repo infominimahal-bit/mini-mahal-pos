@@ -91,6 +91,5 @@ export const AppIcons = {
   
   // Sale types
   retail: Store,
-  wholesale: Package,
-  estore: Globe
+  wholesale: Package
 };

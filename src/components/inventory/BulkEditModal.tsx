@@ -1,3 +1,4 @@
+import { useProductsStore } from '../../stores';
 import { useState, useRef } from 'react';
 import { X, DollarSign, Tag, User, Image as ImageIcon, CheckCircle2, Loader2, Upload, Layers } from 'lucide-react';
 import { productsService } from '../../lib/services';
@@ -8,7 +9,6 @@ import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { MediaLibrary } from '../../shared/MediaLibrary';
 import { compressImage } from '../../shared/imageCompression';
 import { Modal } from '../../shared/ui/Modal';
-import { useTranslation } from '../../hooks/useTranslation';
 import { Button } from '../../shared/ui';
 
 interface BulkEditModalProps {
@@ -20,8 +20,7 @@ interface BulkEditModalProps {
 }
 
 export function BulkEditModal({ isOpen, onClose, selectedIds, categories, suppliers }: BulkEditModalProps) {
-  const { state, dispatch } = useApp();
-  const { t } = useTranslation();
+  const appProducts = useProductsStore(s => s.products);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showMediaLibrary, setShowMediaLibrary] = useState(false);
 
@@ -60,11 +59,11 @@ export function BulkEditModal({ isOpen, onClose, selectedIds, categories, suppli
       await productsService.bulkUpdate(selectedIds, actualUpdates);
 
       // Update local state
-      const updatedProducts = state.products.map(p =>
+      const updatedProducts = appProducts.map(p =>
         selectedIds.includes(p.id) ? { ...p, ...actualUpdates, updatedAt: new Date() } : p
       );
 
-      dispatch({ type: 'SET_PRODUCTS', payload: updatedProducts });
+      useProductsStore.getState().setProducts(updatedProducts);
       sonner.success(`${selectedIds.length} products updated successfully`);
       onClose();
     } catch (error) {
@@ -83,8 +82,8 @@ export function BulkEditModal({ isOpen, onClose, selectedIds, categories, suppli
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title={t('bulk_logistics')}
-        subtitle={t('executing_bulk_protocols').replace('{count}', selectedIds.length.toString())}
+        title={"bulk_logistics"}
+        subtitle={"executing_bulk_protocols".replace('{count}', selectedIds.length.toString())}
         maxWidth="lg"
         footer={
           <div className="flex items-center justify-end gap-2 sm:gap-3 w-full">
@@ -93,7 +92,7 @@ export function BulkEditModal({ isOpen, onClose, selectedIds, categories, suppli
               onClick={onClose}
               className="!bg-transparent !border-rose-200 dark:!border-rose-900/30 !text-[#ff4b6e] hover:!bg-rose-50 dark:hover:!bg-rose-500/10 hover:!opacity-100 !shadow-none !px-4 sm:!px-6 !py-2.5 sm:!py-3.5 !text-[9px] sm:!text-[10px] !rounded-2xl !shrink-0 !min-h-0"
             >
-              {t('abort_protocol')}
+              {"abort_protocol"}
             </Button>
             <Button
               variant="primary"
@@ -103,7 +102,7 @@ export function BulkEditModal({ isOpen, onClose, selectedIds, categories, suppli
               className="flex-1 sm:flex-none sm:!min-w-[240px] !py-2.5 sm:!py-3.5 !text-[9px] sm:!text-[11px]"
               icon={isUpdating ? <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin shrink-0" /> : <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />}
             >
-              <span>{isUpdating ? t('executing') : t('commit_protocols')}</span>
+              <span>{isUpdating ? "executing" : "commit_protocols"}</span>
             </Button>
           </div>
         }
@@ -113,29 +112,29 @@ export function BulkEditModal({ isOpen, onClose, selectedIds, categories, suppli
           <div className="space-y-6">
             <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
               <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-              {t('financial_overrides')}
+              {"financial_overrides"}
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider block">{t('retail_price')}</label>
+                <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider block">{"retail_price"}</label>
                 <div className="relative">
                   <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600" />
                   <input
                     type="number"
-                    placeholder={t('no_change')}
+                    placeholder={"no_change"}
                     className="w-full pl-12 pr-4 bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all font-medium placeholder:text-gray-600"
                     onChange={(e) => setUpdates(prev => ({ ...prev, price: e.target.value ? parseFloat(e.target.value) : undefined }))}
                   />
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider block">{t('acquisition_cost')}</label>
+                <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider block">{"acquisition_cost"}</label>
                 <div className="relative">
                   <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600" />
                   <input
                     type="number"
-                    placeholder={t('no_change')}
+                    placeholder={"no_change"}
                     className="w-full pl-12 pr-4 bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all font-medium placeholder:text-gray-600"
                     onChange={(e) => setUpdates(prev => ({ ...prev, cost: e.target.value ? parseFloat(e.target.value) : undefined }))}
                   />
@@ -148,19 +147,19 @@ export function BulkEditModal({ isOpen, onClose, selectedIds, categories, suppli
           <div className="space-y-6">
             <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
               <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-              {t('classification_matrix')}
+              {"classification_matrix"}
             </h3>
             <div className="space-y-5 relative z-30">
               <SearchableSelect
-                label={t('global_category')}
-                options={[{ id: '', label: t('no_change') }, ...availableCategories.map(cat => ({ id: cat, label: cat }))]}
+                label={"global_category"}
+                options={[{ id: '', label: "no_change" }, ...availableCategories.map(cat => ({ id: cat, label: cat }))]}
                 value={updates.category || ''}
                 onChange={(val) => setUpdates(prev => ({ ...prev, category: val || undefined }))}
                 icon={Tag}
               />
               <SearchableSelect
-                label={t('primary_supplier')}
-                options={[{ id: '', label: t('no_change') }, ...availableSuppliers.map(sup => ({ id: sup, label: sup }))]}
+                label={"primary_supplier"}
+                options={[{ id: '', label: "no_change" }, ...availableSuppliers.map(sup => ({ id: sup, label: sup }))]}
                 value={updates.supplier || ''}
                 onChange={(val) => setUpdates(prev => ({ ...prev, supplier: val || undefined }))}
                 icon={User}
@@ -173,11 +172,11 @@ export function BulkEditModal({ isOpen, onClose, selectedIds, categories, suppli
             <div className="flex items-center justify-between">
               <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
                 <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-                {t('visual_protocol')}
+                {"visual_protocol"}
               </h3>
               {updates.image && (
                 <Button variant="ghost" onClick={() => setUpdates(prev => ({ ...prev, image: undefined }))} className="!min-h-0 !p-0 !bg-transparent hover:!bg-transparent !text-rose-500 !text-[10px] hover:!underline">
-                  {t('reset_asset')}
+                  {"reset_asset"}
                 </Button>
               )}
             </div>
@@ -202,14 +201,14 @@ export function BulkEditModal({ isOpen, onClose, selectedIds, categories, suppli
           <div className="space-y-6">
             <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
               <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-              {t('operational_state')}
+              {"operational_state"}
             </h3>
 
             <div className="grid grid-cols-1 gap-4">
               {[
-                { label: t('asset_activation'), key: 'active' },
-                { label: t('fiscal_taxation'), key: 'taxable' },
-                { label: t('priority_featuring'), key: 'isFeatured' },
+                { label: "asset_activation", key: 'active' },
+                { label: "fiscal_taxation", key: 'taxable' },
+                { label: "priority_featuring", key: 'isFeatured' },
               ].map(({ label, key }) => (
                 <label key={key} className={`flex items-center justify-between p-5 rounded-[20px] border transition-all cursor-pointer ${(updates as any)[key] !== undefined ? 'bg-emerald-50 dark:bg-primary/10 border-emerald-200 dark:border-primary/20' : 'bg-[#f8f9fa] dark:bg-black/75 border-gray-200 dark:border-white/5'}`}>
                   <span className={`text-[11px] font-black uppercase tracking-widest ${(updates as any)[key] !== undefined ? 'text-primary dark:text-emerald-400' : 'text-gray-600 dark:text-gray-400'}`}>{label}</span>
