@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Shield, Lock, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
 import { sonner } from '../../lib/sonner';
 import { Button } from '../../shared/ui';
 
 export function PasswordChange() {
-  const { updatePassword } = useAuth();
+  const { updatePassword, user } = useAuth();
+  const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -17,6 +19,10 @@ export function PasswordChange() {
   ];
 
   const handleUpdate = async () => {
+    if (!oldPassword) {
+      sonner.error('Validation Error: Current password is required.');
+      return;
+    }
     if (newPassword.length < 6) {
       sonner.error('Password too short: Password must be at least 6 characters.');
       return;
@@ -28,8 +34,20 @@ export function PasswordChange() {
 
     setIsUpdating(true);
     try {
+      if (!user?.email) throw new Error("User email not found.");
+
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: oldPassword,
+      });
+
+      if (verifyError) {
+        throw new Error("Incorrect current password.");
+      }
+
       await updatePassword(newPassword);
       sonner.success('Security Updated: Your password has been changed successfully.');
+      setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: any) {
@@ -50,6 +68,19 @@ export function PasswordChange() {
       </div>
 
       <div className="space-y-4">
+        <div className="space-y-1.5">
+          <label className="text-xs font-black text-gray-600 uppercase tracking-widest ml-1">Current Password</label>
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+              className="w-full bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 rounded-2xl py-4 px-5 pr-12 focus:ring-4 focus:ring-emerald-500/10 focus:border-primary transition-all font-bold text-gray-900 dark:text-white"
+              placeholder="••••••••"
+            />
+          </div>
+        </div>
+
         <div className="space-y-1.5">
           <label className="text-xs font-black text-gray-600 uppercase tracking-widest ml-1">New Password</label>
           <div className="relative">
@@ -97,7 +128,7 @@ export function PasswordChange() {
 
         <Button
           type="button"
-          disabled={isUpdating || !newPassword || newPassword !== confirmPassword || newPassword.length < 6}
+          disabled={isUpdating || !oldPassword || !newPassword || newPassword !== confirmPassword || newPassword.length < 6}
           onClick={handleUpdate}
           className="w-full hover:bg-emerald-700 disabled:bg-gray-200 dark:disabled:bg-white/5 disabled:text-gray-600 disabled:!opacity-100 mt-4"
         >

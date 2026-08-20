@@ -5,6 +5,7 @@ import { derivePaymentStatus } from './utils';
 import { commitSaleAuthoritative, revertLocalSaleStock } from './atomicOps';
 import { recordCustomerLedger } from './customersService';
 import { collectSaleMovements } from './saleCreate.stock';
+import { adjustPaymentBalances, buildSalePaymentMoves } from './paymentsService';
 
 export async function createSale(sale: Omit<Sale, 'id'>): Promise<Sale> {
   if (!sale.invoiceNumber || String(sale.invoiceNumber).trim() === '' || sale.invoiceNumber === 'undefined') {
@@ -63,6 +64,12 @@ export async function createSale(sale: Omit<Sale, 'id'>): Promise<Sale> {
     for (const q of historyQueue) {
       await queueOp(q.entity, 'create', q.histId, q.remote, q.opts);
     }
+  }
+
+  // 2.5. Record Payment Movements (Wallets)
+  if (!isDraftSale) {
+    const paymentMoves = buildSalePaymentMoves(newSale);
+    await adjustPaymentBalances(paymentMoves, { batchId: id });
   }
 
   // 3. Update Customer Stats if identified (NEVER for drafts — drafts are not revenue)

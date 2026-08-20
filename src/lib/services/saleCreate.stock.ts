@@ -21,12 +21,10 @@ export async function collectSaleMovements(
     const product = await localDb.products.get(item.product.id);
 
      if (product && product.trackInventory) {
-      // DEFENSIVE (inventory integrity): always use the magnitude. A negative
-      // item.quantity/weight must NEVER flip the stock sign — a sale always
-      // DECREASES stock, so changeQty stays negative regardless of input sign.
-      const qty = Math.abs(Number(item.weight || item.quantity) || 0);
+      // Fix: Preserve the original sign of quantity to support returns (which have negative qtys).
+      const rawQty = Number(item.weight || item.quantity) || 0;
       // RULE: Allow negative stock — never block a sale on stock level
-      const newStock = (product.stock || 0) - qty;
+      const newStock = (product.stock || 0) - rawQty;
       if (newStock < 0) anyOversold = true;
 
       // Find variant cost fallback if applicable
@@ -44,13 +42,13 @@ export async function collectSaleMovements(
         for (const addonItem of item.addonItems) {
           const addonProduct = await localDb.products.get(addonItem.addon.addonProductId);
           if (addonProduct) {
-            addonCostTotal += (Number(addonProduct.cost) || 0) * addonItem.quantity * Math.abs(qty);
+            addonCostTotal += (Number(addonProduct.cost) || 0) * addonItem.quantity * Math.abs(rawQty);
           }
         }
       }
 
       // Simple cost calculation (no FIFO)
-      const effectivePurchaseCost = (baseCostFallback * qty) + addonCostTotal;
+      const effectivePurchaseCost = (baseCostFallback * Math.abs(rawQty)) + addonCostTotal;
 
       newSale.items[i] = {
         ...item,
@@ -68,11 +66,14 @@ export async function collectSaleMovements(
 
         // Log Stock History
         const histId = generateId();
+        const changeQty = -rawQty; // A sale (qty > 0) means stock goes down (-). A return (qty < 0) means stock goes up (+).
+        const histType = rawQty < 0 ? 'return' : 'sale';
+        
         const histEntry: StockHistory = {
           id: histId,
           productId: product.id,
-          changeQty: -qty,
-          type: 'sale' as const,
+          changeQty: changeQty,
+          type: histType,
           referenceId: id,
           note: `Sale ${newSale.invoiceNumber}${newSale.editedFromInvoice ? ' (Edit #' + newSale.editedFromInvoice + ')' : ''}`,
           balanceAfter: newStock,
@@ -84,8 +85,8 @@ export async function collectSaleMovements(
         movements.push({
           id: histId,
           product_id: product.id,
-          change_qty: -qty,
-          type: 'sale',
+          change_qty: changeQty,
+          type: histType,
           note: `Sale ${newSale.invoiceNumber}${newSale.editedFromInvoice ? ' (Edit #' + newSale.editedFromInvoice + ')' : ''}`,
           variant_id: '',
           variant_label: '',
@@ -98,7 +99,7 @@ export async function collectSaleMovements(
       if (item.selectedVariantId && product.variantData) {
         const variant = product.variantData.find(v => v.id === item.selectedVariantId);
         if (variant) {
-          const newVariantStock = (variant.stock || 0) - qty;
+          const newVariantStock = (variant.stock || 0) - rawQty;
 
           {
             // Update local variant data (cloud handled by variant_stock_history trigger)
@@ -118,8 +119,8 @@ export async function collectSaleMovements(
               productId: product.id,
               variantId: item.selectedVariantId,
               variantLabel: item.selectedVariantLabel || variant.cardTitle || variant.option1,
-              changeQty: -qty,
-              type: 'sale',
+              changeQty: changeQty,
+              type: histType as any,
               referenceId: id,
               note: `Sale ${newSale.invoiceNumber}${newSale.editedFromInvoice ? ' (Edit #' + newSale.editedFromInvoice + ')' : ''}`,
               balanceAfter: newVariantStock,
@@ -130,8 +131,8 @@ export async function collectSaleMovements(
             movements.push({
               id: vHistId,
               product_id: product.id,
-              change_qty: -qty,
-              type: 'sale',
+              change_qty: changeQty,
+              type: histType,
               note: `Sale ${newSale.invoiceNumber}${newSale.editedFromInvoice ? ' (Edit #' + newSale.editedFromInvoice + ')' : ''}`,
               variant_id: item.selectedVariantId,
               variant_label: item.selectedVariantLabel || variant.cardTitle || variant.option1,

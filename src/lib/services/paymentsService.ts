@@ -192,7 +192,7 @@ export const buildSalePaymentMoves = (sale: any): any[] => {
     return sale.splitPayments.map((p: any) => ({
       id: generateId(),
       modeId: normalizePaymentMethod(p.method),
-      delta: Math.abs(Number(p.amount || 0)),
+      delta: Number(p.amount || 0),
       referenceId: ref,
       note: `Sale ${sale.invoiceNumber || ref}`,
     }));
@@ -200,7 +200,7 @@ export const buildSalePaymentMoves = (sale: any): any[] => {
   return [{
     id: generateId(),
     modeId: normalizePaymentMethod(sale.paymentMethod),
-    delta: Math.abs(Number(sale.total || 0)),
+    delta: Number(sale.total || 0),
     referenceId: ref,
     note: `Sale ${sale.invoiceNumber || ref}`,
   }];
