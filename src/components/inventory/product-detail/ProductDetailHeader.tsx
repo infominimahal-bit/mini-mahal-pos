@@ -1,10 +1,10 @@
-import { ArrowLeft, Package, Camera, Star, BadgeInfo, ShieldAlert, Edit3, X, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Package, Camera, Star, BadgeInfo, ShieldAlert, Edit3, X } from 'lucide-react';
 import { Button, Badge } from '../../../shared/ui';
 import type { ProductDetailController } from './useProductDetail';
 
 export function ProductDetailHeader({ d }: { d: ProductDetailController }) {
   const {
-    product, onBack, t, formData, isEditMode, setIsEditMode, setShowMediaLibrary, handleRecalc,
+    product, onBack, t, formData, isEditMode, setIsEditMode, setShowMediaLibrary,
     isInfinite, isOut, isLow, stockPct,
   } = d;
 
@@ -72,14 +72,6 @@ export function ProductDetailHeader({ d }: { d: ProductDetailController }) {
         </div>
 
           <div className="flex sm:flex-col gap-2 w-full sm:w-auto mt-4 sm:mt-0">
-          <Button
-            variant="secondary"
-            onClick={handleRecalc}
-            className="flex-1 sm:flex-none !p-4 sm:!p-2.5 !rounded-2xl !text-[11px] !font-black !shadow-lg !bg-white dark:!bg-white/5 !border-gray-200 dark:!border-white/10"
-            icon={<RefreshCw className="h-4 w-4" />}
-          >
-            {t('recalc_stock', 'Recalc')}
-          </Button>
           <Button
             variant={isEditMode ? 'danger' : 'secondary'}
             onClick={() => setIsEditMode(!isEditMode)}

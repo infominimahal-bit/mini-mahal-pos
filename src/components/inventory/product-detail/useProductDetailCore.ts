@@ -63,11 +63,11 @@ export function useProductDetail({ product, onBack, onEdit }: ProductDetailHubPr
     HISTORY_PER_PAGE: data.HISTORY_PER_PAGE,
   };
 
-  const { handleAdjustment, handleQuickRestock, handleSave, handleRecalc, generateBarcode, generateSku } = createDetailHandlers(base);
+  const { handleAdjustment, handleQuickRestock, handleSave, generateBarcode, generateSku } = createDetailHandlers(base);
 
   return {
     ...base,
-    handleAdjustment, handleQuickRestock, handleSave, handleRecalc, generateBarcode, generateSku,
+    handleAdjustment, handleQuickRestock, handleSave, generateBarcode, generateSku,
   };
 }
 
