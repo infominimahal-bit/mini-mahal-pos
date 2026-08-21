@@ -143,7 +143,7 @@ export class PosDB extends Dexie {
     // the full ledger sum. This makes product.stock ledger-derived (single source
     // of truth) and self-heals any desync, regardless of which code path wrote
     // the movement. Bulk/cloud writes are suspended via stockReconcileSuspended.
-    this.stockHistory.hooks('creating', async (_primKey, obj: any) => {
+    this.stockHistory.hook('creating', async (_primKey, obj: any) => {
       if (stockReconcileSuspended) return;
       const pid = obj?.productId;
       if (!pid) return;
@@ -156,7 +156,7 @@ export class PosDB extends Dexie {
       const prod = useProductsStore.getState().products.find(p => p.id === pid);
       if (prod) useProductsStore.getState().updateProduct({ ...prod, stock: sum });
     });
-    this.stockHistory.hooks('deleting', async (_primKey, obj: any) => {
+    this.stockHistory.hook('deleting', async (_primKey, obj: any) => {
       if (stockReconcileSuspended) return;
       const pid = obj?.productId;
       if (!pid) return;
