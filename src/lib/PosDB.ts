@@ -9,6 +9,14 @@ import {
   migrateV13, migrateV4, migrateV8
 } from './posDbHelpers';
 
+// PHASE 17 — auto stock reconciliation flag.
+// When true, the stockHistory hooks below skip recomputing product.stock.
+// Bulk cloud imports (CloudPull) and realtime mirror-writes set this so the
+// authoritative cloud value isn't double-counted; only LOCAL mutations trigger
+// the ledger-derived recompute.
+export let stockReconcileSuspended = false;
+export const setStockReconcileSuspended = (v: boolean) => { stockReconcileSuspended = v; };
+
 // Full CURRENT schema for the opened (top) version. MUST declare EVERY table the
 // app uses — Dexie only exposes table handles for tables present in the version
 // that is actually opened. The extracted SCHEMA_V22 constant only added
@@ -130,5 +138,36 @@ export class PosDB extends Dexie {
     this.version(28).stores(SCHEMA_CURRENT);
     this.version(29).stores(SCHEMA_CURRENT);
     this.version(30).stores(SCHEMA_CURRENT);
+
+    // PHASE 17 — every local stock_history write recomputes product.stock from
+    // the full ledger sum. This makes product.stock ledger-derived (single source
+    // of truth) and self-heals any desync, regardless of which code path wrote
+    // the movement. Bulk/cloud writes are suspended via stockReconcileSuspended.
+    this.stockHistory.hooks('creating', async (_primKey, obj: any) => {
+      if (stockReconcileSuspended) return;
+      const pid = obj?.productId;
+      if (!pid) return;
+      const rows = await this.stockHistory.where('productId').equals(pid).toArray() as any[];
+      let sum = 0;
+      for (const h of rows) { if (h.variantId) continue; sum += Number(h.changeQty) || 0; }
+      sum += Number(obj.changeQty) || 0;
+      await this.products.update(pid, { stock: sum, updatedAt: new Date() });
+      const { useProductsStore } = await import('../stores');
+      const prod = useProductsStore.getState().products.find(p => p.id === pid);
+      if (prod) useProductsStore.getState().updateProduct({ ...prod, stock: sum });
+    });
+    this.stockHistory.hooks('deleting', async (_primKey, obj: any) => {
+      if (stockReconcileSuspended) return;
+      const pid = obj?.productId;
+      if (!pid) return;
+      const rows = await this.stockHistory.where('productId').equals(pid).toArray() as any[];
+      let sum = 0;
+      for (const h of rows) { if (h.variantId) continue; sum += Number(h.changeQty) || 0; }
+      sum -= Number(obj.changeQty) || 0;
+      await this.products.update(pid, { stock: sum, updatedAt: new Date() });
+      const { useProductsStore } = await import('../stores');
+      const prod = useProductsStore.getState().products.find(p => p.id === pid);
+      if (prod) useProductsStore.getState().updateProduct({ ...prod, stock: sum });
+    });
   }
 }

@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { localDb, SETTINGS_ID } from './localDb';
+import { setStockReconcileSuspended } from './PosDB';
 import {
   mapProduct, mapCustomer, mapSale, mapExpense, mapSupplier, mapCategory, mapDiscount,
   mapPurchaseRecord, mapSalesman, mapUser, mapSettings, mapPayment, mapStockHistory,
@@ -220,7 +221,13 @@ export const PULL_DEFS: PullDef[] = [
       });
       return rows.map(mapStockHistory);
     },
-    write: async (rows) => { if (rows.length) await localDb.stockHistory.bulkPut(rows as any); },
+    write: async (rows) => {
+      if (rows.length) {
+        setStockReconcileSuspended(true);
+        try { await localDb.stockHistory.bulkPut(rows as any); }
+        finally { setStockReconcileSuspended(false); }
+      }
+    },
   },
   {
     entity: 'variant_stock_history',

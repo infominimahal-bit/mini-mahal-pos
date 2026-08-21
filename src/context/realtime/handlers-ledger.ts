@@ -1,4 +1,5 @@
 import { localDb, isPendingDelete } from '../../lib/localDb';
+import { setStockReconcileSuspended } from '../../lib/PosDB';
 import {
   usePaymentsStore,
   useCartStore,
@@ -29,7 +30,9 @@ export function attachLedgerHandlers(channel: any, ctx: RealtimeCtx) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_history' }, async (payload) => {
       if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
         if (await isPendingDelete('stock_history', payload.new.id)) return;
-        await localDb.stockHistory.put(mapStockHistory(payload.new)); 
+        setStockReconcileSuspended(true);
+        try { await localDb.stockHistory.put(mapStockHistory(payload.new)); }
+        finally { setStockReconcileSuspended(false); }
       } else if (payload.eventType === 'DELETE') {
         await localDb.stockHistory.delete(payload.old.id);
       }
