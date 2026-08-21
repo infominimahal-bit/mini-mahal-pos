@@ -48,22 +48,31 @@ export async function createSale(sale: Omit<Sale, 'id'>): Promise<Sale> {
 
   // 1. Local Write (Now contains precise purchaseCost per item)
   (newSale as any).paymentStatus = derivePaymentStatus(newSale);
+  // NOTE: collectSaleMovements() above already adjusted local product stock +
+  // wrote local stock_history. For ONLINE sales we enforce ALL-OR-NOTHING: if the
+  // cloud commit fails we fully REVERT these local writes (see cloudFailedHard)
+  // so local & cloud can never silently diverge. Offline sales stay local-first
+  // and are queued for later sync (no divergence once reconnected).
   await localDb.sales.add(newSale);
 
-  // 2. Atomic cloud commit (online) OR legacy per-op queue fallback.
-  // Phase 1: commit the sale + ALL stock movements in ONE transaction via the
-  // `commit_sale` RPC so products.stock / variant_data can NEVER diverge from
-  // sales. If the RPC succeeds, the legacy 'sales' + 'stock_history' queue ops
-  // are SKIPPED (ids are idempotent, so any retry/fallback insert is ignored).
+  // 2. Atomic cloud commit (online) OR legacy per-op queue fallback (offline).
+  // Commit the sale + ALL stock movements in ONE transaction via the `commit_sale`
+  // RPC so products.stock / variant_data can NEVER diverge from sales. If the RPC
+  // succeeds, the legacy 'sales' + 'stock_history' queue ops are skipped.
   const onlineNow = typeof navigator === 'undefined' || navigator.onLine;
   let cloudCommitted = false;
-  if (onlineNow && !skipStockEffects && !isDraftSale && movements.length > 0) {
+  let cloudFailedHard = false;
+  if (onlineNow && !skipStockEffects && !isDraftSale) {
     const commitRes = await commitSaleAuthoritative(toRemoteSale(newSale), movements);
     if (commitRes && commitRes.already_fulfilled) {
       await revertLocalSaleStock(newSale.id, movements);
       cloudCommitted = true;
     } else if (commitRes) {
       cloudCommitted = true;
+    } else {
+      // ONLINE but cloud rejected/timed-out. ALL-OR-NOTHING: do NOT leave a
+      // half-synced sale locally — revert every local write for this sale.
+      cloudFailedHard = true;
     }
     // P26/P27: persist payment_status on the cloud sale row via the sync queue
     // (OFFLINE-FIRST compliant — never a direct supabase-js write).
@@ -73,6 +82,16 @@ export async function createSale(sale: Omit<Sale, 'id'>): Promise<Sale> {
       } catch (_) { /* non-fatal */ }
     }
   }
+
+  // 2.1 ALL-OR-NOTHING ROLLBACK for online sales whose cloud commit failed.
+  if (cloudFailedHard) {
+    await revertLocalSaleStock(newSale.id, movements);
+    await localDb.stockHistory.where('referenceId').equals(newSale.id).delete();
+    await localDb.variantStockHistory.filter((h: any) => h.referenceId === newSale.id).delete();
+    await localDb.sales.delete(newSale.id);
+    throw new Error('SALE_NOT_SYNCED: Cloud unreachable — the sale was NOT saved (nothing changed locally). Retry when online.');
+  }
+
   if (!cloudCommitted) {
     await queueOp('sales', 'create', id, toRemoteSale(newSale), { batchId: id });
     for (const q of historyQueue) {

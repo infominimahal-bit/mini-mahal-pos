@@ -97,16 +97,16 @@ export function BasicInfoFields(props: ProductFormFieldsProps) {
             {"sku"}
             <HelpTooltip content="Stock Keeping Unit: Unique internal code used to track inventory items across warehouses or stores." />
           </label>
-          <div className="relative">
+          <div className="flex gap-2">
             <input
               type="text"
               name="sku"
               value={formData.sku}
               onChange={onFieldChange}
               placeholder="Auto-generated"
-              className="w-full bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all uppercase font-medium placeholder:text-gray-600 pr-12"
+              className="flex-1 min-w-0 bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all uppercase font-medium placeholder:text-gray-600"
             />
-            <Button type="button" variant="ghost" onClick={onGenerateSku} className="absolute right-1.5 top-1.5 bottom-1.5 !min-h-0 !w-8 !p-0 !rounded-lg !bg-emerald-50/80 dark:!bg-zinc-900 hover:!bg-emerald-50/80 dark:hover:!bg-zinc-900 !text-primary" icon={<Wand2 className="w-3.5 h-3.5" />} />
+            <Button type="button" variant="ghost" onClick={onGenerateSku} className="!min-h-0 !w-11 !h-11 !p-0 !rounded-xl !bg-emerald-50 dark:!bg-emerald-500/10 hover:!bg-emerald-100 dark:hover:!bg-emerald-500/20 !text-emerald-600 dark:!text-emerald-400 shrink-0" icon={<Wand2 className="w-4 h-4" />} />
           </div>
         </div>
 
@@ -116,18 +116,16 @@ export function BasicInfoFields(props: ProductFormFieldsProps) {
             <HelpTooltip content="UPC/EAN standard barcode. Scan with hardware scanner or generate a random sequence for custom retail packaging." />
           </label>
           <div className="flex gap-2">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                name="barcode"
-                value={formData.barcode}
-                onChange={onFieldChange}
-                placeholder={"scan_or_generate"}
-                className="w-full bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all uppercase font-medium pr-12"
-              />
-              <Button type="button" variant="ghost" onClick={onGenerateBarcode} className="absolute right-1.5 top-1.5 bottom-1.5 !min-h-0 !w-8 !p-0 !rounded-lg !bg-emerald-50/80 dark:!bg-zinc-900 hover:!bg-emerald-50/80 dark:hover:!bg-zinc-900 !text-primary" icon={<Wand2 className="w-3.5 h-3.5" />} />
-            </div>
-            <Button type="button" variant="ghost" onClick={onOpenScanner} className="!min-h-0 !w-10 !h-10 !p-0 !rounded-xl !bg-blue-50 dark:!bg-blue-500/10 hover:!bg-blue-50 dark:hover:!bg-blue-500/10 !text-blue-500 shrink-0" icon={<Camera className="w-4 h-4" />} />
+            <input
+              type="text"
+              name="barcode"
+              value={formData.barcode}
+              onChange={onFieldChange}
+              placeholder={"scan_or_generate"}
+              className="flex-1 min-w-0 bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all uppercase font-medium placeholder:text-gray-600"
+            />
+            <Button type="button" variant="ghost" onClick={onGenerateBarcode} className="!min-h-0 !w-11 !h-11 !p-0 !rounded-xl !bg-emerald-50 dark:!bg-emerald-500/10 hover:!bg-emerald-100 dark:hover:!bg-emerald-500/20 !text-emerald-600 dark:!text-emerald-400 shrink-0" icon={<Wand2 className="w-4 h-4" />} />
+            <Button type="button" variant="ghost" onClick={onOpenScanner} className="!min-h-0 !w-11 !h-11 !p-0 !rounded-xl !bg-blue-50 dark:!bg-blue-500/10 hover:!bg-blue-100 dark:hover:!bg-blue-500/20 !text-blue-600 dark:!text-blue-400 shrink-0" icon={<Camera className="w-4 h-4" />} />
           </div>
           {formData.barcode && (
             <BarcodePreview value={formData.barcode} />

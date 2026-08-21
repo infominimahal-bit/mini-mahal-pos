@@ -93,6 +93,7 @@ export function AppContent() {
         <>
           <DialogProvider />
           <Header onShowMobileMenu={() => setIsMobileMenuOpen(true)} isMobileMenuOpen={isMobileMenuOpen} onHideMobileMenu={() => setIsMobileMenuOpen(false)} />
+          <OfflineBanner />
           <main className="flex-1 min-h-0 relative overflow-y-auto overflow-x-hidden bg-gray-50 dark:bg-app" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
               <ErrorBoundary>
               <Suspense fallback={<LoadingView />}>
@@ -128,7 +129,6 @@ export function AppContent() {
               </div>
             )}
           </main>
-          <OfflineBanner />
           <MobileBottomNav onShowMenu={() => setIsMobileMenuOpen(true)} />
         </>
       )}

@@ -46,47 +46,66 @@ export const activeReturns = new Set<string>();
 
 export async function commitSaleAuthoritative(
   remoteSale: any,
-  movements: any[]
+  movements: any[],
+  maxTries = 2
 ): Promise<any> {
-  try {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) return null;
-    // MASTER §5.2: reuse the sale id as the client-generated idempotency key so a
-    // retry / offline replay of the SAME local sale is a no-op server-side, not a
-    // second sale. Stable across retries because the local sale id never changes.
-    const salePayload = { ...remoteSale, idempotency_key: remoteSale?.id };
-    const timeoutPromise = new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000));
-    const { data, error } = await Promise.race([
-      (supabase as any).rpc('commit_sale', {
-        p_sale: salePayload,
-        p_history: movements,
-      }),
-      timeoutPromise
-    ]);
-    if (error) {
-      console.error('[commit_sale] RPC error:', error.message);
+  let lastErr: any = null;
+  for (let attempt = 0; attempt < maxTries; attempt++) {
+    try {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return null;
+      // MASTER §5.2: reuse the sale id as the client-generated idempotency key so a
+      // retry / offline replay of the SAME local sale is a no-op server-side, not a
+      // second sale. Stable across retries because the local sale id never changes.
+      const salePayload = { ...remoteSale, idempotency_key: remoteSale?.id };
+      const timeoutPromise = new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000));
+      const { data, error } = await Promise.race([
+        (supabase as any).rpc('commit_sale', {
+          p_sale: salePayload,
+          p_history: movements,
+        }),
+        timeoutPromise
+      ]);
+      if (error) {
+        lastErr = error;
+        if (attempt < maxTries - 1) { await new Promise((r) => setTimeout(r, 400)); continue; }
+        console.error('[commit_sale] RPC error:', error.message);
+        return null;
+      }
+      return data;
+    } catch (e: any) {
+      lastErr = e;
+      if (attempt < maxTries - 1) { await new Promise((r) => setTimeout(r, 400)); continue; }
+      console.error('[commit_sale] exception:', e?.message || e);
       return null;
     }
-    return data;
-  } catch (e: any) {
-    console.error('[commit_sale] exception:', e?.message || e);
-    return null;
   }
+  return null;
 }
 
-// Revert a locally-written sale + restore local product stock when the cloud
-// reports it was already fulfilled by another device (race on the same order).
+// Revert a locally-written sale + restore local product/variant stock when the
+// cloud rejects the commit (offline first failure) or reports it was already
+// fulfilled by another device. This is what enforces ALL-OR-NOTHING for online
+// sales: a failed cloud commit leaves NO half-written local state behind.
 export async function revertLocalSaleStock(saleId: string, movements: any[]) {
   try {
     await localDb.sales.delete(saleId);
     for (const m of movements || []) {
       const pid = m?.product_id || m?.productId;
       if (!pid) continue;
-      if (m?.variant_id || m?.variantId) continue;
       const p = await localDb.products.get(pid);
-      if (p) {
-        const qty = Number(m.change_qty ?? m.changeQty) || 0;
-        // Sale movement change_qty is NEGATIVE (e.g. -5 sold). To RESTORE local stock
-        // we must add the absolute amount: stock - change_qty = stock + 5.
+      if (!p) continue;
+      const qty = Number(m.change_qty ?? m.changeQty) || 0;
+      const vid = m?.variant_id || m?.variantId;
+      if (vid && Array.isArray((p as any).variantData)) {
+        // Sale movement change_qty is NEGATIVE (e.g. -5 sold). To RESTORE local
+        // variant stock we add the absolute amount: stock - change_qty = stock + 5.
+        const updated = ((p as any).variantData as any[]).map((v) =>
+          v.id === vid ? { ...v, stock: (Number(v.stock) || 0) - qty } : v
+        );
+        await localDb.products.update(pid, { variantData: updated, updatedAt: new Date() });
+      } else {
+        // Sale movement change_qty is NEGATIVE (e.g. -5 sold). To RESTORE local
+        // stock we add the absolute amount: stock - change_qty = stock + 5.
         await localDb.products.update(pid, { stock: (p.stock || 0) - qty });
       }
     }

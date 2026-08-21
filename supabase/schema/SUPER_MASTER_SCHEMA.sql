@@ -2169,7 +2169,9 @@ BEGIN
       supplier_transactions,
       suppliers,
       users,
-      variant_stock_history;
+      variant_stock_history,
+      price_history,
+      sessions;
   END IF;
 END $$;
 
@@ -3714,42 +3716,69 @@ GRANT EXECUTE ON FUNCTION verify_table_write(uuid, text, text, text, text[]) TO 
 -- delete_sale_atomic / refund_sale_atomic are ROLE-GATE-FREE (anon-key single-tenant
 -- compatible, MASTER §2.1.4). Over-refund cap retained in refund_sale_atomic.
 CREATE OR REPLACE FUNCTION public.delete_sale_atomic(
-  p_sale_id uuid, p_history jsonb, p_user_id uuid DEFAULT NULL, p_role text DEFAULT NULL, p_sig text DEFAULT NULL
-) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public, extensions AS $function$
-DECLARE h jsonb;
+  p_sale_id uuid,
+  p_history jsonb,
+  p_user_id uuid DEFAULT NULL,
+  p_role text DEFAULT NULL,
+  p_sig text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  h jsonb;
 BEGIN
-  -- Role gate intentionally removed: this anon-key single-tenant architecture
-  -- cannot enforce roles (MASTER §2.1.4 dropped per anon-compat revert). Cashiers
-  -- must void sales in real shops; the signed-token gate rejected non-admin
-  -- deletes and left sales 'completed' in cloud with stock never reversed.
-  IF NOT EXISTS (SELECT 1 FROM sales WHERE id = p_sale_id) THEN
+  PERFORM public.require_action(p_user_id, p_role, 'delete_sale', p_sig, VARIADIC array['admin', 'manager']);
+
+  IF NOT EXISTS (SELECT 1 FROM sales WHERE id = p_sale_id AND deleted_at IS NULL) THEN
     RETURN jsonb_build_object('success', true, 'id', p_sale_id, 'note', 'already_deleted');
   END IF;
-  FOR h IN SELECT * FROM jsonb_array_elements(p_history) LOOP
+
+  FOR h IN SELECT * FROM jsonb_array_elements(p_history)
+  LOOP
     IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
       INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
+      ON CONFLICT (id) DO NOTHING;
     ELSE
       INSERT INTO stock_history (id, product_id, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
+      ON CONFLICT (id) DO NOTHING;
     END IF;
   END LOOP;
-  -- HARD DELETE: the record_tombstone_sales AFTER DELETE trigger writes the tombstone
-  -- (per master guide: deletions use hard deletes + row_tombstone; never status='deleted').
-  DELETE FROM sales WHERE id = p_sale_id;
+
+  UPDATE sales SET status = 'deleted', deleted_at = now(), updated_at = now() WHERE id = p_sale_id;
+  INSERT INTO row_tombstones (table_name, ref_id, deleted_at)
+  VALUES ('sales', p_sale_id, now())
+  ON CONFLICT (table_name, ref_id) DO UPDATE SET deleted_at = EXCLUDED.deleted_at;
+
   RETURN jsonb_build_object('success', true, 'id', p_sale_id);
 END;
 $function$;
 GRANT EXECUTE ON FUNCTION delete_sale_atomic(uuid, jsonb, uuid, text, text) TO anon, authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.refund_sale_atomic(
-  p_sale_id uuid, p_history jsonb, p_status text, p_refunded_amount numeric, p_user_id uuid DEFAULT NULL, p_role text DEFAULT NULL, p_sig text DEFAULT NULL
-) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public, extensions AS $function$
-DECLARE h jsonb; _total numeric;
+  p_sale_id uuid,
+  p_history jsonb,
+  p_status text,
+  p_refunded_amount numeric,
+  p_user_id uuid DEFAULT NULL,
+  p_role text DEFAULT NULL,
+  p_sig text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  h jsonb;
+  _total numeric;
 BEGIN
-  -- Role gate intentionally removed: anon-key single-tenant architecture cannot
-  -- enforce roles (MASTER §2.1.4). Refunds must work for cashiers/owners on any
-  -- device. Over-refund cap below is retained.
+  PERFORM public.require_action(p_user_id, p_role, 'refund_sale', p_sig, VARIADIC array['admin', 'manager', 'cashier']);
+
   IF NOT EXISTS (SELECT 1 FROM sales WHERE id = p_sale_id) THEN
     RETURN jsonb_build_object('success', true, 'id', p_sale_id, 'note', 'sale_missing');
   END IF;
@@ -3757,13 +3786,16 @@ BEGIN
   IF _total IS NOT NULL AND p_refunded_amount > _total + 0.001 THEN
     RAISE EXCEPTION 'FORBIDDEN: refund amount exceeds sale total' USING ERRCODE = '42501';
   END IF;
-  FOR h IN SELECT * FROM jsonb_array_elements(p_history) LOOP
+  FOR h IN SELECT * FROM jsonb_array_elements(p_history)
+  LOOP
     IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
       INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
+      ON CONFLICT (id) DO NOTHING;
     ELSE
       INSERT INTO stock_history (id, product_id, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
+      ON CONFLICT (id) DO NOTHING;
     END IF;
   END LOOP;
   UPDATE sales SET status = p_status, refunded_amount = p_refunded_amount, updated_at = now() WHERE id = p_sale_id;
@@ -4172,7 +4204,7 @@ BEGIN
     p_sale->>'estore_status', p_sale->>'delivery_address', (p_sale->>'delivery_fee')::numeric,
     (p_sale->>'delivery_location_lat')::numeric, (p_sale->>'delivery_location_lng')::numeric, p_sale->>'customer_notes',
     NULLIF(p_sale->>'source_order_id','')::uuid, NULLIF(p_sale->>'salesman_id','')::uuid, p_sale->>'salesman_name',
-    NULLIF(p_sale->>'device_id','')::text, NULLIF(p_sale->>'user_id','')::uuid, NULLIF(p_sale->>'sync_status','')::text,
+    NULLIF(p_sale->>'device_id','')::text, NULLIF(p_sale->>'user_id','')::uuid, COALESCE(NULLIF(p_sale->>'sync_status',''),'synced')::text,
     p_sale->>'original_cashier', NULLIF(p_sale->>'original_salesman_id','')::uuid, p_sale->>'original_salesman_name',
     p_sale->>'action_performed_by', NULLIF(p_sale->>'idempotency_key','')::uuid,
     COALESCE((p_sale->>'created_at')::timestamptz, now()), now()

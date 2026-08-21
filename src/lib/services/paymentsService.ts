@@ -29,7 +29,7 @@ import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { signAction, withActor } from '../actionToken';
 import { fetchAllPages, normalizePaymentMethod } from './utils';
-import { saleTxnType, walletDelta } from './ledgerResolver';
+import { saleTxnType, walletDelta, resolveReversal } from './ledgerResolver';
 
 export const toRemotePayment = (p: any) => {
   const remote: any = {};
@@ -188,7 +188,7 @@ export const buildSalePaymentMoves = (sale: any): any[] => {
   if (isCreditSale(sale)) return [];
   // PHASE 16/4A: wallet direction is derived from the SAME resolver that drives
   // inventory (negative-qty sale => mirror => Wallet OUT). Never guess the sign.
-  const direction = saleTxnType(sale).wallet;
+  const direction = resolveReversal(saleTxnType(sale)).wallet;
   if (sale.paymentMethod === 'split' && sale.splitPayments?.length) {
     return sale.splitPayments.map((p: any) => ({
       id: generateId(),

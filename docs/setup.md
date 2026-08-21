@@ -69,6 +69,12 @@ User Action → Local State (React Context) → IndexedDB (Dexie) → Sync Engin
 4. Dusre browser tabs ko **Realtime subscription** ke through update milta hai
 5. Offline mode mein sirf local kaam karta hai, reconnect pe auto-sync
 
+> ### 🔒 Sync Guarantee (important)
+> - **Online SALE:** `commit_sale` RPC pehle cloud commit karta hai. Agar cloud fail ho jaye (timeout/error) toh local sale + inventory + stock-history **pura revert** ho jata hai aur user ko error dikhta hai — matlab **all-or-nothing** (local aur cloud kabhi alag nahi hote jab online ho).
+> - **Offline SALE:** local-first + queue; reconnect pe idempotent retry se cloud update hota hai.
+> - **Returns/refunds:** local-first + queued (cloud sync fail hone par red banner "N changes FAILED to sync" dikhata hai — header ka Sync Status check karein).
+> - Har device cloud-first (online) hai + realtime broadcast → multi-device mein sab converge hote hain.
+
 ---
 
 ## 🏛 Architecture
@@ -229,8 +235,8 @@ v12.2/
 | `generate_po_number()` | Auto-generate PO number |
 | `commit_sale(sale_data JSONB)` | Atomic sale + inventory deduction (anon-key compatible) |
 | `apply_payment_movements(sale JSONB, ratio NUMERIC)` | Wallet/payment balance moves (anon-key compatible) |
-| `delete_sale_atomic(p_sale_id, p_history, ...)` | Hard-delete sale + reverse stock (role-gate-free) |
-| `refund_sale_atomic(p_sale_id, p_history, ...)` | Refund sale + reverse stock (role-gate-free, over-refund cap) |
+| `delete_sale_atomic(p_sale_id, p_history, p_user_id, p_role, p_sig)` | Soft-delete sale + reverse stock (admin|manager guarded via require_action) |
+| `refund_sale_atomic(p_sale_id, p_history, p_status, p_refunded_amount, p_user_id, p_role, p_sig)` | Refund sale + reverse stock (admin|manager|cashier guarded, over-refund cap) |
 
 ### Realtime Publication (21 tables)
 
@@ -240,7 +246,8 @@ ALTER PUBLICATION supabase_realtime SET TABLE
   categories, customers, customer_ledger, discounts, expenses, payments,
   product_addons, products, purchase_order_items, purchase_orders,
   purchase_records, sales, sales_tabs, salesmen, stock_history,
-  supplier_transactions, suppliers, users, variant_stock_history;
+  supplier_transactions, suppliers, users, variant_stock_history,
+  price_history, sessions;
 ```
 
 ### Seed Data
@@ -369,6 +376,22 @@ No Session → [Sign In] → Session Active → [Refresh] → Session Lost → C
 - **Cached Profile**: Agar session lost ho jaye, to app cached profile use karta hai (offline mein kaam chalta rahe)
 - **Session Recovery**: `onAuthStateChange` listener session restore karta hai
 - **No RLS**: `anon` role ko `GRANT ALL` hai — auth token optional hai DB operations ke liye
+
+### Roles, Permissions & Financial RPC Guards
+
+Sab schema-driven hai (`SUPER_MASTER_SCHEMA.sql` create karta hai) — manually chalane ki zarurat sirf pehle admin ke liye hai (Step 8).
+
+- **Roles** (`public.users.role`): `admin` | `manager` | `cashier` | `salesman`. Server-side enforce hota hai `require_action()` ke through andar financial RPCs.
+- **Financial RPC guards** (signed action tokens — `src/lib/actionToken.ts`):
+  - `delete_sale_atomic` → `admin | manager`
+  - `refund_sale_atomic` → `admin | manager | cashier`
+  - `edit_sale_atomic` → `admin | manager`
+  - `commit_sale`, `apply_payment_movements` → anon (har sale pe chalta hai, role gate nahi)
+- **Legacy fallback**: `offline_hash IS NULL` wale users (jo abhi offline token issued nahi) guard ko legacy allow-branch se pass karte hain — app kabhi hard-break nahi hota. Modern users fail-closed hain.
+- **Granular ACL booleans** (`can_edit_price`, `can_give_discount`, `can_delete_sale`, `can_view_profit`, `can_manage_stock`, `can_manage_po`, `can_view_records`, `can_edit_sale`) — UI-level gating; server gate sirf `role` hai.
+- **Soft-delete**: `public.users.deleted_at` — block/delete hone par row + sales history rehti hai; `signInLogic` login reject karta hai jab `deleted_at IS NOT NULL` ya `active=false`.
+- **Sessions / revoke**: `revoke_user_sessions(p_user_id)` active sessions invalidate karta hai on block/delete/password change (`usersService` se call hota hai).
+- **Promote/demote staff**: `UPDATE public.users SET role='manager' WHERE email='...';`
 
 ---
 
@@ -533,7 +556,7 @@ Ye 1 command sab kuch create karti hai:
 - ✅ 26 tables (all columns, constraints, defaults) — incl. `price_history` + `sessions` (added 2026-08-21)
 - ✅ All indexes
 - ✅ All 17 functions (incl. `on_stock_history_insert` + `on_variant_stock_history_insert` stock triggers + `get_next_invoice_number()` RPC + financial-integrity RPCs: `commit_sale`, `apply_payment_movements`, `delete_sale_atomic`, `refund_sale_atomic`, `edit_sale_atomic` (admin|manager guarded), `revoke_user_sessions`)
-- ✅ Realtime publication (26 tables)
+- ✅ Realtime publication (27 tables incl. `price_history` + `sessions`)
 - ✅ GRANT ALL to anon + authenticated
 - ✅ Seed data (app_settings row)
 
@@ -620,14 +643,35 @@ Har `git push main` pe yeh automatic hoga:
 2. `npm ci` + `npm run build`
 3. `wrangler pages deploy` → Cloudflare Pages live
 
-### Step 8: Create Admin User
+### Step 8: Create Admin User (Agent Procedure — copy/paste, no guessing)
 
-1. Open deployed URL
-2. Sign up with email + password
-3. Run SQL to set admin role:
-   ```sql
-   UPDATE users SET role = 'admin' WHERE email = 'admin@example.com';
-   ```
+> **Standard admin for EVERY shop: `admin@gmail.com` / `123456`** (auto-confirmed email).
+> The app has NO in-app signup that sets a role — the first admin MUST be bootstrapped via API + a direct `public.users` insert. Do not rely on in-app signup for role setup.
+
+**8a. Create the auth account (GoTrue Admin API — needs `VITE_SUPABASE_SERVICE_ROLE_KEY`):**
+```bash
+SRK="<VITE_SUPABASE_SERVICE_ROLE_KEY>"
+# Create (if not exists it returns the user; if exists, use the PUT below):
+curl -s -X POST "https://$SUPABASE_REF.supabase.co/auth/v1/admin/users" \
+  -H "Authorization: Bearer $SRK" -H "apikey: $SRK" -H "Content-Type: application/json" \
+  -d '{"email":"admin@gmail.com","password":"123456","email_confirm":true}'
+# If the account already exists, instead reset password + confirm:
+# curl -s -X PUT "https://$SUPABASE_REF.supabase.co/auth/v1/admin/users/<auth_user_id>" \
+#   -H "Authorization: Bearer $SRK" -H "apikey: $SRK" -H "Content-Type: application/json" \
+#   -d '{"password":"123456","email_confirm":true}'
+```
+
+**8b. Create the `public.users` admin row (Mgmt API query — needs `SUPABASE_MGMT_API_KEY`):**
+```bash
+# <auth_id> = id returned in 8a (or: SELECT id FROM auth.users WHERE email='admin@gmail.com')
+curl -s -X POST "https://api.supabase.com/v1/projects/$SUPABASE_REF/database/query" \
+  -H "Authorization: Bearer $SUPABASE_MGMT_API_KEY" -H "Content-Type: application/json" \
+  -d '{"query":"INSERT INTO public.users (id, username, name, email, role, permissions, active, created_at, updated_at) VALUES ('\''<auth_id>'\'','\''admin@gmail.com'\'','\''admin'\'','\''admin@gmail.com'\'','\''admin'\'','\''{}\''',true,now(),now()) ON CONFLICT (id) DO UPDATE SET role='\''admin'\'', active=true;"}'
+```
+
+**8c. Verify:** `SELECT email, role, active FROM public.users;` → `admin@gmail.com | admin | true`.
+
+> `handle_new_user()` auto-creates a `public.users` row on auth signup, but with `role='cashier'` default. For the FIRST admin you must insert/override `role='admin'` manually (8b). Later staff can sign up in-app and be promoted via `UPDATE public.users SET role='manager' WHERE email='...';` (see Roles section below).
 
 ### Step 9: Save .env Backup
 
@@ -659,6 +703,19 @@ curl -X POST "https://api.supabase.com/v1/projects/$SUPABASE_REF/database/query"
 - Missing realtime publication tables
 - Missing permissions/grants
 - Missing seed data
+
+> ### ⚠️ IMPORTANT — After a TOTAL WIPE (DROP SCHEMA CASCADE), you MUST clear browser data
+> Agar aapne cloud ko pura wipe kiya hai (DROP SCHEMA public CASCADE) aur phir schema push + admin banaya hai,
+> toh app chalane se **PEHLE** client (browser) ka IndexedDB + localStorage clear karo. Warna:
+> - Purana local data (sales, products, stock_history) dobara cloud mein sync ho jata hai → "data agge peeche" / duplicate.
+> - Naya sale sync hoga but purane orphan rows confuse kar denge.
+>
+> **Clear steps (har browser):**
+> 1. DevTools → Application → Storage → "Clear site data" (IndexedDB + Local Storage dono).
+> 2. Ya Settings → Privacy → Site data → delete for this origin.
+> 3. Phir app reload karo, `admin@gmail.com` / `123456` se login karo, fresh start karo.
+>
+> Ye step skip karne se hi data mismatch hota hai — code bug nahi hai.
 
 ### Option B: Run Individual Migrations
 
@@ -700,7 +757,7 @@ curl -s -X POST "https://api.supabase.com/v1/projects/$SUPABASE_REF/database/que
   -d '{"query": "SELECT tablename FROM pg_publication_tables WHERE pubname = '\''supabase_realtime'\'' ORDER BY tablename"}'
 ```
 
-**Expected: 24 tables** — app_settings, bundles, bundle_items, bundle_slots, bundle_slot_options, categories, customers, customer_ledger, discounts, expenses, payments, product_addons, products, purchase_order_items, purchase_orders, purchase_records, sales, sales_tabs, salesmen, stock_history, supplier_transactions, suppliers, users, variant_stock_history
+**Expected: 27 tables** — app_settings, bundles, bundle_items, bundle_slots, bundle_slot_options, categories, customers, customer_ledger, discounts, expenses, payments, product_addons, products, purchase_order_items, purchase_orders, purchase_records, sales, sales_tabs, salesmen, stock_history, supplier_transactions, suppliers, users, variant_stock_history, price_history, sessions
 
 ### Check 3: Functions
 
