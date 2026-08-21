@@ -6,6 +6,7 @@ import { adjustPaymentBalances, buildReversePaymentMoves, buildSalePaymentMoves 
 import { recordCustomerLedger } from './customersService';
 import { createSale } from './saleCreate';
 import { deleteSale } from './saleDelete';
+import { logAuditEvent } from './auditLogService';
 
 // PHASE 5b — Atomic bill edit. Replaces the old two-call (create + delete)
 // flow so stock can NEVER leak if one call fails independently. The cloud RPC
@@ -14,6 +15,15 @@ import { deleteSale } from './saleDelete';
 // stats/ledger) are applied here, AFTER the RPC succeeds.
 export async function editSaleAtomic(oldSale: any, newSale: any, cashier: string): Promise<any> {
   const now = new Date();
+  // BUG-C05/C13: salesman is IMMUTABLE — always carry forward from the original sale.
+  const oldSaleLocal = await localDb.sales.get(oldSale.id);
+  if (!oldSaleLocal) throw new Error(`Old sale not found: ${oldSale.id}`);
+  newSale.salesmanId = (oldSaleLocal as any).salesmanId || newSale.salesmanId;
+  newSale.salesmanName = (oldSaleLocal as any).salesmanName || newSale.salesmanName;
+  (newSale as any).lastEditedBy = cashier;
+  (newSale as any).lastEditedAt = now;
+  (newSale as any).editCount = ((oldSaleLocal as any).editCount || 0) + 1;
+
   const isDraft = newSale.status === 'pending' || !!newSale.notes?.includes('DRAFT_SALE');
 
   const newMovements = await buildSaleStockMovements(newSale, false, newSale.invoiceNumber);
@@ -93,6 +103,15 @@ export async function editSaleAtomic(oldSale: any, newSale: any, cashier: string
   // 3. Local optimistic swap (cloud realtime will re-affirm stock = truth).
   await localDb.sales.delete(oldSale.id);
   await localDb.sales.put(newSale);
+
+  // BUG-C06: audit trail — every bill edit is logged locally + synced.
+  await logAuditEvent({
+    saleId: newSale.id,
+    invoiceNumber: newSale.invoiceNumber,
+    action: 'edited',
+    performedByName: cashier,
+    meta: { oldSaleId: oldSale.id, oldInvoice: oldSale.invoiceNumber, newTotal: newSale.total, salesmanName: (oldSale as any).salesmanName },
+  });
   const touch = async (m: any) => {
     const p = await localDb.products.get(m.product_id);
     if (p) await localDb.products.update(p.id, { stock: (p.stock || 0) + Number(m.change_qty), updatedAt: now });

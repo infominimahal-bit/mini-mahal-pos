@@ -2,11 +2,34 @@ import { supabase } from '../supabase';
 import { withActor, signAction } from '../actionToken';
 import type { PendingOp } from '../types';
 import { localDb, SETTINGS_ID, filterPayload, recordBlacklistedColumn } from './state';
+import { useConflictStore } from '../../stores/conflictStore';
 
 export async function executeOp(op: PendingOp): Promise<void> {
     if (op.entity === 'payment_movements') {
       try {
         await supabase.rpc('apply_payment_movements', { p_moves: op.payload });
+        await localDb.pendingOps.delete(op.id!);
+      } catch (e) {
+        throw e;
+      }
+      return;
+    }
+
+    if (op.entity === 'sale_audit_log' && op.opType === 'create') {
+      try {
+        const { error: ae } = await supabase.from('sale_audit_log').insert(op.payload);
+        if (ae && ae.code !== '23505') throw ae;
+        await localDb.pendingOps.delete(op.id!);
+      } catch (e) {
+        throw e;
+      }
+      return;
+    }
+
+    if (op.entity === 'payment_modes' && (op.opType === 'upsert' || op.opType === 'update')) {
+      try {
+        const { error: me } = await supabase.from('payment_modes').upsert(op.payload, { onConflict: 'id' });
+        if (me) throw me;
         await localDb.pendingOps.delete(op.id!);
       } catch (e) {
         throw e;
@@ -32,6 +55,39 @@ export async function executeOp(op: PendingOp): Promise<void> {
     const { opType, entityId, payload: originalPayload } = op;
     const MAX_SCHEMA_RETRIES = 10;
     let schemaRetries = 0;
+
+    // BUG-C11/M03: multi-device conflict detection on sale updates.
+    if (op.entity === 'sales' && (op.opType === 'update' || op.opType === 'upsert')) {
+      // Tombstone check: a delete on another device wins.
+      const { data: tomb } = await supabase
+        .from('row_tombstones').select('ref_id').eq('ref_id', entityId).eq('table_name', 'sales').maybeSingle();
+      if (tomb) {
+        await localDb.sales.delete(entityId).catch(() => {});
+        if (op.id != null) await localDb.pendingOps.delete(op.id).catch(() => {});
+        useConflictStore.getState().addConflict({
+          entity: 'sales', entityId,
+          localVersion: originalPayload, cloudVersion: { status: 'deleted' }, pendingOpId: op.id as number,
+        });
+        return;
+      }
+      // updated_at conflict: cloud is newer and status differs → flag conflict, hold the op.
+      const { data: cs } = await supabase
+        .from('sales').select('id, updated_at, status').eq('id', entityId).maybeSingle();
+      if (cs) {
+        const cloudAt = new Date((cs as any).updated_at);
+        const localAt = new Date((op as any).localUpdatedAt || (op as any).createdAt || 0);
+        if (cloudAt > localAt && (cs as any).status !== originalPayload.status) {
+          if (op.id != null) {
+            await localDb.pendingOps.update(op.id, { conflictState: 'conflict', lastError: `CONFLICT: cloud=${(cs as any).updated_at}` }).catch(() => {});
+          }
+          useConflictStore.getState().addConflict({
+            entity: 'sales', entityId,
+            localVersion: originalPayload, cloudVersion: cs, pendingOpId: op.id as number,
+          });
+          return;
+        }
+      }
+    }
 
     while (schemaRetries < MAX_SCHEMA_RETRIES) {
         let payload = filterPayload(op.entity, originalPayload);
@@ -66,11 +122,15 @@ export async function executeOp(op: PendingOp): Promise<void> {
                 error = result.error;
             }
             else if (op.entity === 'sales' && opType === 'update' && (payload.status === 'refunded' || payload.status === 'partially_refunded')) {
-                const result = await supabase.rpc('process_return', { sale_id: entityId, return_data: payload });
-                error = result.error;
-                if (!error && result.data && result.data.success === false) {
-                    error = new Error(result.data.error || 'Unknown process_return error');
-                }
+                // BUG-C12: use the atomic refund RPC (not process_return) so stock +
+                // status commit together and cannot diverge.
+                const { error: refundErr } = await supabase.rpc('refund_sale_atomic', {
+                    p_sale_id: entityId,
+                    p_history: (op as any).history || [],
+                    p_status: payload.status,
+                    p_refunded_amount: Number(payload.refunded_amount || 0),
+                });
+                error = refundErr;
             }
             else if (op.entity === 'sales' && opType === 'update') {
                 const guarded = await withActor({ ...payload, id: entityId }, 'sales');

@@ -34,48 +34,9 @@ export const useSalesStore = create<SalesState>((set) => ({
   })),
 
   deleteSale: (saleId) => set((st) => {
-    const saleToDelete = st.sales.find((s) => s.id === saleId);
-    let customers = useCustomersStore.getState().customers;
-    const updatedProducts = [...useProductsStore.getState().products];
-
-    if (saleToDelete && saleToDelete.customerId) {
-      const remainingTotal = saleToDelete.total - (saleToDelete.refundedAmount || 0);
-      customers = customers.map((c) =>
-        c.id === saleToDelete.customerId
-          ? { ...c, totalPurchases: Math.max(0, (c.totalPurchases || 0) - remainingTotal), updatedAt: new Date() }
-          : c
-      );
-      useCustomersStore.setState({ customers });
-    }
-
-    if (saleToDelete && saleToDelete.status === 'completed') {
-      saleToDelete.items.forEach((item) => {
-        const productIdx = updatedProducts.findIndex((p) => p.id === item.product.id);
-        if (productIdx >= 0 && updatedProducts[productIdx].trackInventory !== false) {
-          const qty = (item.weight || item.quantity) - (item.refundedQuantity || 0);
-          if (qty > 0) {
-            const updatedProduct = { ...updatedProducts[productIdx] };
-            updatedProduct.stock = (updatedProduct.stock || 0) + qty;
-            updatedProducts[productIdx] = updatedProduct;
-          }
-        }
-        if (item.addonItems && item.addonItems.length > 0) {
-          item.addonItems.forEach((addonItem) => {
-            const addonIdx = updatedProducts.findIndex((p) => p.id === addonItem.addon.addonProductId);
-            if (addonIdx >= 0 && updatedProducts[addonIdx].trackInventory !== false) {
-              const addonQty = (addonItem.quantity * item.quantity) - (item.refundedQuantity ? addonItem.quantity * item.refundedQuantity : 0);
-              if (addonQty > 0) {
-                const updatedAddonProduct = { ...updatedProducts[addonIdx] };
-                updatedAddonProduct.stock = (updatedAddonProduct.stock || 0) + addonQty;
-                updatedProducts[addonIdx] = updatedAddonProduct;
-              }
-            }
-          });
-        }
-      });
-      useProductsStore.setState({ products: updatedProducts });
-    }
-
+    // BUG-H03: stock/customer reversals are handled by saleDelete service via
+    // Dexie → productsStore sync. Do NOT mutate product/customer state here
+    // (that would double-apply and drift the UI stock).
     return { sales: st.sales.filter((s) => s.id !== saleId) };
   }),
 

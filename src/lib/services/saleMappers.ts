@@ -69,6 +69,11 @@ export const toRemoteSale = (s: Partial<Sale>) => {
   if ('deliveryLocationLat' in s) { remote.delivery_location_lat = s.deliveryLocationLat; delete remote.deliveryLocationLat; }
   if ('deliveryLocationLng' in s) { remote.delivery_location_lng = s.deliveryLocationLng; delete remote.deliveryLocationLng; }
   if ('customerNotes' in s) { remote.customer_notes = s.customerNotes; delete remote.customerNotes; }
+  if ('deviceId' in s) { remote.device_id = s.deviceId; delete remote.deviceId; }
+  if ('syncedAt' in s) { remote.synced_at = s.syncedAt instanceof Date ? s.syncedAt.toISOString() : s.syncedAt; delete remote.syncedAt; }
+  if ('lastEditedBy' in s) { remote.last_edited_by = s.lastEditedBy || null; delete remote.lastEditedBy; }
+  if ('lastEditedAt' in s) { remote.last_edited_at = s.lastEditedAt instanceof Date ? s.lastEditedAt.toISOString() : s.lastEditedAt; delete remote.lastEditedAt; }
+  if ('editCount' in s) { remote.edit_count = s.editCount || 0; delete remote.editCount; }
   if ('salesmanId' in s) { remote.salesman_id = s.salesmanId; delete remote.salesmanId; }
   if ('salesmanName' in s) { remote.salesman_name = s.salesmanName; delete remote.salesmanName; }
   if ('cashierRole' in s) { remote.cashier_role = s.cashierRole; delete remote.cashierRole; }

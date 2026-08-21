@@ -6,6 +6,7 @@ import { commitSaleAuthoritative, revertLocalSaleStock } from './atomicOps';
 import { recordCustomerLedger } from './customersService';
 import { collectSaleMovements } from './saleCreate.stock';
 import { adjustPaymentBalances, buildSalePaymentMoves } from './paymentsService';
+import { logAuditEvent } from './auditLogService';
 
 export async function createSale(sale: Omit<Sale, 'id'>): Promise<Sale> {
   if (!sale.invoiceNumber || String(sale.invoiceNumber).trim() === '' || sale.invoiceNumber === 'undefined') {
@@ -101,5 +102,15 @@ export async function createSale(sale: Omit<Sale, 'id'>): Promise<Sale> {
   }
 
   (newSale as any).wasOversold = anyOversold;
+
+  // BUG-C06/C07: audit trail — every sale creation is logged locally + synced.
+  await logAuditEvent({
+    saleId: newSale.id,
+    invoiceNumber: newSale.invoiceNumber,
+    action: 'created',
+    performedByName: (newSale as any).cashier,
+    meta: { total: newSale.total, itemCount: newSale.items.length, deviceId: (newSale as any).deviceId },
+  });
+
   return newSale;
 }

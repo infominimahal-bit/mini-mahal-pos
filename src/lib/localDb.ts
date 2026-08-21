@@ -106,6 +106,8 @@ export const TABLE_TO_ENTITY: Record<string, PendingOpEntity> = {
   'salesTabs': 'sales_tabs', 'expenses': 'expenses', 'appSettings': 'app_settings', 'bundles': 'bundles',
   'bundleItems': 'bundle_items', 'bundleSlots': 'bundle_slots', 'bundleSlotOptions': 'bundle_slot_options',
   'variantStockHistory': 'variant_stock_history', 'productAddons': 'product_addons',
+  'payment_movements': 'payment_movements',
+  'sale_audit_log': 'sale_audit_log',
 };
 
 export async function seedLocalDb(data: any) {

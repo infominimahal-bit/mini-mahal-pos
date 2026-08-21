@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sale, RefundRequest } from '../../types';
 import { Modal } from '../../shared/ui/Modal';
 import { RotateCcw, AlertTriangle } from 'lucide-react';
@@ -6,6 +6,7 @@ import { formatCurrency } from '../../lib/currencies';
 import { useApp } from '../../context/SupabaseAppContext';
 import { useSettingsStore } from '../../stores';
 import { Button, Select } from '../../shared/ui';
+import { paymentModesService } from '../../lib/services/paymentsService';
 
 interface RefundSaleModalProps {
   isOpen: boolean;
@@ -17,12 +18,21 @@ interface RefundSaleModalProps {
 
 export default function RefundSaleModal({ isOpen, onClose, sale, onConfirmRefund, isProcessing }: RefundSaleModalProps) {
   const settings = useSettingsStore(s => s.settings);
+  const [modes, setModes] = useState<{ id: string; name: string }[]>([]);
   // Default refund method = original sale method (fall back to cash for split/cheque)
   const defaultMethod = (['cash', 'card', 'online', 'digital'].includes(sale.paymentMethod))
     ? sale.paymentMethod
     : 'cash';
   const [reason, setReason] = useState('');
-  const [method, setMethod] = useState(defaultMethod);
+  const [method, setMethod] = useState<string>(defaultMethod);
+
+  useEffect(() => {
+    paymentModesService.getAll().then(list => {
+      setModes(list.map((m: any) => ({ id: m.id, name: m.name })));
+      const ids = list.map((m: any) => m.id);
+      if (!ids.includes(method)) setMethod(ids.includes(defaultMethod) ? defaultMethod : (ids[0] || 'cash'));
+    }).catch(() => setModes([{ id: 'cash', name: 'Cash' }, { id: 'card', name: 'Card' }, { id: 'online', name: 'Online Wallet' }]));
+  }, [sale.id]);
 
   // Partial refunds are removed: a refund is ALWAYS a full refund of the remaining
   // balance. This keeps the wallet reversal exact (the real amount) — never kam/ziyada.
@@ -56,15 +66,15 @@ export default function RefundSaleModal({ isOpen, onClose, sale, onConfirmRefund
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">Refund Method</label>
+            <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">Refund Via Wallet</label>
             <Select
               value={method}
               onChange={(e) => setMethod(e.target.value)}
               className="!py-2.5"
             >
-              <option value="cash">Cash</option>
-              <option value="card">Card</option>
-              <option value="online">Online Wallet</option>
+              {modes.map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
             </Select>
           </div>
           <div className="space-y-1.5 sm:col-span-1">

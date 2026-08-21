@@ -117,6 +117,8 @@ export interface Sale {
   deliveryLocationLat?: number;
   deliveryLocationLng?: number;
   customerNotes?: string;
+  deviceId?: string;
+  syncedAt?: Date;
   // Salesman tracking
   salesmanId?: string;
   salesmanName?: string;

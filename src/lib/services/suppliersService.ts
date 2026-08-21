@@ -108,16 +108,19 @@ export const suppliersService = {
     }));
   },
 
-  async recordPayment(data: { supplier_id: string; amount: number; payment_type: string; note?: string; isManualOverride?: boolean; overrideBy?: string; expenseId?: string }) {
+  async recordPayment(data: { supplier_id: string; amount: number; payment_type: string; note?: string; isManualOverride?: boolean; overrideBy?: string; expenseId?: string; splitPayments?: Array<{ method: string; amount: number }> }) {
+    const split = data.splitPayments && data.splitPayments.length ? data.splitPayments : null;
+    const totalAmount = split ? split.reduce((s, sp) => s + Number(sp.amount || 0), 0) : data.amount;
     const id = generateId();
     const tx: any = {
       id,
       supplierId: data.supplier_id,
       type: 'payment',
       sourceType: 'payment' as const,
-      amount: data.amount,
+      amount: totalAmount,
       note: data.note,
       paymentType: data.payment_type,
+      splitPayments: split,
       isManualOverride: data.isManualOverride || false,
       overrideBy: data.overrideBy || undefined,
       expenseId: data.expenseId,
@@ -125,14 +128,24 @@ export const suppliersService = {
     };
     await localDb.supplierTransactions.add(tx);
     await queueOp('supplier_transactions', 'create', id, toRemoteSupplierTransaction(tx));
-    // Wallet deduction: paying supplier = money OUT of our register
-    await adjustPaymentBalances([{
-      id: generateId(),
-      modeId: normalizePaymentMethod(data.payment_type || 'cash'),
-      delta: -data.amount,
-      referenceId: id,
-      note: `Supplier payment: ${data.note || ''}`,
-    }]);
+    // Wallet deduction: paying supplier = money OUT of our register (split-aware)
+    if (split) {
+      await adjustPaymentBalances(split.map(sp => ({
+        id: generateId(),
+        modeId: normalizePaymentMethod(sp.method || 'cash'),
+        delta: -Number(sp.amount || 0),
+        referenceId: id,
+        note: `Supplier payment: ${data.note || ''}`,
+      })), { batchId: id });
+    } else {
+      await adjustPaymentBalances([{
+        id: generateId(),
+        modeId: normalizePaymentMethod(data.payment_type || 'cash'),
+        delta: -totalAmount,
+        referenceId: id,
+        note: `Supplier payment: ${data.note || ''}`,
+      }], { batchId: id });
+    }
     return tx;
   },
 
@@ -167,6 +180,29 @@ export const suppliersService = {
   },
 
   async deleteTransaction(id: string) {
+    // BUG-C02: reverse the wallet balances BEFORE any delete so money comes back.
+    const tx = await localDb.supplierTransactions.get(id);
+    if (tx?.type === 'payment' && Number(tx.amount || 0) > 0) {
+      if ((tx as any).splitPayments?.length) {
+        await adjustPaymentBalances((tx as any).splitPayments.map((sp: any) => ({
+          id: generateId(),
+          modeId: normalizePaymentMethod(sp.method || 'cash'),
+          delta: +Number(sp.amount),
+          referenceId: id,
+          referenceType: 'supplier_payment_reversal',
+          note: 'Supplier payment deleted',
+        })), { batchId: id });
+      } else {
+        await adjustPaymentBalances([{
+          id: generateId(),
+          modeId: normalizePaymentMethod((tx as any).paymentType || (tx as any).payment_type || 'cash'),
+          delta: +Number(tx.amount),
+          referenceId: id,
+          referenceType: 'supplier_payment_reversal',
+          note: 'Supplier payment deleted',
+        }], { batchId: id });
+      }
+    }
     // Cascade: a supplier PAYMENT also creates a linked expense row.
     // Delete the orphaned expense too, otherwise expense totals stay inflated.
     try {

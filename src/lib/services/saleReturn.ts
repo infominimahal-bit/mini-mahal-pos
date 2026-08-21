@@ -2,8 +2,31 @@ import { Sale, RefundRequest, StockHistory, VariantStockHistory, Payment } from 
 import { localDb, queueOp, generateId } from '../localDb';
 import { toRemoteProduct, toRemoteCustomer, toRemoteSale, toRemoteStockHistory, toRemoteVariantStockHistory } from './mappers';
 import { refundSaleAtomic, applyStockMovementsRemote, activeReturns } from './atomicOps';
-import { adjustPaymentBalances, buildReversePaymentMoves, toRemotePayment } from './paymentsService';
+import { adjustPaymentBalances, buildReversePaymentMoves, buildRefundPaymentMoves, toRemotePayment } from './paymentsService';
+import { normalizePaymentMethod } from './utils';
 import { recordCustomerLedger } from './customersService';
+import { logAuditEvent } from './auditLogService';
+
+export function calculateRefundAmount(sale: any, items: Array<{ index: number; qty: number }>): number {
+  if (!items?.length) return 0;
+  const sub = Number(sale.subtotal || 0);
+  const disc = Number(sale.billDiscountAmount || sale.discountAmount || 0);
+  const discRate = sub > 0 ? disc / sub : 0;
+  let total = 0;
+  for (const req of items) {
+    const item = sale.items[req.index];
+    if (!item) continue;
+    const qty = Math.abs(Number(req.qty) || 0);
+    if (!qty) continue;
+    const itemSub = Number(item.subtotal || 0);
+    const itemQty = Math.abs(Number(item.weight || item.quantity) || 1);
+    const unitPrice = itemQty > 0 ? itemSub / itemQty : 0;
+    total += unitPrice * (1 - discRate) * qty;
+  }
+  const taxRate = Number(sale.taxAmount || 0) && Number(sale.total || 0)
+    ? Number(sale.taxAmount) / (Number(sale.total) - Number(sale.taxAmount)) : 0;
+  return Math.round(total * (1 + taxRate) * 100) / 100;
+}
 
 export async function returnSale(id: string, request?: RefundRequest, currentCashierName?: string): Promise<void> {
   if (activeReturns.has(id)) {
@@ -38,7 +61,13 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
       };
     }) : (request?.items || []);
 
-    const totalRefundAmount = isFullRefund ? sale.total : (request?.totalRefundAmount || 0);
+    let totalRefundAmount: number;
+    if (isFullRefund) {
+      totalRefundAmount = sale.total - (sale.refundedAmount || 0);
+    } else {
+      const calc = calculateRefundAmount(sale, itemsToReverse);
+      totalRefundAmount = calc > 0 ? calc : (request?.totalRefundAmount || 0);
+    }
 
     // R3 FIX: block over-refund BEFORE any local mutation so a repeated/partial
     // double-refund request can never restore stock or reverse payment twice.
@@ -181,6 +210,28 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
     }
 
     // (stock + status are committed atomically further below, after finalStatus is known)
+    // 1b. Restore FREE GIFTS stock on full refund (BUG-C09)
+    if (isFullRefund && (sale as any).freeGifts?.length) {
+      for (const gift of (sale as any).freeGifts) {
+        const gp = await localDb.products.get((gift as any)?.product?.id);
+        if (gp?.trackInventory) {
+          const qty = Math.abs(Number((gift as any).quantity || 1));
+          const newStock = (gp.stock || 0) + qty;
+          await localDb.products.update(gp.id, { stock: newStock, updatedAt: now });
+          const hid = generateId();
+          const he = {
+            id: hid, productId: gp.id, changeQty: qty, type: 'return' as const,
+            referenceId: id, note: `Sale #${sale.invoiceNumber} Refunded (Free Gift)`,
+            balanceAfter: newStock, cashierName: currentCashierName || 'System', createdAt: now,
+          };
+          await localDb.stockHistory.add(he);
+          returnMovements.push({ id: hid, product_id: gp.id, change_qty: qty, type: 'return',
+            note: he.note, variant_id: '', variant_label: '', cashier_name: he.cashierName });
+          returnQueue.push({ entity: 'stock_history', histId: hid, remote: toRemoteStockHistory(he), opts: { batchId: id } });
+        }
+      }
+    }
+
     // 2. Update sale record
     const newRefundedAmount = (sale.refundedAmount || 0) + totalRefundAmount;
 
@@ -275,9 +326,9 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
 
     // 5. Create reversing payment record for audit trail
     if (totalRefundAmount > 0) {
-      const refundMethod = (request?.method && ['cash', 'card', 'digital', 'online'].includes(request.method))
-        ? request.method
-        : (sale.paymentMethod === 'split' ? 'cash' : (sale.paymentMethod || 'cash'));
+      const refundWalletId = request?.method ? normalizePaymentMethod(request.method) : undefined;
+      const refundMethod = refundWalletId
+        || (sale.paymentMethod === 'split' ? 'cash' : (sale.paymentMethod || 'cash'));
       const refundPayId = generateId();
       const refundPayment: Payment = {
         id: refundPayId,
@@ -290,9 +341,19 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
       };
       await localDb.payments.add(refundPayment);
       await queueOp('payments', 'create', refundPayId, toRemotePayment(refundPayment), { batchId: id });
-      // Reverse wallet balances proportionally for the refunded amount (split-aware)
-      await adjustPaymentBalances(buildReversePaymentMoves(sale, taxRatio), { batchId: id });
+      // Refund wallet moves: same-wallet → reverse proportionally, different-wallet → deduct chosen only (BUG-C01/C08)
+      const walletMoves = buildRefundPaymentMoves(sale, totalRefundAmount, refundWalletId);
+      await adjustPaymentBalances(walletMoves, { batchId: id });
     }
+
+    // BUG-C06: audit trail — every refund is logged locally + synced.
+    await logAuditEvent({
+      saleId: id,
+      invoiceNumber: sale.invoiceNumber,
+      action: isFullRefund ? 'refunded' : 'partially_refunded',
+      performedByName: currentCashierName || (sale as any).cashier || 'System',
+      meta: { refundAmount: totalRefundAmount, refundWallet: request?.method },
+    });
   } finally {
     activeReturns.delete(id);
   }

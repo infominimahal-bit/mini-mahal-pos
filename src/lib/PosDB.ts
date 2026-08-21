@@ -36,7 +36,7 @@ const SCHEMA_CURRENT = {
   stockHistory: 'id, productId, timestamp, type, referenceId',
   salesTabs: 'id, userId',
   appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns, enableSplitPayment',
-  pendingOps: '++id, [entity+entityId], status, createdAt, batchId',
+  pendingOps: '++id, [entity+entityId], status, createdAt, batchId, conflictState',
   syncHistory: '++id, timestamp',
   bundles: 'id, name, active',
   bundleItems: 'id, bundleId, productId',
@@ -49,6 +49,8 @@ const SCHEMA_CURRENT = {
   purchase_records: 'id, productId, supplierId, date',
   salesmen: 'id, name, active',
   customer_ledger: 'id, customerId, saleId, type, createdAt',
+  payment_movements: 'id, modeId, referenceId, createdAt',
+  sale_audit_log: 'id, saleId, action, createdAt',
 };
 
 export class PosDB extends Dexie {
@@ -81,6 +83,8 @@ export class PosDB extends Dexie {
   productAddons!: Table<ProductAddon>;
   savedReceiptPngs!: Table<any>;
   salesmen!: Table<any>;
+  payment_movements!: Table<any>;
+  sale_audit_log!: Table<any>;
 
   constructor() {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -120,5 +124,8 @@ export class PosDB extends Dexie {
     this.version(24).stores(SCHEMA_CURRENT);
     this.version(25).stores(SCHEMA_CURRENT);
     this.version(26).stores(SCHEMA_CURRENT);
+    this.version(27).stores(SCHEMA_CURRENT);
+    this.version(28).stores(SCHEMA_CURRENT);
+    this.version(29).stores(SCHEMA_CURRENT);
   }
 }

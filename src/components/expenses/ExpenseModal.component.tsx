@@ -10,6 +10,7 @@ import { useTranslation } from '../../hooks/useTranslation';
 import { sonner } from '../../lib/sonner';
 import { Button, ToggleSwitch, Select } from '../../shared/ui';
 import { buildExpensePayload } from './expenseModalUtils';
+import { paymentModesService } from '../../lib/services/paymentsService';
 
 interface ExpenseModalProps {
   isOpen: boolean;
@@ -29,13 +30,19 @@ export function ExpenseModal({ isOpen, onClose, onSave, expense }: ExpenseModalP
     amount: '',
     category: EXPENSE_CATEGORIES[0],
     date: '',
-    paymentMethod: 'cash' as 'cash' | 'card' | 'online',
+    paymentMethod: 'cash',
     storeType: 'retail' as 'retail' | 'wholesale' | undefined,
     notes: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isManualOverride, setIsManualOverride] = useState(false);
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
+  const [walletModes, setWalletModes] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    paymentModesService.getAll().then(list => setWalletModes(list.map((m: any) => ({ id: m.id, name: m.name }))))
+      .catch(() => setWalletModes([{ id: 'cash', name: 'Cash' }, { id: 'card', name: 'Card' }, { id: 'online', name: 'Online Wallet' }]));
+  }, []);
 
   useEffect(() => {
     if (expense) {
@@ -195,11 +202,11 @@ export function ExpenseModal({ isOpen, onClose, onSave, expense }: ExpenseModalP
                 required
                 className="!bg-[#f8f9fa] dark:!bg-black/75 !border-none !text-sm !rounded-xl !px-4 !text-gray-900 dark:!text-white"
                 value={formData.paymentMethod}
-                onChange={e => setFormData({ ...formData, paymentMethod: e.target.value as any })}
+                onChange={e => setFormData({ ...formData, paymentMethod: e.target.value })}
               >
-                <option value="cash" className="dark:bg-surface">{"cash_settlement"}</option>
-                <option value="card" className="dark:bg-surface">{"card_payment"}</option>
-                <option value="online" className="dark:bg-surface">{"online_wallet"}</option>
+                {walletModes.map(m => (
+                  <option key={m.id} value={m.id} className="dark:bg-surface">{m.name}</option>
+                ))}
               </Select>
             </div>
             {formData.category === 'Supplies' && (

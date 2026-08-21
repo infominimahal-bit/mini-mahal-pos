@@ -39,6 +39,8 @@ export const toRemoteSupplierTransaction = (t: any) => {
   if ('balanceAfter' in t && t.balanceAfter !== undefined) remote.balance_after = t.balanceAfter;
   if ('isManualOverride' in t && t.isManualOverride !== undefined) remote.is_manual_override = t.isManualOverride;
   if ('overrideBy' in t && t.overrideBy !== undefined) remote.override_by = t.overrideBy;
+  if ('paymentType' in t && t.paymentType !== undefined) remote.payment_type = t.paymentType;
+  if ('splitPayments' in t && t.splitPayments !== undefined) remote.split_payments = t.splitPayments;
   if ('createdAt' in t && t.createdAt !== undefined) remote.created_at = t.createdAt instanceof Date ? t.createdAt.toISOString() : t.createdAt;
   if ('updatedAt' in t && t.updatedAt !== undefined) remote.updated_at = t.updatedAt instanceof Date ? t.updatedAt.toISOString() : t.updatedAt;
   return remote;

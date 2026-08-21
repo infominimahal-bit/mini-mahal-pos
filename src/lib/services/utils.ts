@@ -121,7 +121,12 @@ export function derivePaymentStatus(sale: any): string {
 // P6/P24: append an immutable customer_ledger entry (OFFLINE-FIRST compliant).
 // Writes go to local Dexie first, then queueOp so the SyncEngine replicates them —
 // never a direct supabase-js write. Returns the new running balance_after.
-export const normalizePaymentMethod = (m: string): string => (m === 'digital' || m === 'wallet' ? 'online' : m);
+export const normalizePaymentMethod = (method: string): string => {
+  if (!method) return 'cash';
+  const m = method.toLowerCase().trim();
+  if (m === 'digital' || m === 'wallet') return 'online';
+  return m; // custom modes pass through as-is
+};
 
 
 export { generateId } from '../localDb';

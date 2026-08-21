@@ -682,6 +682,11 @@ CREATE TABLE IF NOT EXISTS sales (
     delivery_location_lng NUMERIC,
     customer_notes      TEXT,
     is_orphan           BOOLEAN NOT NULL DEFAULT false,
+    device_id           TEXT,
+    synced_at           TIMESTAMPTZ,
+    last_edited_by      TEXT,
+    last_edited_at      TIMESTAMPTZ,
+    edit_count          INTEGER DEFAULT 0,
     created_at          TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at          TIMESTAMPTZ DEFAULT now()
 );
@@ -862,6 +867,8 @@ CREATE TABLE IF NOT EXISTS supplier_transactions (
     balance_after   DECIMAL(12,2),
     is_manual_override BOOLEAN DEFAULT FALSE,
     override_by     TEXT,
+    payment_type    TEXT,
+    split_payments  JSONB,
     created_at      TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at      TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -3214,11 +3221,14 @@ GRANT EXECUTE ON FUNCTION apply_stock_movements(jsonb) TO anon, authenticated, s
 --     balance, adjusted atomically + idempotently per transaction.
 -- ════════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS payment_modes (
-    id          TEXT PRIMARY KEY,                       -- 'cash','card','online','wallet'
+    id          TEXT PRIMARY KEY,                       -- 'cash','card','online','wallet', or custom
     name        TEXT NOT NULL,
     icon        TEXT DEFAULT 'wallet',
     balance     NUMERIC(14,2) NOT NULL DEFAULT 0,
     is_active   BOOLEAN DEFAULT TRUE,
+    sort_order  INTEGER DEFAULT 99,
+    color       TEXT DEFAULT '#6366f1',
+    is_default  BOOLEAN DEFAULT FALSE,
     created_at  TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at  TIMESTAMPTZ DEFAULT now()
 );
@@ -3239,6 +3249,60 @@ ALTER TABLE payment_movements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payment_movements REPLICA IDENTITY FULL;
 DROP POLICY IF EXISTS "Allow all for authenticated" ON payment_movements;
 CREATE POLICY "Allow all for authenticated" ON payment_movements FOR ALL USING (true) WITH CHECK (true);
+
+-- ════════════════════════════════════════════════════
+-- 26b. SALE AUDIT LOG  (deviceId + every sale action trail)
+-- ════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS sale_audit_log (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sale_id           UUID,
+  invoice_number    TEXT,
+  action            TEXT NOT NULL CHECK (action IN (
+    'created','edited','deleted','refunded','partially_refunded',
+    'discount_changed','payment_changed','item_added','item_removed','price_changed','status_changed'
+  )),
+  performed_by_id   UUID,
+  performed_by_name TEXT,
+  performed_by_role TEXT,
+  device_id         TEXT,
+  note              TEXT,
+  meta              JSONB,
+  created_at        TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sal_sale ON sale_audit_log(sale_id);
+CREATE INDEX IF NOT EXISTS idx_sal_time ON sale_audit_log(created_at DESC);
+ALTER TABLE sale_audit_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "sal_all" ON sale_audit_log FOR ALL USING (true) WITH CHECK (true);
+GRANT ALL ON TABLE sale_audit_log TO anon, authenticated, service_role;
+
+-- ════════════════════════════════════════════════════
+-- 26c. RECONCILIATION VIEWS  (ledger consistency checks)
+-- ════════════════════════════════════════════════════
+CREATE OR REPLACE VIEW stock_drift AS
+SELECT p.id, p.name, p.stock AS current_stock,
+  COALESCE(SUM(sh.change_qty),0) AS history_sum,
+  p.stock - COALESCE(SUM(sh.change_qty),0) AS drift
+FROM products p LEFT JOIN stock_history sh ON sh.product_id = p.id
+WHERE p.track_inventory = true GROUP BY p.id, p.name, p.stock
+HAVING p.stock != COALESCE(SUM(sh.change_qty),0);
+
+CREATE OR REPLACE VIEW wallet_drift AS
+SELECT pm.id, pm.name, pm.balance,
+  COALESCE(SUM(pmv.delta),0) AS movements_sum,
+  pm.balance - COALESCE(SUM(pmv.delta),0) AS drift
+FROM payment_modes pm LEFT JOIN payment_movements pmv ON pmv.mode_id = pm.id
+GROUP BY pm.id, pm.name, pm.balance
+HAVING ABS(pm.balance - COALESCE(SUM(pmv.delta),0)) > 0.01;
+
+CREATE OR REPLACE VIEW over_refunds AS
+SELECT id, invoice_number, total, refunded_amount FROM sales
+WHERE refunded_amount > total + 0.01;
+
+CREATE OR REPLACE VIEW orphan_sales AS
+SELECT s.id, s.invoice_number FROM sales s
+INNER JOIN row_tombstones rt ON rt.ref_id = s.id AND rt.table_name = 'sales';
+
+GRANT SELECT ON stock_drift, wallet_drift, over_refunds, orphan_sales TO anon, authenticated, service_role;
 
 -- Atomic, idempotent per-method balance adjustment (mirrors apply_stock_movements).
 -- Each move carries a unique id; if already applied it is skipped (FOUND = false),

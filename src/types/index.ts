@@ -5,3 +5,4 @@ export * from './sale';
 export * from './user';
 export * from './settings';
 export * from './bundle';
+export * from './payment';

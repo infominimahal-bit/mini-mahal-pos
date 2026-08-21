@@ -4,10 +4,17 @@ import { toRemoteProduct, toRemoteCustomer, toRemoteStockHistory, toRemoteVarian
 import { deleteSaleAtomic, applyStockMovementsRemote } from './atomicOps';
 import { adjustPaymentBalances, buildReversePaymentMoves } from './paymentsService';
 import { recordCustomerLedger } from './customersService';
+import { logAuditEvent } from './auditLogService';
 
 export async function deleteSale(id: string, currentCashierName?: string, editInfo?: { newInvoice?: string }): Promise<Product[]> {
   const sale = await localDb.sales.get(id);
   if (!sale) return [];
+
+  // BUG-C14: already-deleted sale → just purge locally, no double stock/wallet reversal.
+  if (sale.status === 'deleted') {
+    await localDb.sales.delete(id);
+    return [];
+  }
 
   // Pre-fetch this sale's stock history so we can make the reversal IDEMPOTENT:
   // only restore the portion of each item that has NOT already been returned
@@ -30,9 +37,10 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
 
   // 1. Reverse Stock (Only restore what has not been refunded/returned yet)
   // Pending drafts never deducted stock initially, so we don't restore it.
-  // DRAFT RULE: pending drafts never deducted stock either — deleting a draft must
-  // NOT restore anything (that would create a phantom +Q in the ledger).
-  const isDraftSale = sale.status === 'pending' || !!sale.notes?.includes('DRAFT_SALE');
+  // DRAFT RULE: BUG-C14 — drafts ('DRAFT_SALE' notes) never deducted stock, so
+  // deleting one must NOT restore anything. status='pending' is a CREDIT sale
+  // (real stock taken) and must still be reversed — so it is NOT a draft here.
+  const isDraftSale = !!sale.notes?.includes('DRAFT_SALE');
   if (!isDraftSale) {
     for (const item of sale.items) {
       const product = await localDb.products.get(item.product.id);
@@ -137,7 +145,7 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
         for (const addonItem of item.addonItems) {
           const addonProduct = await localDb.products.get(addonItem.addon.addonProductId);
           if (addonProduct && addonProduct.trackInventory) {
-            const addonQty = (addonItem.quantity * itemQtyMag) - (item.refundedQuantity ? addonItem.quantity * item.refundedQuantity : 0);
+            const addonQty = addonItem.quantity * itemQtyMag;
             if (addonQty <= 0) continue;
 
             const newAddonStock = (addonProduct.stock || 0) + addonQty;
@@ -183,6 +191,28 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
     }
   }
 
+  // 1a. Restore FREE GIFTS stock on delete (BUG-C09)
+  if (!isDraftSale && (sale as any).freeGifts?.length) {
+    for (const gift of (sale as any).freeGifts) {
+      const gp = await localDb.products.get((gift as any)?.product?.id);
+      if (gp?.trackInventory) {
+        const qty = Math.abs(Number((gift as any).quantity || 1));
+        const newStock = (gp.stock || 0) + qty;
+        await localDb.products.update(gp.id, { stock: newStock, updatedAt: now });
+        const hid = generateId();
+        const he = {
+          id: hid, productId: gp.id, changeQty: qty, type: 'return' as const,
+          referenceId: id, note: `Sale #${sale.invoiceNumber} Deleted (Free Gift)${editTag}`,
+          balanceAfter: newStock, cashierName: currentCashierName || sale.cashier || 'System', createdAt: now,
+        };
+        await localDb.stockHistory.add(he);
+        returnMovements.push({ id: hid, product_id: gp.id, change_qty: qty, type: 'return',
+          note: he.note, variant_id: '', variant_label: '', cashier_name: he.cashierName });
+        returnQueue.push({ entity: 'stock_history', histId: hid, remote: toRemoteStockHistory(he), opts: undefined });
+      }
+    }
+  }
+
   // 1b. Atomic cloud commit: reverse stock + hard-delete sale in ONE tx (online).
   const onlineDel = typeof navigator === 'undefined' || navigator.onLine;
   let deleteCommitted = false;
@@ -206,13 +236,24 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
   }
 
   // 1c. Reverse wallet balances for the un-refunded portion (split-aware)
-  if (!isDraftSale && (sale.status === 'completed' || sale.status === 'partially_refunded' || sale.status === 'cancelled')) {
+  // BUG-C14: credit sales did NOT debit a wallet, so never reverse a wallet for them.
+  const walletWasDebited = sale.paymentMethod !== 'credit' && !isDraftSale;
+  if (walletWasDebited && !['deleted', 'refunded'].includes(sale.status || '')) {
     const delRatio = sale.total > 0 ? (sale.total - (sale.refundedAmount || 0)) / sale.total : 0;
     await adjustPaymentBalances(buildReversePaymentMoves(sale, delRatio), { batchId: id });
   }
 
   // 2. Hard-Delete: Permanently remove from local database
   await localDb.sales.delete(id);
+
+  // BUG-C06: audit trail — every sale deletion is logged locally + synced.
+  await logAuditEvent({
+    saleId: id,
+    invoiceNumber: sale.invoiceNumber,
+    action: 'deleted',
+    performedByName: currentCashierName || (sale as any).cashier || 'System',
+    meta: { total: sale.total, salesmanName: (sale as any).salesmanName },
+  });
 
   // 4. Reverse Customer Credit/Stats if it was a credit sale (Only if not already deleted)
   //    Drafts never touched customer stats, so they must not be reversed either.
