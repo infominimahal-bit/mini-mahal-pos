@@ -43,7 +43,7 @@ export function InventoryReportMobileTable({
 
           <div className="grid grid-cols-2 gap-4 py-3 border-y border-gray-200 dark:border-white/5">
             <div>
-              <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-1">{"Stock Position"}</p>
+              <p className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest mb-1">{"Stock Position"}</p>
               <div className="flex items-baseline gap-1">
                 <span className="text-base font-black text-gray-900 dark:text-white">{item.isInfinite ? '∞' : item.stock}</span>
                 {!item.isInfinite && <span className="text-[10px] text-gray-600">/ {"min"} {item.minStock}</span>}
@@ -51,7 +51,7 @@ export function InventoryReportMobileTable({
             </div>
             <div className="flex flex-col gap-2">
               <div>
-                <p className="text-[8px] font-black text-gray-600 uppercase tracking-widest mb-0.5">{"Value (Cost)"}</p>
+                <p className="text-[8px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest mb-0.5">{"Value (Cost)"}</p>
                 <p className="text-sm font-black text-gray-900 dark:text-white">{formatCurrency(item.stockValue, appSettings.currency)}</p>
               </div>
               <div>
@@ -82,7 +82,7 @@ export function InventoryReportMobileTable({
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <Clock className="w-3 h-3 text-primary" />
-                    <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest">{"Batch History"}</p>
+                    <p className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"Batch History"}</p>
                   </div>
                   {item.batches.map((batch: any, idx: number) => (
                     <div key={idx} className="flex justify-between items-center bg-gray-50 dark:bg-black/20 p-2 rounded-xl text-[10px]">
@@ -97,7 +97,7 @@ export function InventoryReportMobileTable({
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="w-3 h-3 text-blue-500" />
-                    <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest">{"Sales Ledger"}</p>
+                    <p className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"Sales Ledger"}</p>
                   </div>
                   {item.recentSales.map((sale: any, sIdx: number) => (
                     <div key={sIdx} className="bg-gray-50 dark:bg-black/20 p-3 rounded-xl space-y-1 text-[10px]">

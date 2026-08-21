@@ -7,7 +7,7 @@ export function ReceiptLayoutTemplateSection(props: ReceiptSettingsFormProps) {
   return (
     <div className="p-4 sm:p-5 bg-gray-50/50 dark:bg-white/[0.02] rounded-[2rem] border border-gray-200 dark:border-white/5 space-y-4">
       <div className="space-y-2 relative z-30">
-        <label className="block text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">Paper Size</label>
+        <label className="block text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">Paper Size</label>
         <SearchableSelect
           options={[
             { id: '80mm', label: 'Thermal 80mm (Standard)' },
@@ -25,7 +25,7 @@ export function ReceiptLayoutTemplateSection(props: ReceiptSettingsFormProps) {
       </div>
 
       <div className="space-y-2 relative z-30">
-        <label className="block text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">Visual Template</label>
+        <label className="block text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">Visual Template</label>
         <SearchableSelect
           options={[
             { id: 'modern', label: 'Modern Clean' },

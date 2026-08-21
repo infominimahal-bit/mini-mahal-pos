@@ -72,19 +72,28 @@ export async function executeOp(op: PendingOp): Promise<void> {
       }
       // updated_at conflict: cloud is newer and status differs → flag conflict, hold the op.
       const { data: cs } = await supabase
-        .from('sales').select('id, updated_at, status').eq('id', entityId).maybeSingle();
+        .from('sales').select('id, updated_at, status, edit_count').eq('id', entityId).maybeSingle();
       if (cs) {
-        const cloudAt = new Date((cs as any).updated_at);
-        const localAt = new Date((op as any).localUpdatedAt || (op as any).createdAt || 0);
-        if (cloudAt > localAt && (cs as any).status !== originalPayload.status) {
+        const cloudEditCount = (cs as any).edit_count || 0;
+        const localEditCount = originalPayload.edit_count || 0;
+        const isCloudRefundedOrDeleted = ['refunded', 'partially_refunded', 'deleted', 'cancelled'].includes((cs as any).status);
+        const isPushingCompleted = originalPayload.status === 'completed' || originalPayload.status === 'pending';
+
+        const hasEditConflict = cloudEditCount > 0 && cloudEditCount >= localEditCount;
+        const hasStatusConflict = isCloudRefundedOrDeleted && isPushingCompleted;
+
+        if (hasEditConflict || hasStatusConflict) {
           if (op.id != null) {
-            await localDb.pendingOps.update(op.id, { conflictState: 'conflict', lastError: `CONFLICT: cloud=${(cs as any).updated_at}` }).catch(() => {});
+            await localDb.pendingOps.update(op.id, { conflictState: 'conflict', status: 'conflict', lastError: `CONFLICT: cloud_edit=${cloudEditCount}, cloud_status=${(cs as any).status}` }).catch(() => {});
           }
           useConflictStore.getState().addConflict({
             entity: 'sales', entityId,
             localVersion: originalPayload, cloudVersion: cs, pendingOpId: op.id as number,
           });
-          return;
+          // PHASE 30: do NOT silently drop the op (it was being deleted by push.ts).
+          // Throw so the op is retained (status 'conflict') and resolvable via the
+          // conflict UI instead of losing the local edit.
+          throw new Error(`CONFLICT_PAUSED: cloud_edit=${cloudEditCount}, cloud_status=${(cs as any).status}`);
         }
       }
     }
@@ -112,24 +121,35 @@ export async function executeOp(op: PendingOp): Promise<void> {
                 error = result.error;
             }
             else if (op.entity === 'sales' && opType === 'update' && payload.isAtomicEdit) {
-                const rpcPayload = {
+                const token = await signAction('edit_sale');
+                const rpcPayload: any = {
                     p_new_sale: payload.newSale,
                     p_new_history: payload.newHistory,
                     p_old_sale_id: payload.oldSaleId,
                     p_old_reverse_history: payload.oldReverseHistory
                 };
+                // PHASE 39A: server-side role enforcement (admin|manager). Always
+                // pass the token params (null when no actor) so the call hits the
+                // guarded 7-arg overload — never the legacy unguarded 4-arg one.
+                rpcPayload.p_user_id = token?.p_user_id ?? null;
+                rpcPayload.p_role = token?.p_role ?? null;
+                rpcPayload.p_sig = token?.p_sig ?? null;
                 const result = await supabase.rpc('edit_sale_atomic', rpcPayload);
                 error = result.error;
             }
             else if (op.entity === 'sales' && opType === 'update' && (payload.status === 'refunded' || payload.status === 'partially_refunded')) {
                 // BUG-C12: use the atomic refund RPC (not process_return) so stock +
                 // status commit together and cannot diverge.
-                const { error: refundErr } = await supabase.rpc('refund_sale_atomic', {
+                const token = await signAction('refund_sale');
+                const refundPayload: any = {
                     p_sale_id: entityId,
                     p_history: (op as any).history || [],
                     p_status: payload.status,
                     p_refunded_amount: Number(payload.refunded_amount || 0),
-                });
+                };
+                // PHASE 39A: server-side role enforcement (admin|manager|cashier).
+                if (token) { refundPayload.p_user_id = token.p_user_id; refundPayload.p_role = token.p_role; refundPayload.p_sig = token.p_sig; }
+                const { error: refundErr } = await supabase.rpc('refund_sale_atomic', refundPayload);
                 error = refundErr;
             }
             else if (op.entity === 'sales' && opType === 'update') {

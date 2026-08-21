@@ -59,6 +59,13 @@ export function attachCoreHandlers(channel: any, ctx: RealtimeCtx) {
         if (!exists) useSalesStore.getState().addSale(mapped);
       } else if (payload.eventType === 'UPDATE') {
         if (await isPendingDelete('sales', payload.new.id)) return;
+        // PHASE 30: never blindly overwrite a locally-pending edit/conflict with a
+        // remote update (last-write-wins would corrupt the local change).
+        const pendingLocal = await localDb.pendingOps
+          .where('entity').equals('sales')
+          .filter((o: any) => o.entityId === payload.new.id && o.opType !== 'delete' && ['pending', 'conflict', 'failed'].includes(o.status))
+          .first();
+        if (pendingLocal) return;
         const mapped = mapSale(payload.new);
         await localDb.sales.put(mapped);
         useSalesStore.getState().updateSale(mapped);

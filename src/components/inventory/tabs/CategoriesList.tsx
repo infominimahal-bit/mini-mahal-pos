@@ -22,11 +22,11 @@ export function CategoriesList({ categories, appProducts, appSettings, setSelect
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/50 dark:bg-white/[0.02]">
-                <th className="p-4 text-xs font-bold uppercase text-gray-600 tracking-widest text-center">Identity</th>
-                <th className="p-4 text-xs font-bold uppercase text-gray-600 tracking-widest text-center">Items</th>
-                <th className="p-4 text-xs font-bold uppercase text-gray-600 tracking-widest text-center">Total Stock</th>
-                <th className="p-4 text-xs font-bold uppercase text-gray-600 tracking-widest text-center">In Stock Value</th>
-                <th className="p-4 text-xs font-bold uppercase text-gray-600 tracking-widest text-right">Actions</th>
+                <th className="p-4 text-xs font-bold uppercase text-gray-600 dark:text-gray-400 tracking-widest text-center">Identity</th>
+                <th className="p-4 text-xs font-bold uppercase text-gray-600 dark:text-gray-400 tracking-widest text-center">Items</th>
+                <th className="p-4 text-xs font-bold uppercase text-gray-600 dark:text-gray-400 tracking-widest text-center">Total Stock</th>
+                <th className="p-4 text-xs font-bold uppercase text-gray-600 dark:text-gray-400 tracking-widest text-center">In Stock Value</th>
+                <th className="p-4 text-xs font-bold uppercase text-gray-600 dark:text-gray-400 tracking-widest text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-white/5">

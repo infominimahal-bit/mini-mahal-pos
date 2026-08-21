@@ -94,7 +94,10 @@ export function useInventoryReportData({
       }
       const itemQty = item ? Math.abs(Number(item.weight ? item.weight : item.quantity) || 0) : 0;
       const scale = itemQty > 0 ? qty / itemQty : 1;
-      const revenue = item ? (Number(item.subtotal) || 0) * scale : 0;
+      // PHASE 4A-i: revenue magnitude is always positive; the +/- sign is applied
+      // by the sale/return branch below so a minus sale shows NEGATIVE revenue
+      // (not clamped to a wrong positive value).
+      const revenue = item ? Math.abs(Number(item.subtotal) || 0) * scale : 0;
       const cogs = (productCostById.get(h.productId) || 0) * qty;
       let cur = kpiByProduct.get(h.productId) || { sold: 0, revenue: 0, cogs: 0 };
       if (h.type === 'sale') { cur.sold += qty; cur.revenue += revenue; cur.cogs += cogs; }

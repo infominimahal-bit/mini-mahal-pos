@@ -162,7 +162,10 @@ export function calculateCart(input: CartCalculationInput): CartCalculationResul
   const totalDiscount = Math.max(0, Math.min(roundTo2(manualItemDiscountTotal + autoPromotionAmount + billDiscountAmount), subtotal));
   const taxableExtraTotal = roundTo2(extraCharges.filter(c => c.taxable !== false).reduce((s, c) => s + c.amount, 0));
   const nonTaxableExtraTotal = roundTo2(extraCharges.filter(c => c.taxable === false).reduce((s, c) => s + c.amount, 0));
-  const taxableBase = Math.max(0, roundTo2(subtotal - totalDiscount + taxableExtraTotal));
+  let taxableBase = roundTo2(subtotal - totalDiscount + taxableExtraTotal);
+  if (subtotal >= 0) {
+    taxableBase = Math.max(0, taxableBase); // Prevent discounts from causing negative totals on normal sales
+  }
   const taxAmount = roundTo2(taxableBase * (taxRate / 100));
   const total = roundTo2(taxableBase + taxAmount + nonTaxableExtraTotal);
 

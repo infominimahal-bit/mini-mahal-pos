@@ -17,7 +17,7 @@ export function ProductIdentityDetails({ d }: { d: ProductDetailController }) {
           <div className="p-3 bg-violet-500/10 text-violet-500 rounded-[1.5rem]"><BadgeInfo className="w-6 h-6" /></div>
           <div>
             <h3 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tight">{t('identity_details', 'Identity Details')}</h3>
-            <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">{t('global_product_properties', 'Global product properties')}</p>
+            <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{t('global_product_properties', 'Global product properties')}</p>
           </div>
         </div>
         <div className="space-y-6">
@@ -50,7 +50,7 @@ export function ProductIdentityDetails({ d }: { d: ProductDetailController }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">{t('sku_optional', 'SKU (Optional)')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t('sku_optional', 'SKU (Optional)')}</label>
               <div className="relative">
                 <input
                   value={formData.sku}
@@ -79,7 +79,7 @@ export function ProductIdentityDetails({ d }: { d: ProductDetailController }) {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">{t('barcode_ean', 'Barcode / EAN')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t('barcode_ean', 'Barcode / EAN')}</label>
               <div className="relative">
                 <input
                   value={formData.barcode}

@@ -36,7 +36,7 @@ export function GeneralModules({
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">{t("app_theme", "App Theme")}</label>
+            <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t("app_theme", "App Theme")}</label>
             <div className="grid grid-cols-3 gap-2 bg-white dark:bg-black/25 p-1 rounded-xl border border-gray-200 dark:border-white/5">
               {(['light', 'dark', 'auto'] as const).map((tVal) => (
                 <Button
@@ -59,7 +59,7 @@ export function GeneralModules({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">{t("interface_mode", "Interface Mode")}</label>
+            <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t("interface_mode", "Interface Mode")}</label>
             <Select
               name="interfaceMode"
               value={formData.interfaceMode || 'touch'}

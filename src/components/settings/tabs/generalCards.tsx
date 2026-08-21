@@ -59,7 +59,7 @@ export function GeneralStoreIdentity({ formData, setFormData, handleChange, hand
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">{t("business_name", "Business Name")}</label>
+          <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t("business_name", "Business Name")}</label>
           <input
             type="text"
             name="storeName"
@@ -70,7 +70,7 @@ export function GeneralStoreIdentity({ formData, setFormData, handleChange, hand
           />
         </div>
         <div className="space-y-1.5">
-          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">{t("contact_phone", "Contact Phone")}</label>
+          <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t("contact_phone", "Contact Phone")}</label>
           <input
             type="tel"
             name="storePhone"
@@ -81,7 +81,7 @@ export function GeneralStoreIdentity({ formData, setFormData, handleChange, hand
           />
         </div>
         <div className="space-y-1.5">
-          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">{t("store_email", "Store Email")}</label>
+          <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t("store_email", "Store Email")}</label>
           <input
             type="email"
             name="storeEmail"
@@ -92,7 +92,7 @@ export function GeneralStoreIdentity({ formData, setFormData, handleChange, hand
           />
         </div>
         <div className="space-y-1.5">
-          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">{t("store_website", "Store Website")}</label>
+          <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t("store_website", "Store Website")}</label>
           <input
             type="text"
             name="storeWebsite"
@@ -103,7 +103,7 @@ export function GeneralStoreIdentity({ formData, setFormData, handleChange, hand
           />
         </div>
         <div className="md:col-span-2 space-y-1.5">
-          <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">{t("physical_address", "Physical Address")}</label>
+          <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t("physical_address", "Physical Address")}</label>
           <textarea
             name="storeAddress"
             value={formData.storeAddress}
@@ -133,7 +133,7 @@ export function GeneralLocalization({ formData, setFormData, handleChange, handl
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2 relative z-30">
-          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">{t("store_currency", "Store Currency")}</label>
+          <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t("store_currency", "Store Currency")}</label>
           <SearchableSelect
             options={CURRENCIES.map(c => ({ id: c.code, label: `${c.code} - ${c.name} (${c.symbol})` }))}
             value={formData.currency}
@@ -146,7 +146,7 @@ export function GeneralLocalization({ formData, setFormData, handleChange, handl
           />
         </div>
         <div className="space-y-2 relative z-30">
-          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">{t("store_country", "Store Country")}</label>
+          <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t("store_country", "Store Country")}</label>
           <SearchableSelect
             options={[
               { id: 'PK', label: 'Pakistan (🇵🇰)' },
@@ -184,7 +184,7 @@ export function GeneralLocalization({ formData, setFormData, handleChange, handl
           />
         </div>
         <div className="space-y-2 relative z-20">
-          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">{"Default POS View"}</label>
+          <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{"Default POS View"}</label>
           <SearchableSelect
             options={[
               { id: 'retail', label: t('retail_sales', 'Retail Mode') },
@@ -200,7 +200,7 @@ export function GeneralLocalization({ formData, setFormData, handleChange, handl
           />
         </div>
         <div className="space-y-2 relative z-10">
-          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">{t("standard_paper_size", "Standard Paper Size")}</label>
+          <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t("standard_paper_size", "Standard Paper Size")}</label>
           <SearchableSelect
             options={[
               { id: '80mm', label: '80mm (Standard Thermal)' },
@@ -218,7 +218,7 @@ export function GeneralLocalization({ formData, setFormData, handleChange, handl
         </div>
         <div className="grid grid-cols-2 gap-2 relative">
           <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">{t("default_tax_percent", "Default Tax %")}</label>
+            <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t("default_tax_percent", "Default Tax %")}</label>
             <input
               type="number"
               name="taxRate"
@@ -230,7 +230,7 @@ export function GeneralLocalization({ formData, setFormData, handleChange, handl
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">{t("tax_business_id", "Tax/Business ID")}</label>
+            <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t("tax_business_id", "Tax/Business ID")}</label>
             <input
               type="text"
               name="taxId"
@@ -261,7 +261,7 @@ export function GeneralInvoicing({ formData, handleChange, handleRepairCounter, 
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">{t("invoice_prefix", "Invoice Prefix")}</label>
+          <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t("invoice_prefix", "Invoice Prefix")}</label>
           <input
             type="text"
             name="invoicePrefix"
@@ -271,7 +271,7 @@ export function GeneralInvoicing({ formData, handleChange, handleRepairCounter, 
           />
         </div>
         <div className="space-y-1.5 flex flex-col justify-end">
-          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1 mb-1.5">{t("serial_start", "Serial Start")}</label>
+          <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1 mb-1.5">{t("serial_start", "Serial Start")}</label>
           <div className="flex gap-2">
             <input
               type="number"

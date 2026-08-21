@@ -224,7 +224,7 @@ export function BarcodeGenerator({ products, onClose, onProductsChange }: Barcod
                     <div className="flex-shrink-0 flex items-center justify-between gap-2 px-3 py-2 bg-gray-100/95 dark:bg-[#0f0f0f]/95 border-b border-gray-200/50 dark:border-white/5 flex-wrap gap-y-1.5">
                         <div className="flex items-center gap-1.5 flex-wrap">
                             <div className="flex items-center gap-1.5 bg-white/80 dark:bg-white/5 py-1 px-2.5 rounded-full border border-gray-200 dark:border-white/5 shadow-sm">
-                                <span className="text-[8px] font-bold text-gray-600 uppercase tracking-widest whitespace-nowrap hidden sm:inline">{"simulation"}</span>
+                                <span className="text-[8px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest whitespace-nowrap hidden sm:inline">{"simulation"}</span>
                                 <div className="hidden sm:block h-2 w-px bg-gray-300 dark:bg-white/10" />
                                 <span className="text-[9px] font-black text-blue-600 uppercase">{paperSize}</span>
                                 <div className="h-2 w-px bg-gray-300 dark:bg-white/10" />
@@ -291,7 +291,7 @@ export function BarcodeGenerator({ products, onClose, onProductsChange }: Barcod
                                             <div className="page-indicator print:hidden flex items-center gap-2 my-2.5"
                                                 style={{ width: `${A4_W * previewScale}px`, maxWidth: 'calc(100vw - 32px)' }}>
                                                 <div className="h-px flex-1 bg-gray-300 dark:bg-white/10" />
-                                                <span className="flex items-center gap-1.5 text-[8px] font-black text-gray-600 uppercase tracking-widest px-2.5 py-1 rounded-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 shadow-sm whitespace-nowrap">
+                                                <span className="flex items-center gap-1.5 text-[8px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest px-2.5 py-1 rounded-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 shadow-sm whitespace-nowrap">
                                                     <span className="text-blue-500">●</span> {"page"} {pi + 1} / {pages.length}
                                                 </span>
                                                 <div className="h-px flex-1 bg-gray-300 dark:bg-white/10" />

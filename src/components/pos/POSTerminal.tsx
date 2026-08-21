@@ -106,7 +106,7 @@ export function POSTerminal() {
 
           <div className="flex-1 overflow-hidden">
             <ProductGrid
-              onAddToCart={addToCart}
+              onAddToCart={(p, w) => addToCart(p, w, isReturnMode)}
               onOpenDrafts={() => setIsDraftsModalOpen(true)}
               onAddTab={() => window.dispatchEvent(new CustomEvent('create-new-tab'))}
               isReturnMode={isReturnMode}
@@ -189,7 +189,7 @@ export function POSTerminal() {
               setPendingWeight(undefined);
             }}
             onConfirm={(options: any) => {
-              addToCart(optionsProduct, pendingWeight, options);
+              addToCart(optionsProduct, pendingWeight, isReturnMode, options);
               setOptionsProduct(null);
               setPendingWeight(undefined);
             }}

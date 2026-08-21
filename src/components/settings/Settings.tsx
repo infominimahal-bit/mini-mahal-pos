@@ -205,7 +205,7 @@ export function Settings() {
             {syncStatus === 'idle' && (
               <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 dark:bg-white/5 rounded-full border border-gray-200 dark:border-white/5">
                 <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-[#10B981]' : 'bg-gray-300'}`} />
-                <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{isOnline ? 'Online' : 'Offline'}</span>
+                <span className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{isOnline ? 'Online' : 'Offline'}</span>
               </div>
             )}
           </div>

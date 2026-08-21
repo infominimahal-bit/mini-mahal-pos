@@ -77,7 +77,7 @@ export function WalletStrip({ currency, timezone }: { currency: string, timezone
   return (
     <div className="mb-3">
       <div className="flex items-center gap-1.5 mb-2">
-        <p className="text-[8px] sm:text-[9px] font-black text-gray-600 uppercase tracking-widest flex items-center">
+        <p className="text-[8px] sm:text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest flex items-center">
           Today's Drawer
           <HelpTooltip content="Shows total collected today for each method (Cash Flow). This is not the all-time absolute balance." />
         </p>

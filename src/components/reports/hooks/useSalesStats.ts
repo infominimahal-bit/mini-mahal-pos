@@ -77,7 +77,9 @@ export function useSalesStats(filteredSales: any[], appSettings: any) {
     return Object.values(types).filter(t => {
       if (t.name === 'Retail' && !retailEnabled) return false;
       if (t.name === 'Wholesale' && !wholesaleEnabled) return false;
-      return t.value > 0;
+      // PHASE 4A-i: never drop negative-value sales from the breakdown — a
+      // negative/minus sale must keep its signed (negative) contribution.
+      return true;
     });
   }, [filteredSales, appSettings]);
 
@@ -86,7 +88,7 @@ export function useSalesStats(filteredSales: any[], appSettings: any) {
       const itemsCost = sale.items.reduce((itemSum: number, item: any) => {
         const baseQty = item.weight ? Number(item.weight) : (Number(item.quantity) || 0);
         const net = netItemQty(item);
-        const ratio = baseQty > 0 ? net / baseQty : 0;
+        const ratio = baseQty !== 0 ? Math.abs(net) / Math.abs(baseQty) : 0;
         const { cost } = getItemCOGS(item);
         return itemSum + cost * ratio;
       }, 0);

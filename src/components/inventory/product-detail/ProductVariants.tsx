@@ -12,7 +12,7 @@ export function ProductVariants({ d }: { d: ProductDetailController }) {
         <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-[1.5rem]"><PackageSearch className="w-6 h-6" /></div>
         <div>
           <h3 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tight">{t('customization_details', 'Customizations & Options')}</h3>
-          <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">{t('variants_modifiers_subtitle', 'Manage product variants and add-on modifiers')}</p>
+          <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{t('variants_modifiers_subtitle', 'Manage product variants and add-on modifiers')}</p>
         </div>
       </div>
       <div className="space-y-6">

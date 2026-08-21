@@ -29,6 +29,7 @@ import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { signAction, withActor } from '../actionToken';
 import { fetchAllPages, normalizePaymentMethod } from './utils';
+import { saleTxnType, walletDelta } from './ledgerResolver';
 
 export const toRemotePayment = (p: any) => {
   const remote: any = {};
@@ -175,14 +176,24 @@ export const adjustPaymentBalances = async (moves: any[], opts?: any) => {
   await queueOp('payment_movements', 'apply', opts?.batchId || generateId(), remoteMoves, opts);
 };
 
+/** PHASE 16/4A: central helper — a credit sale never debited a wallet, so it must
+ *  never move a wallet on sale / refund / reverse. */
+export const isCreditSale = (sale: any): boolean =>
+  sale?.paymentMethod === 'credit';
+
 /** Build wallet moves for a completed sale (handles split + single method). */
 export const buildSalePaymentMoves = (sale: any): any[] => {
   const ref = sale.id;
+  // PHASE 22: credit sale records a payable, not a wallet movement.
+  if (isCreditSale(sale)) return [];
+  // PHASE 16/4A: wallet direction is derived from the SAME resolver that drives
+  // inventory (negative-qty sale => mirror => Wallet OUT). Never guess the sign.
+  const direction = saleTxnType(sale).wallet;
   if (sale.paymentMethod === 'split' && sale.splitPayments?.length) {
     return sale.splitPayments.map((p: any) => ({
       id: generateId(),
       modeId: normalizePaymentMethod(p.method),
-      delta: Number(p.amount || 0),
+      delta: walletDelta(p.amount, direction),
       referenceId: ref,
       note: `Sale ${sale.invoiceNumber || ref}`,
     }));
@@ -190,7 +201,7 @@ export const buildSalePaymentMoves = (sale: any): any[] => {
   return [{
     id: generateId(),
     modeId: normalizePaymentMethod(sale.paymentMethod),
-    delta: Number(sale.total || 0),
+    delta: walletDelta(sale.total, direction),
     referenceId: ref,
     note: `Sale ${sale.invoiceNumber || ref}`,
   }];
@@ -199,6 +210,8 @@ export const buildSalePaymentMoves = (sale: any): any[] => {
 /** Build reverse wallet moves (used on refund / delete). */
 export const buildReversePaymentMoves = (sale: any, ratio = 1): any[] => {
   const ref = sale.id;
+  // PHASE 22: nothing was debited for a credit sale, so nothing to reverse.
+  if (isCreditSale(sale)) return [];
   if (sale.paymentMethod === 'split' && sale.splitPayments?.length) {
     return sale.splitPayments.map((p: any) => ({
       id: generateId(),
@@ -229,6 +242,9 @@ export const buildRefundPaymentMoves = (sale: any, refundAmount: number, refundW
     : [normalizePaymentMethod(sale.paymentMethod)];
 
   const isDiff = refWallet && !origWallets.includes(refWallet);
+  // PHASE 14/22: a credit sale never debited a wallet, so refunding it must NOT
+  // move any wallet (previously this wrongly deducted the chosen wallet).
+  if (isCreditSale(sale)) return [];
   if (isDiff) {
     return [{
       id: generateId(), modeId: refWallet!, delta: -Math.abs(refundAmount),

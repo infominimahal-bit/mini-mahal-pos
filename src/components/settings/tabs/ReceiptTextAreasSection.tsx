@@ -5,7 +5,7 @@ export function ReceiptTextAreasSection(props: ReceiptSettingsFormProps) {
   return (
     <div className="p-4 sm:p-5 bg-gray-50/50 dark:bg-white/[0.02] rounded-[2rem] border border-gray-200 dark:border-white/5 space-y-4">
       <div className="space-y-1.5">
-        <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">Header Welcome Text</label>
+        <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">Header Welcome Text</label>
         <textarea
           name="receiptHeader"
           value={formData.receiptHeader}
@@ -17,7 +17,7 @@ export function ReceiptTextAreasSection(props: ReceiptSettingsFormProps) {
         />
       </div>
       <div className="space-y-1.5">
-        <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">Footer / Terms Text</label>
+        <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">Footer / Terms Text</label>
         <textarea
           name="receiptFooter"
           value={formData.receiptFooter}

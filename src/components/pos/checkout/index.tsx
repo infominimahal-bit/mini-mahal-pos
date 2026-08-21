@@ -62,7 +62,7 @@ export function CheckoutPage({ onClose, onComplete }: CheckoutPageProps) {
       </button>
 
       <div className="hidden sm:flex flex-col items-end">
-        <p className="text-[8px] sm:text-[9px] font-black text-gray-600 uppercase tracking-widest leading-none">{"Net Total"}</p>
+        <p className="text-[8px] sm:text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest leading-none">{"Net Total"}</p>
         <p className="text-base sm:text-xl font-black text-primary dark:text-emerald-400 tabular-nums leading-tight mt-0.5">{formatCurrency(finalTotal, appSettings.currency)}</p>
       </div>
     </div>

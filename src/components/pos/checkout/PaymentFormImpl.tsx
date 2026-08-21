@@ -117,7 +117,7 @@ export function PaymentForm({
       <WalletStrip currency={appSettings.currency} timezone={appSettings.timezone} />
 
       <div>
-        <p className="text-[8px] sm:text-[9px] font-black text-gray-600 uppercase tracking-widest mb-1.5 sm:mb-2 flex items-center">
+        <p className="text-[8px] sm:text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest mb-1.5 sm:mb-2 flex items-center">
           {"Payment Method"}
           <HelpTooltip content="Select how the bill is being paid." />
         </p>
@@ -180,7 +180,7 @@ export function PaymentForm({
         ) : (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="flex justify-between items-center">
-              <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest">{"Received Amount"}</label>
+              <label className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"Received Amount"}</label>
               <button onClick={() => setAmountPaid(finalTotal.toString())} className="text-[8px] font-black text-primary bg-primary/10 px-3 py-1 rounded-full hover:bg-primary/20 active:scale-95 transition-all">{"Exact Amount"}</button>
             </div>
             <div className="relative">
@@ -277,7 +277,7 @@ export function PaymentForm({
       <div>
         <div className="flex items-center gap-2 mb-2">
           <FileText className="w-3.5 h-3.5 text-primary" />
-          <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest flex items-center">
+          <span className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest flex items-center">
             {"Internal Memo"}
             <HelpTooltip content="Special remarks or shipping notes printed on dispatch notes and saved in transaction history." />
           </span>

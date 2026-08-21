@@ -31,6 +31,7 @@ import { signAction, withActor } from '../actionToken';
 import { mapProduct, toRemoteProduct, toRemoteStockHistory } from './mappers';
 import { fetchAllPages } from './utils';
 import { buildChildProduct } from './productsServiceHelpers';
+import { logPriceChange } from './priceHistoryService';
 
 export const productsServiceExtra = {
   async update(id: string, updates: Partial<Product>): Promise<Product> {
@@ -48,6 +49,16 @@ export const productsServiceExtra = {
 
     // 1. Local Update
     await localDb.products.put(updated);
+
+    // PHASE 11/12: log attributable price/cost changes. The single update path
+    // previously didn't log anything — only bulkUpdate did (and into stock_history
+    // as a hack). Now every price/cost change is recorded in price_history.
+    if (updates.price !== undefined && Number(existing.price || 0) !== Number(updates.price || 0)) {
+      await logPriceChange({ productId: id, oldPrice: Number(existing.price || 0), newPrice: Number(updates.price || 0), note: 'Product price updated' });
+    }
+    if (updates.cost !== undefined && Number(existing.cost || 0) !== Number(updates.cost || 0)) {
+      await logPriceChange({ productId: id, oldCost: Number(existing.cost || 0), newCost: Number(updates.cost || 0), note: 'Product cost updated' });
+    }
 
     // 2. Queue for Sync — send FULL product except stock (stock is handled by stock_history triggers)
     const remotePayload = toRemoteProduct(updated);
@@ -133,24 +144,21 @@ export const productsServiceExtra = {
   async bulkUpdate(ids: string[], updates: Partial<Product>): Promise<void> {
     const now = new Date();
 
-    // Log per-product price-change history if price is being changed
+    // PHASE 11/12: log per-product price/cost changes into the dedicated
+    // price_history table (replaces the old stock_history 'adjustment' hack).
     if (updates.price !== undefined) {
       const products = await localDb.products.where('id').anyOf(ids).toArray();
       for (const product of products) {
-        if (product.price !== updates.price) {
-          const histId = generateId();
-          const histEntry = {
-            id: histId,
-            productId: product.id,
-            changeQty: 0,
-            type: 'adjustment' as const,
-            note: `Batch Price Change: ${product.price} → ${updates.price}`,
-            balanceAfter: product.stock || 0,
-            cashierName: 'Bulk Edit',
-            createdAt: now
-          };
-          await localDb.stockHistory.add(histEntry);
-          await queueOp('stock_history', 'create', histId, toRemoteStockHistory(histEntry));
+        if (Number(product.price || 0) !== Number(updates.price || 0)) {
+          await logPriceChange({ productId: product.id, oldPrice: Number(product.price || 0), newPrice: Number(updates.price || 0), note: 'Batch price change' });
+        }
+      }
+    }
+    if (updates.cost !== undefined) {
+      const products = await localDb.products.where('id').anyOf(ids).toArray();
+      for (const product of products) {
+        if (Number(product.cost || 0) !== Number(updates.cost || 0)) {
+          await logPriceChange({ productId: product.id, oldCost: Number(product.cost || 0), newCost: Number(updates.cost || 0), note: 'Batch cost change' });
         }
       }
     }

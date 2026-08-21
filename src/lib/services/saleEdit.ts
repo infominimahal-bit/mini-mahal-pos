@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import { localDb, queueOp } from '../localDb';
+import { signAction } from '../actionToken';
 import { toRemoteSale, toRemoteCustomer } from './mappers';
 import { buildSaleStockMovements } from './saleStockMovements';
 import { adjustPaymentBalances, buildReversePaymentMoves, buildSalePaymentMoves } from './paymentsService';
@@ -20,6 +21,13 @@ export async function editSaleAtomic(oldSale: any, newSale: any, cashier: string
   if (!oldSaleLocal) throw new Error(`Old sale not found: ${oldSale.id}`);
   newSale.salesmanId = (oldSaleLocal as any).salesmanId || newSale.salesmanId;
   newSale.salesmanName = (oldSaleLocal as any).salesmanName || newSale.salesmanName;
+  // PHASE 2/6: original cashier is IMMUTABLE — never overwrite with the acting
+  // editor. The editor is recorded separately via lastEditedBy + audit trail.
+  newSale.cashier = (oldSaleLocal as any).cashier || newSale.cashier;
+  (newSale as any).originalSalesmanId = (oldSaleLocal as any).salesmanId;
+  (newSale as any).originalSalesmanName = (oldSaleLocal as any).salesmanName;
+  (newSale as any).originalCashier = (oldSaleLocal as any).cashier;
+  (newSale as any).actionPerformedBy = cashier;
   (newSale as any).lastEditedBy = cashier;
   (newSale as any).lastEditedAt = now;
   (newSale as any).editCount = ((oldSaleLocal as any).editCount || 0) + 1;
@@ -32,12 +40,20 @@ export async function editSaleAtomic(oldSale: any, newSale: any, cashier: string
   const online = typeof navigator === 'undefined' || navigator.onLine;
   let committed = false;
   if (online) {
-    const res = await supabase.rpc('edit_sale_atomic', {
+    const token = await signAction('edit_sale');
+    const rpcPayload: any = {
       p_new_sale: toRemoteSale(newSale),
       p_new_history: newMovements,
       p_old_sale_id: oldSale.id,
       p_old_reverse_history: oldReverseMovements,
-    });
+    };
+    // PHASE 39A: server-side role enforcement (admin|manager). Always pass the
+    // token params (null when no actor) so the call hits the guarded 7-arg
+    // overload — never the legacy unguarded 4-arg one (which was dropped).
+    rpcPayload.p_user_id = token?.p_user_id ?? null;
+    rpcPayload.p_role = token?.p_role ?? null;
+    rpcPayload.p_sig = token?.p_sig ?? null;
+    const res = await supabase.rpc('edit_sale_atomic', rpcPayload);
     if (res.error) {
       console.error('[editSaleAtomic] RPC failed, falling back to a queued edit:', res.error);
     } else {
@@ -72,7 +88,7 @@ export async function editSaleAtomic(oldSale: any, newSale: any, cashier: string
       const oldNet = oldSale.total - (oldSale.refundedAmount || 0);
       const updatedCustomer = {
         ...customer,
-        totalPurchases: Math.max(0, (customer.totalPurchases || 0) - oldNet + newSale.total),
+        totalPurchases: (customer.totalPurchases || 0) - oldNet + newSale.total,
         updatedAt: now,
       };
       await localDb.customers.put(updatedCustomer);
@@ -104,7 +120,8 @@ export async function editSaleAtomic(oldSale: any, newSale: any, cashier: string
   await localDb.sales.delete(oldSale.id);
   await localDb.sales.put(newSale);
 
-  // BUG-C06: audit trail — every bill edit is logged locally + synced.
+  // BUG-C06 / PHASE 4+33: audit trail — every bill edit is logged locally + synced.
+  // Generic 'edited' event PLUS granular events so each change type is traceable.
   await logAuditEvent({
     saleId: newSale.id,
     invoiceNumber: newSale.invoiceNumber,
@@ -112,6 +129,33 @@ export async function editSaleAtomic(oldSale: any, newSale: any, cashier: string
     performedByName: cashier,
     meta: { oldSaleId: oldSale.id, oldInvoice: oldSale.invoiceNumber, newTotal: newSale.total, salesmanName: (oldSale as any).salesmanName },
   });
+  const keyOf = (it: any) => it?.id || it?.product?.id;
+  const oldItems = (oldSale as any).items || [];
+  const newItems = (newSale as any).items || [];
+  const oldKeys = new Set(oldItems.map(keyOf));
+  const newKeys = new Set(newItems.map(keyOf));
+  for (const it of oldItems) {
+    if (!newKeys.has(keyOf(it))) {
+      await logAuditEvent({ saleId: newSale.id, invoiceNumber: newSale.invoiceNumber, action: 'item_removed', performedByName: cashier, meta: { product: it?.product?.name, qty: it?.weight || it?.quantity } });
+    }
+  }
+  for (const it of newItems) {
+    if (!oldKeys.has(keyOf(it))) {
+      await logAuditEvent({ saleId: newSale.id, invoiceNumber: newSale.invoiceNumber, action: 'item_added', performedByName: cashier, meta: { product: it?.product?.name, qty: it?.weight || it?.quantity } });
+    }
+  }
+  if (Math.abs(((oldSale as any).discount_amount || 0) - (newSale as any).discount_amount) > 0.001) {
+    await logAuditEvent({ saleId: newSale.id, invoiceNumber: newSale.invoiceNumber, action: 'discount_changed', performedByName: cashier, meta: { from: (oldSale as any).discount_amount, to: (newSale as any).discount_amount } });
+  }
+  if (((oldSale as any).paymentMethod || '') !== (newSale as any).paymentMethod || JSON.stringify((oldSale as any).splitPayments) !== JSON.stringify((newSale as any).splitPayments)) {
+    await logAuditEvent({ saleId: newSale.id, invoiceNumber: newSale.invoiceNumber, action: 'payment_changed', performedByName: cashier, meta: { from: (oldSale as any).paymentMethod, to: (newSale as any).paymentMethod, fromSplit: (oldSale as any).splitPayments, toSplit: (newSale as any).splitPayments } });
+  }
+  for (const it of newItems) {
+    const oi = oldItems.find((x: any) => keyOf(x) === keyOf(it));
+    if (oi && Math.abs(((oi.price || oi.subtotal) || 0) - ((it.price || it.subtotal) || 0)) > 0.001) {
+      await logAuditEvent({ saleId: newSale.id, invoiceNumber: newSale.invoiceNumber, action: 'price_changed', performedByName: cashier, meta: { product: it?.product?.name, from: oi.price || oi.subtotal, to: it.price || it.subtotal } });
+    }
+  }
   const touch = async (m: any) => {
     const p = await localDb.products.get(m.product_id);
     if (p) await localDb.products.update(p.id, { stock: (p.stock || 0) + Number(m.change_qty), updatedAt: now });

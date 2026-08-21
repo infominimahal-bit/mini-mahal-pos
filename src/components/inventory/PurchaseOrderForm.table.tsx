@@ -78,7 +78,7 @@ export function PurchaseOrderFormTable({
                 <tr key={item.id} className="group hover:bg-gray-50/50 dark:hover:bg-white/[0.01] transition-all duration-300 print:break-inside-avoid">
                   <td className="p-8 print:p-2">
                     <p className="font-black text-gray-900 dark:text-white text-[13px] uppercase tracking-tight">{item.name}</p>
-                    <p className="text-[10px] font-bold text-gray-600 tracking-widest mt-1">{item.sku || 'No SKU'}</p>
+                    <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 tracking-widest mt-1">{item.sku || 'No SKU'}</p>
                   </td>
                   <td className="p-8 print:p-2 text-center">
                     <input

@@ -28,6 +28,7 @@ import {
 import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { signAction, withActor } from '../actionToken';
+import { hashPasswordString } from '../authUtils';
 import { mapSalesman, mapUser } from './mappers';
 import { fetchAllPages } from './utils';
 
@@ -130,15 +131,34 @@ export const usersService = {
   },
 
   async delete(id: string): Promise<void> {
-    await localDb.users.delete(id);
-    queueOp('users', 'delete', id, {});
-    // Also remove the underlying auth user so a "deleted" login can never be used again.
-    // Routed through the server-side admin-users Edge Function (key never in browser).
-    try {
-      await adminUserAction('deleteUser', { id });
-    } catch (err) {
-      console.warn('[usersService] Could not delete auth user via edge function:', err);
-    }
+    // PHASE 39A: SOFT delete. Keep the row + auth account so sales/audit history
+    // survives; login is permanently rejected by the deleted_at / active gates in
+    // signInLogic.ts + AuthContext. We do NOT hard-delete the auth user.
+    const now = new Date();
+    await localDb.users.update(id, { active: false, deletedAt: now, updatedAt: now } as any);
+    await queueOp('users', 'update', id, { active: false, deleted_at: now.toISOString(), updated_at: now.toISOString() });
+    try { await supabase.rpc('revoke_user_sessions', { p_user_id: id }); } catch (e) { console.warn('[usersService] revoke sessions on delete failed:', e); }
+  },
+
+  async blockUser(userId: string) {
+    const { error } = await supabase.rpc('admin_block_user', { p_target_user_id: userId });
+    if (error) throw error;
+    await localDb.users.update(userId, { active: false, updatedAt: new Date() } as any);
+    // Kill every active session immediately so a blocked user is logged out everywhere.
+    try { await supabase.rpc('revoke_user_sessions', { p_user_id: userId }); } catch (e) { console.warn('[usersService] revoke sessions on block failed:', e); }
+  },
+
+  async changeUserPassword(userId: string, newPassword: string) {
+    const { error } = await supabase.rpc('admin_change_password', {
+      p_target_user_id: userId,
+      p_new_password: newPassword
+    });
+    if (error) throw error;
+    // PHASE 39A: rotate the stored offline hash so old signed tokens become invalid,
+    // and revoke active sessions so stale logins expire.
+    const newHash = await hashPasswordString(newPassword);
+    await supabase.from('users').update({ offline_hash: newHash } as any).eq('id', userId).then(() => {}).catch(() => {});
+    try { await supabase.rpc('revoke_user_sessions', { p_user_id: userId }); } catch (e) { console.warn('[usersService] revoke sessions on pw change failed:', e); }
   }
 };
 

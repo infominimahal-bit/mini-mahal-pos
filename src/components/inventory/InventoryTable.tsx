@@ -195,7 +195,7 @@ export function InventoryTable({
                   : <Square className="h-4 w-4 text-gray-600" />}
               Select All
             </Button>
-            <span className="text-[9px] font-bold text-gray-600 uppercase tracking-widest">{selectedProductIds.length} {t("selected", "Selected")}</span>
+            <span className="text-[9px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{selectedProductIds.length} {t("selected", "Selected")}</span>
           </div>
         )}
         {paginatedProducts.length === 0 ? (
@@ -280,7 +280,7 @@ export function InventoryTable({
 
       
         <div className="p-4 bg-gray-50/50 dark:bg-white/[0.02] border-t border-gray-200 dark:border-white/5 flex items-center justify-between gap-4">
-          <p className="hidden sm:block text-[10px] font-black text-gray-600 uppercase tracking-widest italic truncate">Items {((currentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length}</p>
+          <p className="hidden sm:block text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest italic truncate">Items {((currentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length}</p>
           <div className="flex items-center gap-1.5 mx-auto sm:mx-0">
             <Pagination
               page={currentPage}

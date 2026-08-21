@@ -129,15 +129,15 @@ export function FinancialReport({
               </div>
               <div className="space-y-4">
                 <div className="flex justify-between items-center px-1">
-                  <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{"Total Sales"}</span>
+                  <span className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"Total Sales"}</span>
                   <span className="text-sm font-black text-primary dark:text-emerald-400">+{formatCurrency(w.stats?.sales || 0, currency)}</span>
                 </div>
                 <div className="flex justify-between items-center px-1">
-                  <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{"Total Refunds"}</span>
+                  <span className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"Total Refunds"}</span>
                   <span className="text-sm font-black text-rose-500">-{formatCurrency(w.stats?.refunds || 0, currency)}</span>
                 </div>
                 <div className="flex justify-between items-center px-1">
-                  <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{"Total Expenses"}</span>
+                  <span className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"Total Expenses"}</span>
                   <span className="text-sm font-black text-rose-500">-{formatCurrency(w.stats?.expenses || 0, currency)}</span>
                 </div>
                 <div className="relative pt-4 mt-4 border-t border-gray-200 dark:border-white/5">

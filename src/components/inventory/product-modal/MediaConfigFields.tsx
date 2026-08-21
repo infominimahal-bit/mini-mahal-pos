@@ -49,7 +49,7 @@ export function MediaConfigFields(props: ProductFormFieldsProps) {
                 </Button>
               )}
             </div>
-            <p className="text-[8px] font-bold text-gray-600 uppercase tracking-widest">Supports WebP, JPG, PNG · Max 50KB</p>
+            <p className="text-[8px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">Supports WebP, JPG, PNG · Max 50KB</p>
           </div>
         </div>
       </div>

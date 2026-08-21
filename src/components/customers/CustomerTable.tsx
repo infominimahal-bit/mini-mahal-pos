@@ -44,11 +44,11 @@ export function CustomerTable({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-50/50 dark:bg-white/[0.02]">
-              <th className="p-4 text-[10px] font-black uppercase text-gray-600 tracking-widest">{"Customer Info"}</th>
-              <th className="p-4 text-[10px] font-black uppercase text-gray-600 tracking-widest">{"Contact"}</th>
-              <th className="p-4 text-[10px] font-black uppercase text-gray-600 tracking-widest text-right">{"Total Purchases"}</th>
-              <th className="p-4 text-[10px] font-black uppercase text-gray-600 tracking-widest text-center">{"Last Purchase"}</th>
-              <th className="p-4 text-[10px] font-black uppercase text-gray-600 tracking-widest text-right">{"Actions"}</th>
+              <th className="p-4 text-[10px] font-black uppercase text-gray-600 dark:text-gray-400 tracking-widest">{"Customer Info"}</th>
+              <th className="p-4 text-[10px] font-black uppercase text-gray-600 dark:text-gray-400 tracking-widest">{"Contact"}</th>
+              <th className="p-4 text-[10px] font-black uppercase text-gray-600 dark:text-gray-400 tracking-widest text-right">{"Total Purchases"}</th>
+              <th className="p-4 text-[10px] font-black uppercase text-gray-600 dark:text-gray-400 tracking-widest text-center">{"Last Purchase"}</th>
+              <th className="p-4 text-[10px] font-black uppercase text-gray-600 dark:text-gray-400 tracking-widest text-right">{"Actions"}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 dark:divide-white/5">
@@ -201,7 +201,7 @@ export function CustomerTable({
       {/* Premium Pagination Footer */}
       
       <div className="p-4 bg-gray-50/50 dark:bg-white/[0.02] border-t border-gray-200 dark:border-white/5 flex items-center justify-between gap-4">
-        <p className="hidden sm:block text-[10px] font-black text-gray-600 uppercase tracking-widest italic truncate">{"Records"} {((currentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredCustomers.length)} {"of"} {filteredCustomers.length}</p>
+        <p className="hidden sm:block text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest italic truncate">{"Records"} {((currentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredCustomers.length)} {"of"} {filteredCustomers.length}</p>
         <div className="mx-auto sm:mx-0">
           <Pagination
             page={currentPage}

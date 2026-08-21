@@ -18,7 +18,7 @@ export function StockInMetadata({ batchData, setBatchData, recordAsSupplierBill,
       </h3>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{t('transmission_date', 'Transmission Date')}</label>
+          <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{t('transmission_date', 'Transmission Date')}</label>
           <input
             type="date"
             value={batchData.date}
@@ -27,7 +27,7 @@ export function StockInMetadata({ batchData, setBatchData, recordAsSupplierBill,
           />
         </div>
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{t('internal_ref', 'Internal Ref')}</label>
+          <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{t('internal_ref', 'Internal Ref')}</label>
           <input
             value={batchData.notes}
             onChange={(e) => setBatchData(prev => ({ ...prev, notes: e.target.value }))}

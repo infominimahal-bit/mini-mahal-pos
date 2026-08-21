@@ -39,7 +39,7 @@ export function OrderSummary({
     <div className="p-4 flex flex-col order-2 md:order-1 border-t md:border-t-0 border-gray-200 dark:border-white/5 bg-white dark:bg-[#0C0C0C]">
       <div className="flex items-center gap-2 mb-2 shrink-0">
         <ShoppingBag className="w-3.5 h-3.5 text-primary" />
-        <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">{"Order Items"}</span>
+        <span className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"Order Items"}</span>
       </div>
 
       <OrderSummaryItems
@@ -52,7 +52,7 @@ export function OrderSummary({
       {/* Totals */}
       <div className="pt-3 border-t border-gray-200 dark:border-white/5 space-y-1.5 px-1">
         <div className="flex justify-between">
-          <span className="text-[9px] font-bold text-gray-600 uppercase tracking-widest">{"Subtotal"}</span>
+          <span className="text-[9px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"Subtotal"}</span>
           <span className="text-[11px] font-black text-gray-900 dark:text-white tabular-nums">{formatCurrency(subtotal - totalDiscount, currency)}</span>
         </div>
         {showDiscount && totalDiscount > 0 && (
@@ -63,7 +63,7 @@ export function OrderSummary({
         )}
         {taxAmount > 0 && (
           <div className="flex justify-between">
-            <span className="text-[9px] font-bold text-gray-600 uppercase tracking-widest">{"Tax"}</span>
+            <span className="text-[9px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"Tax"}</span>
             <span className="text-[11px] font-black text-gray-900 dark:text-white tabular-nums">+{formatCurrency(taxAmount, currency)}</span>
           </div>
         )}

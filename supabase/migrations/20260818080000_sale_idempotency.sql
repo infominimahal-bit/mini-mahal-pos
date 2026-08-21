@@ -54,7 +54,9 @@ BEGIN
     applied_discounts, free_gifts, timestamp, sale_date, sale_type,
     extra_charges, split_payments, refunded_amount, estore_status,
     delivery_address, delivery_fee, delivery_location_lat, delivery_location_lng,
-    customer_notes, source_order_id, salesman_id, salesman_name, idempotency_key, created_at, updated_at
+    customer_notes, source_order_id, salesman_id, salesman_name,
+    device_id, user_id, sync_status, original_cashier, original_salesman_id,
+    original_salesman_name, action_performed_by, idempotency_key, created_at, updated_at
   ) VALUES (
     (p_sale->>'id')::uuid,
     p_sale->>'invoice_number',
@@ -94,6 +96,13 @@ BEGIN
     NULLIF(p_sale->>'source_order_id','')::uuid,
     NULLIF(p_sale->>'salesman_id','')::uuid,
     p_sale->>'salesman_name',
+    NULLIF(p_sale->>'device_id','')::text,
+    NULLIF(p_sale->>'user_id','')::uuid,
+    NULLIF(p_sale->>'sync_status','')::text,
+    p_sale->>'original_cashier',
+    NULLIF(p_sale->>'original_salesman_id','')::uuid,
+    p_sale->>'original_salesman_name',
+    p_sale->>'action_performed_by',
     NULLIF(p_sale->>'idempotency_key','')::uuid,
     COALESCE((p_sale->>'created_at')::timestamptz, now()),
     now()

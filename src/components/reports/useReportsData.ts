@@ -93,7 +93,7 @@ export function useReportsData(subTab: string | undefined) {
   }, [reportSales, reportExpenses]);
 
   const totalRevenue = filteredSales.reduce((sum, s) => {
-    const eff = getEffectiveTotal(s); const tax = Number(s.taxAmount) || 0; return sum + Math.max(0, eff - tax);
+    const eff = getEffectiveTotal(s); const tax = Number(s.taxAmount) || 0; return sum + (eff - tax);
   }, 0);
   const totalTransactions = filteredSales.filter(s => s.status === 'completed' || s.status === 'partially_refunded').length;
   const averageTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;

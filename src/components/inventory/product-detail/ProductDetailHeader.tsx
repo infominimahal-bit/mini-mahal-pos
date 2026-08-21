@@ -59,12 +59,12 @@ export function ProductDetailHeader({ d }: { d: ProductDetailController }) {
             )}
             <div className="flex items-center justify-center sm:justify-start gap-4 mt-2">
               <div className="flex flex-col">
-                <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest leading-none mb-1">{t('sku', 'SKU')}</p>
+                <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest leading-none mb-1">{t('sku', 'SKU')}</p>
                 <span className="font-mono text-xs text-gray-600 dark:text-gray-400 font-bold">{product.sku}</span>
               </div>
               <div className="w-px h-6 bg-gray-100 dark:bg-white/5" />
               <div className="flex flex-col">
-                <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest leading-none mb-1">{t('category', 'Category')}</p>
+                <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest leading-none mb-1">{t('category', 'Category')}</p>
                 <span className="text-xs text-gray-600 dark:text-gray-400 font-bold">{product.category}</span>
               </div>
             </div>

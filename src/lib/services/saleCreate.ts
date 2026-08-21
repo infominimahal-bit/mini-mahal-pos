@@ -1,5 +1,7 @@
 import { Sale, StockHistory, VariantStockHistory } from '../../types';
 import { localDb, queueOp, generateId } from '../localDb';
+import { getDeviceId } from '../deviceId';
+import { getActor } from '../actionToken';
 import { mapSale, toRemoteVariantStockHistory, toRemoteProduct, toRemoteCustomer, toRemoteSale, toRemoteStockHistory } from './mappers';
 import { derivePaymentStatus } from './utils';
 import { commitSaleAuthoritative, revertLocalSaleStock } from './atomicOps';
@@ -15,9 +17,20 @@ export async function createSale(sale: Omit<Sale, 'id'>): Promise<Sale> {
   }
   const id = generateId();
   const now = new Date();
+  const actor = getActor();
+  // PHASE 27 / 2 / 6: every transaction carries a stable device id + idempotency
+  // key for multi-device dedup, plus immutable attribution (who actually rang it
+  // up) so edits can never silently reassign the salesman/cashier link.
   const newSale = {
     ...sale,
     id,
+    deviceId: getDeviceId(),
+    idempotencyKey: id,
+    userId: actor?.id ?? null,
+    actionPerformedBy: actor?.id ?? null,
+    originalCashier: sale.cashier ?? null,
+    originalSalesmanId: sale.salesmanId ?? null,
+    originalSalesmanName: sale.salesmanName ?? null,
     timestamp: now,
     createdAt: now
   } as Sale;

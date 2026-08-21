@@ -70,6 +70,13 @@ export const toRemoteSale = (s: Partial<Sale>) => {
   if ('deliveryLocationLng' in s) { remote.delivery_location_lng = s.deliveryLocationLng; delete remote.deliveryLocationLng; }
   if ('customerNotes' in s) { remote.customer_notes = s.customerNotes; delete remote.customerNotes; }
   if ('deviceId' in s) { remote.device_id = s.deviceId; delete remote.deviceId; }
+  if ('idempotencyKey' in s) { remote.idempotency_key = s.idempotencyKey; delete remote.idempotencyKey; }
+  if ('userId' in s) { remote.user_id = s.userId; delete remote.userId; }
+  if ('syncStatus' in s) { remote.sync_status = s.syncStatus; delete remote.syncStatus; }
+  if ('originalCashier' in s) { remote.original_cashier = s.originalCashier; delete remote.originalCashier; }
+  if ('originalSalesmanId' in s) { remote.original_salesman_id = s.originalSalesmanId; delete remote.originalSalesmanId; }
+  if ('originalSalesmanName' in s) { remote.original_salesman_name = s.originalSalesmanName; delete remote.originalSalesmanName; }
+  if ('actionPerformedBy' in s) { remote.action_performed_by = s.actionPerformedBy; delete remote.actionPerformedBy; }
   if ('syncedAt' in s) { remote.synced_at = s.syncedAt instanceof Date ? s.syncedAt.toISOString() : s.syncedAt; delete remote.syncedAt; }
   if ('lastEditedBy' in s) { remote.last_edited_by = s.lastEditedBy || null; delete remote.lastEditedBy; }
   if ('lastEditedAt' in s) { remote.last_edited_at = s.lastEditedAt instanceof Date ? s.lastEditedAt.toISOString() : s.lastEditedAt; delete remote.lastEditedAt; }

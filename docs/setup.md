@@ -530,10 +530,10 @@ curl -X POST "https://api.supabase.com/v1/projects/$SUPABASE_REF/database/query"
 ```
 
 Ye 1 command sab kuch create karti hai:
-- ✅ 24 tables (all columns, constraints, defaults)
+- ✅ 26 tables (all columns, constraints, defaults) — incl. `price_history` + `sessions` (added 2026-08-21)
 - ✅ All indexes
-- ✅ All 16 functions (incl. `on_stock_history_insert` + `on_variant_stock_history_insert` stock triggers + `get_next_invoice_number()` RPC + financial-integrity RPCs: `commit_sale`, `apply_payment_movements`, `delete_sale_atomic`, `refund_sale_atomic`)
-- ✅ Realtime publication (24 tables)
+- ✅ All 17 functions (incl. `on_stock_history_insert` + `on_variant_stock_history_insert` stock triggers + `get_next_invoice_number()` RPC + financial-integrity RPCs: `commit_sale`, `apply_payment_movements`, `delete_sale_atomic`, `refund_sale_atomic`, `edit_sale_atomic` (admin|manager guarded), `revoke_user_sessions`)
+- ✅ Realtime publication (26 tables)
 - ✅ GRANT ALL to anon + authenticated
 - ✅ Seed data (app_settings row)
 

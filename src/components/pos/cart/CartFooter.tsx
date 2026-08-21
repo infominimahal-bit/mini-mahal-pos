@@ -182,7 +182,7 @@ export function CartFooter({
       {/* Grand Total + Buttons */}
       <div className="flex items-center justify-between pl-4 pr-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-2.5 border-t border-gray-200 dark:border-white/10">
         <div>
-          <p className="text-[8px] font-black text-gray-600 uppercase tracking-widest leading-none">{"Grand Total"}</p>
+          <p className="text-[8px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest leading-none">{"Grand Total"}</p>
           <div className="flex items-center gap-1 mt-0.5">
             <span className={`text-lg font-black tracking-tight leading-none ${isBelowCost ? 'text-red-500 animate-pulse' : 'text-amber-500 dark:text-amber-400'}`}>
               {formatCurrency(total, appSettings.currency)}
@@ -286,7 +286,7 @@ export function CartFooter({
           {appDiscounts.filter((d: any) => d.active).length === 0 && (
             <div className="py-12 text-center">
               <Gift className="w-12 h-12 text-gray-200 dark:text-gray-500 mx-auto mb-4" />
-              <p className="text-[11px] font-black text-gray-600 uppercase tracking-widest">No Active Promotions</p>
+              <p className="text-[11px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">No Active Promotions</p>
             </div>
           )}
         </div>

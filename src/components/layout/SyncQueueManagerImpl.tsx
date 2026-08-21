@@ -158,7 +158,7 @@ export function SyncQueueManager({ onClose }: SyncQueueManagerProps) {
                             <CheckCircle2 className="h-10 w-10 text-primary" />
                         </div>
                         <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight mt-6">{"Matrix Sync Complete"}</h3>
-                        <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mt-2 max-w-[200px] leading-relaxed">{"All local mutations are mirrored in global matrix."}</p>
+                        <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest mt-2 max-w-[200px] leading-relaxed">{"All local mutations are mirrored in global matrix."}</p>
                     </div>
                 ) : (
                     <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1.5 custom-scrollbar min-h-[120px]">
@@ -200,7 +200,7 @@ export function SyncQueueManager({ onClose }: SyncQueueManagerProps) {
                                                     {getGroupLabel(children)}
                                                 </p>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-[7px] font-bold text-gray-600 uppercase tracking-widest">{children.length} UPDATES</span>
+                                                    <span className="text-[7px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{children.length} UPDATES</span>
                                                     {getGroupStatusBadge(children)}
                                                 </div>
                                             </div>
@@ -221,7 +221,7 @@ export function SyncQueueManager({ onClose }: SyncQueueManagerProps) {
                                                                     {op.opType} {op.entity}
                                                                 </p>
                                                                 <div className="flex items-center gap-2">
-                                                                    <span className="text-[6px] font-bold text-gray-600 uppercase tracking-widest">ID:{op.entityId?.slice(0, 6)}</span>
+                                                                    <span className="text-[6px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">ID:{op.entityId?.slice(0, 6)}</span>
                                                                     {getStatusBadge(op)}
                                                                 </div>
                                                             </div>
@@ -256,7 +256,7 @@ export function SyncQueueManager({ onClose }: SyncQueueManagerProps) {
                                                     {op.opType} {op.entity}
                                                 </p>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-[7px] font-bold text-gray-600 uppercase tracking-widest">ID:{op.entityId?.slice(0, 6)}</span>
+                                                    <span className="text-[7px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">ID:{op.entityId?.slice(0, 6)}</span>
                                                     {getStatusBadge(op)}
                                                 </div>
                                             </div>

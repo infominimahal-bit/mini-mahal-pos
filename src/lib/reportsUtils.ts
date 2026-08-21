@@ -1,8 +1,10 @@
 import { Sale } from '../types';
 
 export const getItemCOGS = (item: any): { cost: number; isEstimated: boolean } => {
-  if (item.purchaseCost && item.purchaseCost > 0) {
-    return { cost: item.purchaseCost, isEstimated: false };
+  if (item.purchaseCost !== undefined && item.purchaseCost !== 0) {
+    const baseQty = item.weight ? Number(item.weight) : (Number(item.quantity) || 0);
+    const sign = baseQty < 0 ? -1 : 1;
+    return { cost: sign * Math.abs(item.purchaseCost), isEstimated: false };
   }
   if (item.product?.cost && item.product.cost > 0) {
     const qty = item.weight ? item.weight : (item.quantity || 1);
@@ -19,7 +21,7 @@ export function getEffectiveTotal(sale: any): number {
 
 export function netItemQty(item: any): number {
   const base = item?.weight ? Number(item.weight) : (Number(item?.quantity) || 0);
-  return Math.max(0, base - (Number(item?.refundedQuantity) || 0));
+  return base - (Number(item?.refundedQuantity) || 0);
 }
 
 export function getItemRevenue(item: any, sale: Sale): number {

@@ -122,7 +122,7 @@ export function ProductDetailModals({ d }: { d: ProductDetailController }) {
             )}
             <div className="min-w-0 flex-1">
               <p className="font-black text-gray-900 dark:text-white text-sm uppercase tracking-tight truncate">{product.name}</p>
-              <p className="text-[10px] font-bold text-gray-600 tracking-widest mt-1 truncate">{product.sku || 'No SKU'}</p>
+              <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 tracking-widest mt-1 truncate">{product.sku || 'No SKU'}</p>
             </div>
             <div className="flex flex-col items-end gap-1.5 shrink-0">
               <Badge
@@ -183,13 +183,13 @@ export function ProductDetailModals({ d }: { d: ProductDetailController }) {
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gray-50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/5 rounded-2xl p-4">
             <div>
-              <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest">{t('estimated_total', 'Estimated Total')}</p>
+              <p className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{t('estimated_total', 'Estimated Total')}</p>
               <p className="text-xl font-black text-emerald-500 dark:text-emerald-400 tracking-tight mt-0.5">
                 {formatCurrency((parseFloat(restockData.quantity) || 0) * (parseFloat(restockData.cost) || 0), currency)}
               </p>
             </div>
             <div className="flex items-center gap-2 bg-white dark:bg-black/30 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-white/5">
-              <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest whitespace-nowrap">{t('record_supplier_bill', 'Supplier Bill')}</span>
+              <span className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest whitespace-nowrap">{t('record_supplier_bill', 'Supplier Bill')}</span>
               <ToggleSwitch
                 checked={restockData.recordAsSupplierBill}
                 onChange={(v) => setRestockData({ ...restockData, recordAsSupplierBill: v })}

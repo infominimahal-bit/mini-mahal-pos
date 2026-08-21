@@ -4000,3 +4000,272 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+
+-- ════════════════════════════════════════════════════
+-- 30. PHASE 12: USER PERMISSIONS & SECURITY
+-- ════════════════════════════════════════════════════
+
+-- RPC to Block User & Terminate Sessions instantly
+CREATE OR REPLACE FUNCTION admin_block_user(p_target_user_id UUID)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  -- Verify caller is admin or manager
+  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'manager')) THEN
+    RAISE EXCEPTION 'Not authorized to block users';
+  END IF;
+
+  -- 1. Mark as inactive in public schema
+  UPDATE public.users SET active = false WHERE id = p_target_user_id;
+  
+  -- 2. Wipe their sessions so active JWT refreshes fail immediately
+  DELETE FROM auth.sessions WHERE user_id = p_target_user_id;
+  DELETE FROM auth.refresh_tokens WHERE user_id = p_target_user_id;
+END;
+$$;
+
+-- RPC to Change Password & Force Logout
+CREATE OR REPLACE FUNCTION admin_change_password(p_target_user_id UUID, p_new_password TEXT)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  -- Verify caller is admin
+  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin') THEN
+    RAISE EXCEPTION 'Only admins can change passwords';
+  END IF;
+
+  -- Update password in auth schema
+  UPDATE auth.users 
+  SET encrypted_password = crypt(p_new_password, gen_salt('bf')) 
+  WHERE id = p_target_user_id;
+
+  -- Terminate existing sessions so they must re-login
+  DELETE FROM auth.sessions WHERE user_id = p_target_user_id;
+  DELETE FROM auth.refresh_tokens WHERE user_id = p_target_user_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION admin_block_user(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION admin_change_password(UUID, TEXT) TO authenticated;
+
+-- ============================================================================
+-- PATCH (2026-08-21): clone-readiness additions.
+-- Mirrors the 20260821 migrations so SUPER_MASTER_SCHEMA.sql reproduces the live
+-- DB exactly when run on a fresh project. All statements are idempotent
+-- (ADD COLUMN IF NOT EXISTS / CREATE TABLE IF NOT EXISTS / CREATE OR REPLACE).
+-- ============================================================================
+
+-- 1. users soft-delete column
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+
+-- 2. sales attribution + multi-device + sync-status columns
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS idempotency_key uuid;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS source_order_id uuid;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS salesman_id uuid;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS salesman_name text;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS user_id uuid;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS sync_status text NOT NULL DEFAULT 'synced';
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS original_cashier text;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS original_salesman_id uuid;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS original_salesman_name text;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS action_performed_by text;
+
+-- 3. price_history table (PHASE 11/12)
+CREATE TABLE IF NOT EXISTS public.price_history (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id  uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  old_price   numeric,
+  new_price   numeric,
+  old_cost    numeric,
+  new_cost    numeric,
+  changed_by  text,
+  note        text,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_price_history_product ON public.price_history(product_id);
+CREATE INDEX IF NOT EXISTS idx_price_history_created ON public.price_history(created_at);
+ALTER TABLE public.price_history ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS price_history_anon ON public.price_history;
+CREATE POLICY price_history_anon ON public.price_history FOR ALL USING (true) WITH CHECK (true);
+GRANT ALL ON public.price_history TO anon, authenticated, service_role;
+
+-- 4. sessions table + revoke function (PHASE 39A)
+CREATE TABLE IF NOT EXISTS public.sessions (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  device_id    text,
+  login_time   timestamptz NOT NULL DEFAULT now(),
+  last_activity timestamptz NOT NULL DEFAULT now(),
+  status       text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'revoked')),
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON public.sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_status ON public.sessions(status);
+ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sessions_anon ON public.sessions;
+CREATE POLICY sessions_anon ON public.sessions FOR ALL USING (true) WITH CHECK (true);
+GRANT ALL ON public.sessions TO anon, authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.revoke_user_sessions(p_user_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
+BEGIN
+  UPDATE public.sessions SET status = 'revoked', last_activity = now() WHERE user_id = p_user_id AND status = 'active';
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.revoke_user_sessions(uuid) TO anon, authenticated, service_role;
+
+-- 5. commit_sale: add attribution columns to INSERT (2-arg signature unchanged)
+CREATE OR REPLACE FUNCTION public.commit_sale(p_sale jsonb, p_history jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  v_id uuid;
+  h jsonb;
+  cur numeric;
+BEGIN
+  IF p_sale->>'source_order_id' IS NOT NULL AND p_sale->>'source_order_id' <> '' THEN
+    IF EXISTS (SELECT 1 FROM sales WHERE source_order_id = (p_sale->>'source_order_id')::uuid) THEN
+      RETURN jsonb_build_object('success', true, 'id', (SELECT id FROM sales WHERE source_order_id = (p_sale->>'source_order_id')::uuid), 'already_fulfilled', true);
+    END IF;
+  END IF;
+  IF p_sale->>'idempotency_key' IS NOT NULL AND p_sale->>'idempotency_key' <> '' THEN
+    IF EXISTS (SELECT 1 FROM sales WHERE idempotency_key = (p_sale->>'idempotency_key')::uuid) THEN
+      RETURN jsonb_build_object('success', true, 'id', (SELECT id FROM sales WHERE idempotency_key = (p_sale->>'idempotency_key')::uuid), 'already_committed', true);
+    END IF;
+  END IF;
+  FOR h IN SELECT * FROM jsonb_array_elements(p_history)
+  LOOP
+    IF (h->>'change_qty')::int < 0 AND (h->>'variant_id' IS NULL OR (h->>'variant_id') = '') THEN
+      SELECT stock INTO cur FROM products WHERE id = (h->>'product_id')::uuid;
+      IF cur IS NOT NULL AND cur >= 0 AND (cur + (h->>'change_qty')::int) < 0 THEN
+        RAISE EXCEPTION 'OVERSELL: product % has stock % but this sale needs %', (h->>'product_id')::uuid, cur, abs((h->>'change_qty')::int) USING ERRCODE = 'P0003';
+      END IF;
+    END IF;
+  END LOOP;
+  INSERT INTO sales (
+    id, invoice_number, customer_id, customer_name, customer_phone,
+    items, subtotal, discount_amount, bill_discount_value, bill_discount_type,
+    tax_amount, total, received_amount, change_amount, payment_method,
+    card_details, status, cashier, cashier_role, receipt_number, notes,
+    applied_discounts, free_gifts, timestamp, sale_date, sale_type,
+    extra_charges, split_payments, refunded_amount, estore_status,
+    delivery_address, delivery_fee, delivery_location_lat, delivery_location_lng,
+    customer_notes, source_order_id, salesman_id, salesman_name,
+    device_id, user_id, sync_status, original_cashier, original_salesman_id,
+    original_salesman_name, action_performed_by, idempotency_key, created_at, updated_at
+  ) VALUES (
+    (p_sale->>'id')::uuid, p_sale->>'invoice_number',
+    NULLIF(p_sale->>'customer_id','')::uuid, p_sale->>'customer_name', p_sale->>'customer_phone',
+    COALESCE(p_sale->'items','[]'::jsonb), (p_sale->>'subtotal')::numeric,
+    (p_sale->>'discount_amount')::numeric, (p_sale->>'bill_discount_value')::numeric, p_sale->>'bill_discount_type',
+    (p_sale->>'tax_amount')::numeric, (p_sale->>'total')::numeric, (p_sale->>'received_amount')::numeric,
+    (p_sale->>'change_amount')::numeric, p_sale->>'payment_method', p_sale->'card_details',
+    p_sale->>'status', p_sale->>'cashier', p_sale->>'cashier_role', p_sale->>'receipt_number', p_sale->>'notes',
+    p_sale->'applied_discounts', p_sale->'free_gifts', (p_sale->>'timestamp')::timestamptz, (p_sale->>'sale_date')::date,
+    p_sale->>'sale_type', p_sale->'extra_charges', p_sale->'split_payments', (p_sale->>'refunded_amount')::numeric,
+    p_sale->>'estore_status', p_sale->>'delivery_address', (p_sale->>'delivery_fee')::numeric,
+    (p_sale->>'delivery_location_lat')::numeric, (p_sale->>'delivery_location_lng')::numeric, p_sale->>'customer_notes',
+    NULLIF(p_sale->>'source_order_id','')::uuid, NULLIF(p_sale->>'salesman_id','')::uuid, p_sale->>'salesman_name',
+    NULLIF(p_sale->>'device_id','')::text, NULLIF(p_sale->>'user_id','')::uuid, NULLIF(p_sale->>'sync_status','')::text,
+    p_sale->>'original_cashier', NULLIF(p_sale->>'original_salesman_id','')::uuid, p_sale->>'original_salesman_name',
+    p_sale->>'action_performed_by', NULLIF(p_sale->>'idempotency_key','')::uuid,
+    COALESCE((p_sale->>'created_at')::timestamptz, now()), now()
+  ) ON CONFLICT (id) DO NOTHING RETURNING id INTO v_id;
+  IF v_id IS NULL THEN v_id := (p_sale->>'id')::uuid; END IF;
+  FOR h IN SELECT * FROM jsonb_array_elements(p_history)
+  LOOP
+    IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
+      INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', v_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+    ELSE
+      INSERT INTO stock_history (id, product_id, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', v_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+    END IF;
+  END LOOP;
+  RETURN jsonb_build_object('success', true, 'id', v_id);
+END;
+$function$;
+GRANT EXECUTE ON FUNCTION public.commit_sale(jsonb, jsonb) TO anon, authenticated, service_role;
+
+-- 6. edit_sale_atomic: replace unguarded 4-arg overload with guarded 7-arg
+DROP FUNCTION IF EXISTS public.edit_sale_atomic(jsonb, jsonb, uuid, jsonb);
+CREATE OR REPLACE FUNCTION public.edit_sale_atomic(
+  p_new_sale jsonb,
+  p_new_history jsonb,
+  p_old_sale_id uuid,
+  p_old_reverse_history jsonb,
+  p_user_id uuid DEFAULT NULL,
+  p_role text DEFAULT NULL,
+  p_sig text DEFAULT NULL
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public, extensions AS $$
+DECLARE
+  v_id uuid;
+  h jsonb;
+BEGIN
+  PERFORM public.require_action(p_user_id, p_role, 'edit_sale', p_sig, VARIADIC array['admin', 'manager']);
+  IF NOT EXISTS (SELECT 1 FROM sales WHERE id = p_old_sale_id) THEN
+    RAISE EXCEPTION 'OLD_SALE_NOT_FOUND';
+  END IF;
+  IF p_new_sale->>'idempotency_key' IS NOT NULL AND p_new_sale->>'idempotency_key' <> '' THEN
+    IF EXISTS (SELECT 1 FROM sales WHERE idempotency_key = (p_new_sale->>'idempotency_key')::uuid) THEN
+      RETURN jsonb_build_object('success', true, 'already_committed', true, 'new_id', (SELECT id FROM sales WHERE idempotency_key = (p_new_sale->>'idempotency_key')::uuid));
+    END IF;
+  END IF;
+  INSERT INTO sales (
+    id, invoice_number, customer_id, customer_name, customer_phone,
+    items, subtotal, discount_amount, bill_discount_value, bill_discount_type,
+    tax_amount, total, received_amount, change_amount, payment_method,
+    card_details, status, cashier, cashier_role, receipt_number, notes,
+    applied_discounts, free_gifts, timestamp, sale_date, sale_type,
+    extra_charges, split_payments, refunded_amount, estore_status,
+    delivery_address, delivery_fee, delivery_location_lat, delivery_location_lng,
+    customer_notes, source_order_id, salesman_id, salesman_name,
+    idempotency_key, edited_from_invoice, created_at, updated_at
+  ) VALUES (
+    (p_new_sale->>'id')::uuid, p_new_sale->>'invoice_number',
+    NULLIF(p_new_sale->>'customer_id','')::uuid, p_new_sale->>'customer_name', p_new_sale->>'customer_phone',
+    COALESCE(p_new_sale->'items','[]'::jsonb), (p_new_sale->>'subtotal')::numeric,
+    (p_new_sale->>'discount_amount')::numeric, (p_new_sale->>'bill_discount_value')::numeric, p_new_sale->>'bill_discount_type',
+    (p_new_sale->>'tax_amount')::numeric, (p_new_sale->>'total')::numeric, (p_new_sale->>'received_amount')::numeric,
+    (p_new_sale->>'change_amount')::numeric, p_new_sale->>'payment_method', p_new_sale->'card_details',
+    p_new_sale->>'status', p_new_sale->>'cashier', p_new_sale->>'cashier_role', p_new_sale->>'receipt_number', p_new_sale->>'notes',
+    p_new_sale->'applied_discounts', p_new_sale->'free_gifts', (p_new_sale->>'timestamp')::timestamptz, (p_new_sale->>'sale_date')::date,
+    p_new_sale->>'sale_type', p_new_sale->'extra_charges', p_new_sale->'split_payments', (p_new_sale->>'refunded_amount')::numeric,
+    p_new_sale->>'estore_status', p_new_sale->>'delivery_address', (p_new_sale->>'delivery_fee')::numeric,
+    (p_new_sale->>'delivery_location_lat')::numeric, (p_new_sale->>'delivery_location_lng')::numeric, p_new_sale->>'customer_notes',
+    NULLIF(p_new_sale->>'source_order_id','')::uuid, NULLIF(p_new_sale->>'salesman_id','')::uuid, p_new_sale->>'salesman_name',
+    NULLIF(p_new_sale->>'idempotency_key','')::uuid, p_new_sale->>'edited_from_invoice',
+    COALESCE((p_new_sale->>'created_at')::timestamptz, now()), now()
+  ) ON CONFLICT (id) DO NOTHING RETURNING id INTO v_id;
+  IF v_id IS NULL THEN v_id := (p_new_sale->>'id')::uuid; END IF;
+  FOR h IN SELECT * FROM jsonb_array_elements(p_new_history)
+  LOOP
+    IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
+      INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', v_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+    ELSE
+      INSERT INTO stock_history (id, product_id, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', v_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+    END IF;
+  END LOOP;
+  FOR h IN SELECT * FROM jsonb_array_elements(p_old_reverse_history)
+  LOOP
+    IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
+      INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', p_old_sale_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+    ELSE
+      INSERT INTO stock_history (id, product_id, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', p_old_sale_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+    END IF;
+  END LOOP;
+  DELETE FROM sales WHERE id = p_old_sale_id;
+  RETURN jsonb_build_object('success', true, 'new_id', v_id);
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.edit_sale_atomic(jsonb, jsonb, uuid, jsonb, uuid, text, text) TO anon, authenticated, service_role;

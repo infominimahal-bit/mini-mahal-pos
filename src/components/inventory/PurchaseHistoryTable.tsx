@@ -32,10 +32,10 @@ export function PurchaseHistoryTable({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-50/50 dark:bg-white/[0.02]">
-              <th className="p-6 text-[10px] font-black text-gray-600 uppercase tracking-widest">{"Date & Identity"}</th>
-              <th className="p-6 text-[10px] font-black text-gray-600 uppercase tracking-widest text-center">{"Procurement Details"}</th>
-              <th className="p-6 text-[10px] font-black text-gray-600 uppercase tracking-widest text-center">{"Financial Impact"}</th>
-              <th className="p-6 text-[10px] font-black text-gray-600 uppercase tracking-widest text-right">{"Admin Control"}</th>
+              <th className="p-6 text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"Date & Identity"}</th>
+              <th className="p-6 text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest text-center">{"Procurement Details"}</th>
+              <th className="p-6 text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest text-center">{"Financial Impact"}</th>
+              <th className="p-6 text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest text-right">{"Admin Control"}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 dark:divide-white/5">
@@ -79,7 +79,7 @@ export function PurchaseHistoryTable({
       <div className="p-6 bg-gray-50/50 dark:bg-white/[0.02] border-t border-gray-200 dark:border-white/5 flex items-center justify-between">
         <div className="hidden sm:flex items-center gap-2">
           <div className="flex h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-          <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest italic">Page {currentPage} of {totalPages}</p>
+          <p className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest italic">Page {currentPage} of {totalPages}</p>
         </div>
         <Pagination mode="prevNext" page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage}
           pageSize={itemsPerPage}

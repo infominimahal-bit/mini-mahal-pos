@@ -34,7 +34,7 @@ export function ProductHistory({ d }: { d: ProductDetailController }) {
 
       {totalHistoryPages > 1 && (
         <div className="px-8 py-3 bg-gray-50/50 dark:bg-white/[0.01] border-b border-gray-200 dark:border-white/5 flex items-center justify-between">
-          <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest italic">
+          <p className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest italic">
             {t('page', 'Page')} <span className="text-primary">{historyPage}</span> {t('of', 'of')} {totalHistoryPages}
           </p>
           <div className="flex gap-2">
@@ -61,10 +61,10 @@ export function ProductHistory({ d }: { d: ProductDetailController }) {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/50 dark:bg-white/[0.02]">
-                <th className="px-8 py-4 text-[9px] font-black text-gray-600 uppercase tracking-widest">{t('date_time', 'Date / Time')}</th>
-                <th className="px-8 py-4 text-[9px] font-black text-gray-600 uppercase tracking-widest text-center">{t('entity_source', 'Entity / Source')}</th>
-                <th className="px-8 py-4 text-[9px] font-black text-gray-600 uppercase tracking-widest text-center">{t('user', 'User')}</th>
-                <th className="px-8 py-4 text-[9px] font-black text-gray-600 uppercase tracking-widest text-right">{t('qty_change', 'Qty Change')}</th>
+                <th className="px-8 py-4 text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{t('date_time', 'Date / Time')}</th>
+                <th className="px-8 py-4 text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest text-center">{t('entity_source', 'Entity / Source')}</th>
+                <th className="px-8 py-4 text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest text-center">{t('user', 'User')}</th>
+                <th className="px-8 py-4 text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest text-right">{t('qty_change', 'Qty Change')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-white/5">
@@ -96,7 +96,7 @@ export function ProductHistory({ d }: { d: ProductDetailController }) {
                     <p className="text-[8px] text-gray-600 font-bold uppercase">{h.label}</p>
                   </td>
                   <td className="px-8 py-4 text-center">
-                    <span className="text-[9px] font-bold text-gray-600 uppercase tracking-widest">{h.user?.split('@')[0] || 'System'}</span>
+                    <span className="text-[9px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{h.user?.split('@')[0] || 'System'}</span>
                     {h.notes && (
                       <p className="text-[7px] text-gray-600 font-medium italic mt-0.5 max-w-[150px] mx-auto truncate">
                         {h.notes}
@@ -135,11 +135,11 @@ export function ProductHistory({ d }: { d: ProductDetailController }) {
               </div>
               <div className="flex items-center justify-between bg-gray-50 dark:bg-white/5 p-2 rounded-xl">
                 <div className="flex flex-col">
-                  <p className="text-[8px] font-black text-gray-600 uppercase tracking-widest mb-0.5">{t('reference', 'Reference')}</p>
+                  <p className="text-[8px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest mb-0.5">{t('reference', 'Reference')}</p>
                   <p className="text-[10px] font-black text-gray-700 dark:text-gray-300 uppercase truncate max-w-[120px]">{h.entity}</p>
                 </div>
                 <div className="text-right flex flex-col">
-                  <p className="text-[8px] font-black text-gray-600 uppercase tracking-widest mb-0.5">{t('source_user', 'Source / User')}</p>
+                  <p className="text-[8px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest mb-0.5">{t('source_user', 'Source / User')}</p>
                   <p className="text-[10px] font-black text-primary uppercase">{h.user?.split('@')[0] || 'System'}</p>
                 </div>
               </div>
@@ -155,7 +155,7 @@ export function ProductHistory({ d }: { d: ProductDetailController }) {
 
       {totalHistoryPages > 1 && (
         <div className="px-8 py-4 bg-gray-50/50 dark:bg-white/[0.01] border-t border-gray-200 dark:border-white/5 flex items-center justify-between">
-          <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest italic">
+          <p className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest italic">
             {t('showing', 'Showing')} {(historyPage - 1) * HISTORY_PER_PAGE + 1} {t('to', 'to')} {Math.min(historyPage * HISTORY_PER_PAGE, movementHistory.length)} {t('of', 'of')} {movementHistory.length}
           </p>
           <div className="flex gap-2">

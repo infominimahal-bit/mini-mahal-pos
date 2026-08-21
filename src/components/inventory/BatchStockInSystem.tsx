@@ -190,12 +190,12 @@ export function BatchStockInSystem({ onClose, initialProduct }: BatchStockInSyst
     <div className="flex items-center justify-between w-full">
       <div className="hidden sm:flex items-center gap-6">
         <div className="flex flex-col">
-          <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">{"total_sourced_cost"}</span>
+          <span className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"total_sourced_cost"}</span>
           <span className="text-xl font-black text-primary tabular-nums leading-none mt-1">{formatCurrency(totalInvoiceCost, appSettings.currency)}</span>
         </div>
         <div className="w-px h-8 bg-gray-100 dark:bg-white/10" />
         <div className="flex flex-col">
-          <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">{"unit_count"}</span>
+          <span className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"unit_count"}</span>
           <span className="text-xl font-black text-gray-900 dark:text-white tabular-nums leading-none mt-1">{totalItemsCount}</span>
         </div>
       </div>

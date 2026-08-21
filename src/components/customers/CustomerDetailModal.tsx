@@ -115,7 +115,7 @@ const appSettings = useSettingsStore(s => s.settings);
                         <Phone className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Phone</p>
+                        <p className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">Phone</p>
                         <p className="text-sm font-black text-gray-900 dark:text-white">{customer.phone || 'Not set'}</p>
                       </div>
                     </div>
@@ -130,7 +130,7 @@ const appSettings = useSettingsStore(s => s.settings);
                     </Button>
                   </div>
                   <div className="p-4 bg-gray-50 dark:bg-black/20 rounded-2xl border border-gray-200 dark:border-white/5">
-                    <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-1">Address</p>
+                    <p className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest mb-1">Address</p>
                     <p className="text-xs font-bold text-gray-900 dark:text-gray-300">{customer.address || 'Not set'}</p>
                   </div>
                 </div>

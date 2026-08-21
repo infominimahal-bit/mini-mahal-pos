@@ -158,7 +158,7 @@ export function PurchaseOrderSystem() {
               </Button>
 
               <div className="flex items-center gap-2 bg-gray-100 dark:bg-white/5 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-white/5">
-                <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest whitespace-nowrap">{"Supplier Bill"}</span>
+                <span className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest whitespace-nowrap">{"Supplier Bill"}</span>
                 <ToggleSwitch
                   checked={recordAsSupplierBill}
                   onChange={setRecordAsSupplierBill}

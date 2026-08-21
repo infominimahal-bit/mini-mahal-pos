@@ -51,6 +51,7 @@ const SCHEMA_CURRENT = {
   customer_ledger: 'id, customerId, saleId, type, createdAt',
   payment_movements: 'id, modeId, referenceId, createdAt',
   sale_audit_log: 'id, saleId, action, createdAt',
+  priceHistory: 'id, productId, createdAt',
 };
 
 export class PosDB extends Dexie {
@@ -85,6 +86,7 @@ export class PosDB extends Dexie {
   salesmen!: Table<any>;
   payment_movements!: Table<any>;
   sale_audit_log!: Table<any>;
+  priceHistory!: Table<any>;
 
   constructor() {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -127,5 +129,6 @@ export class PosDB extends Dexie {
     this.version(27).stores(SCHEMA_CURRENT);
     this.version(28).stores(SCHEMA_CURRENT);
     this.version(29).stores(SCHEMA_CURRENT);
+    this.version(30).stores(SCHEMA_CURRENT);
   }
 }

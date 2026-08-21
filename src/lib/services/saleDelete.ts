@@ -47,13 +47,20 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
       if (product && product.trackInventory) {
         // IDEMPOTENT REVERSAL: only restore what hasn't already been returned.
         // `reversedQty` = sum of existing 'return' entries for this sale+product.
-        const grossQty = Math.abs(Number(item.weight || item.quantity) || 0);
-        const reversedQty = saleHistory
-          .filter(h => h.productId === product.id && h.type === 'return')
-          .reduce((s, h) => s + Math.abs(Number(h.changeQty) || 0), 0);
-        const qty = Math.max(0, grossQty - reversedQty);
-        const itemQtyMag = qty;
-        if (qty <= 0) continue;
+        const rawQty = Number(item.weight || item.quantity) || 0;
+        const sign = rawQty < 0 ? -1 : 1;
+        const grossQty = Math.abs(rawQty);
+        
+        // Prevent double-deletion reversals by checking if a 'Deleted' entry already exists
+        const alreadyDeleted = saleHistory.some(h => h.productId === product.id && h.note?.includes('Deleted'));
+        if (alreadyDeleted) continue;
+
+        // Use item.refundedQuantity to determine how many items were already partially refunded
+        const reversedQty = Number(item.refundedQuantity) || 0;
+        const netQtyMag = Math.max(0, grossQty - reversedQty);
+        const qty = netQtyMag * sign;
+        const itemQtyMag = netQtyMag;
+        if (netQtyMag <= 0) continue;
         const newStock = (product.stock || 0) + qty;
 
         // Update Local Product
@@ -145,8 +152,8 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
         for (const addonItem of item.addonItems) {
           const addonProduct = await localDb.products.get(addonItem.addon.addonProductId);
           if (addonProduct && addonProduct.trackInventory) {
-            const addonQty = addonItem.quantity * itemQtyMag;
-            if (addonQty <= 0) continue;
+            const addonQty = addonItem.quantity * qty; // qty retains the sign!
+            if (Math.abs(addonQty) <= 0) continue;
 
             const newAddonStock = (addonProduct.stock || 0) + addonQty;
 
@@ -263,7 +270,7 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
       const remainingTotal = sale.total - (sale.refundedAmount || 0);
       const updatedCustomer = {
         ...customer,
-        totalPurchases: Math.max(0, (customer.totalPurchases || 0) - remainingTotal),
+        totalPurchases: (customer.totalPurchases || 0) - remainingTotal,
         updatedAt: now
       };
       await localDb.customers.put(updatedCustomer);

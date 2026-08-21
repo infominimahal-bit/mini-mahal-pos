@@ -43,12 +43,12 @@ export function TransactionList({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-50 dark:bg-white/[0.02]">
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-600 tracking-widest">{t('date', 'Date')}</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-600 tracking-widest">{t('type', 'Type')}</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-600 tracking-widest">{t('description', 'Description')}</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-600 tracking-widest text-right">{t('paid', 'Paid')}</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-600 tracking-widest text-right">{t('bill', 'Bill')}</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-600 tracking-widest text-center">{t('actions', 'Actions')}</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-600 dark:text-gray-400 tracking-widest">{t('date', 'Date')}</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-600 dark:text-gray-400 tracking-widest">{t('type', 'Type')}</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-600 dark:text-gray-400 tracking-widest">{t('description', 'Description')}</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-600 dark:text-gray-400 tracking-widest text-right">{t('paid', 'Paid')}</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-600 dark:text-gray-400 tracking-widest text-right">{t('bill', 'Bill')}</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-600 dark:text-gray-400 tracking-widest text-center">{t('actions', 'Actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 dark:divide-white/5">

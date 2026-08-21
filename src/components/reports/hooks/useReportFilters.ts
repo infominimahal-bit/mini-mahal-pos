@@ -143,7 +143,7 @@ export function useReportFilters(appSettings: any, appSales: any, appExpenses: a
           };
         });
         return [
-          { ...item, subtotal: Math.max(0, (item.subtotal || 0) - addonSubtotalSum), purchaseCost: Math.max(0, (item.purchaseCost || 0) - addonCostSum) },
+          { ...item, subtotal: (item.subtotal || 0) - addonSubtotalSum, purchaseCost: (item.purchaseCost || 0) - addonCostSum },
           ...addonsAsItems
         ];
       });

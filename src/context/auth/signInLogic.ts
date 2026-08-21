@@ -50,6 +50,19 @@ export async function signInLogic(
     const { data: authData, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
     if (error) throw error;
 
+    // PHASE 39A: real-time block/delete check on EVERY online login attempt.
+    if (authData.user) {
+      try {
+        const { data: prof } = await supabase.from('users').select('active, deleted_at').eq('id', authData.user.id).single();
+        if (prof && (prof.active === false || prof.deleted_at != null)) {
+          await supabase.auth.signOut().catch(() => {});
+          sonner.error('Account deactivated. Login denied.');
+          setLoading(false);
+          return;
+        }
+      } catch (e) { /* network error: defer to periodic recheck, do not block login blindly */ }
+    }
+
     const hash = await hashPasswordString(password);
     localStorage.setItem(`offline_hash_${loginEmail}`, hash);
 
@@ -80,8 +93,8 @@ export async function signInLogic(
         const allLocalUsers = await localDb.users.toArray();
         const matchedUser = allLocalUsers.find(u => u.email?.toLowerCase() === lowerIdentifier || u.username?.toLowerCase() === lowerIdentifier);
         
-        if (matchedUser) {
-          if (matchedUser.active === false) {
+         if (matchedUser) {
+          if (matchedUser.active === false || (matchedUser as any).deletedAt != null) {
             sonner.error('Account deactivated. Cannot login offline.');
             setLoading(false);
             return;
@@ -120,8 +133,13 @@ export async function signInLogic(
               const parsed = JSON.parse(cachedProfile);
               const pEmail = (parsed.email || '').toLowerCase();
               const pUsername = (parsed.username || '').toLowerCase();
-              if (pEmail === lowerIdentifier || pUsername === lowerIdentifier) {
-                const enteredHash = await hashPasswordString(password);
+               if (pEmail === lowerIdentifier || pUsername === lowerIdentifier) {
+                 if (parsed.active === false || parsed.deletedAt != null) {
+                   sonner.error('Account deactivated. Cannot login offline.');
+                   setLoading(false);
+                   return;
+                 }
+                 const enteredHash = await hashPasswordString(password);
                 const sHash = parsed.offlineHash || localStorage.getItem(`offline_hash_${parsed.email}`);
                 if (sHash && sHash === enteredHash) {
                   if (parsed.lastLogin) parsed.lastLogin = new Date(parsed.lastLogin);

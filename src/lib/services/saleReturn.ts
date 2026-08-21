@@ -316,7 +316,7 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
         const updatedCustomer = {
           ...customer,
           balance: balAfter,
-          totalPurchases: Math.max(0, (customer.totalPurchases || 0) - totalRefundAmount),
+          totalPurchases: (customer.totalPurchases || 0) - totalRefundAmount,
           updatedAt: now
         };
         await localDb.customers.put(updatedCustomer);

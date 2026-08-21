@@ -140,7 +140,7 @@ export function PurchaseHistory() {
       </div>
 
         <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-surface rounded-[2rem] border border-gray-200 dark:border-white/5 shadow-sm">
-          <p className="hidden sm:block text-[10px] font-black text-gray-600 uppercase tracking-widest">
+          <p className="hidden sm:block text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">
             Page <span className="text-primary">{currentPage}</span> of {totalPages}
           </p>
           <Pagination mode="numbered" page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage}

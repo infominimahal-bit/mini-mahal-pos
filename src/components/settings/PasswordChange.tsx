@@ -69,7 +69,7 @@ export function PasswordChange() {
 
       <div className="space-y-4">
         <div className="space-y-1.5">
-          <label className="text-xs font-black text-gray-600 uppercase tracking-widest ml-1">Current Password</label>
+          <label className="text-xs font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">Current Password</label>
           <div className="relative">
             <input
               type={showPassword ? 'text' : 'password'}
@@ -82,7 +82,7 @@ export function PasswordChange() {
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-black text-gray-600 uppercase tracking-widest ml-1">New Password</label>
+          <label className="text-xs font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">New Password</label>
           <div className="relative">
             <input
               type={showPassword ? 'text' : 'password'}
@@ -101,7 +101,7 @@ export function PasswordChange() {
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-black text-gray-600 uppercase tracking-widest ml-1">Confirm Password</label>
+          <label className="text-xs font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">Confirm Password</label>
           <input
             type={showPassword ? 'text' : 'password'}
             value={confirmPassword}

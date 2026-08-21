@@ -53,6 +53,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkSessionExpiry();
     const expiryTimer = setInterval(checkSessionExpiry, 60_000);
 
+    // PHASE 39A: real-time block/delete enforcement for ALREADY-LOGGED-IN users.
+    // Polls the cached flag locally and (when online) the server, force-logging
+    // out immediately if the account was blocked/removed after login.
+    const forceLogout = async (reason: string) => {
+      localStorage.removeItem('pos_offline_profile');
+      localStorage.removeItem('pos_session_start');
+      try { await supabase.auth.signOut(); } catch (e) { /* ignore */ }
+      setProfile(null);
+      setUser(null);
+      setSession(null);
+      sonner.error(reason);
+    };
+
+    const verifyActiveStatus = async () => {
+      const cached = localStorage.getItem('pos_offline_profile');
+      if (!cached) return;
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed.active === false || parsed.deletedAt != null) {
+          forceLogout('Your account has been deactivated. You have been logged out.');
+          return;
+        }
+        if (navigator.onLine && parsed.id) {
+          const { data: prof, error } = await supabase
+            .from('users')
+            .select('active, deleted_at')
+            .eq('id', parsed.id)
+            .single();
+          if (!error && prof && (prof.active === false || prof.deleted_at != null)) {
+            forceLogout('Your account has been deactivated. You have been logged out.');
+          }
+        }
+      } catch (e) { /* network error: never sign out on network failure (GEMINI rule) */ }
+    };
+
+    const activeTimer = setInterval(verifyActiveStatus, 30_000);
+
     (supabase.auth as any)._initCalled = true;
     supabase.auth.stopAutoRefresh?.().catch(() => { });
 
@@ -150,6 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
       clearInterval(expiryTimer);
+      clearInterval(activeTimer);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };

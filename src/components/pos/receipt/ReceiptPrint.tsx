@@ -54,7 +54,7 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
             <button onClick={() => handlePrint()} className="w-full py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">
               Print Manually
             </button>
-            <button onClick={handleSafeClose} className="text-[10px] font-black text-gray-600 uppercase tracking-widest hover:text-gray-900 dark:hover:text-white transition-colors">
+            <button onClick={handleSafeClose} className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest hover:text-gray-900 dark:hover:text-white transition-colors">
               Tap to close
             </button>
           </div>

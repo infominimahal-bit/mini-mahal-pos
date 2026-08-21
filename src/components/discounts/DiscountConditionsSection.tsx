@@ -58,7 +58,7 @@ export function DiscountConditionsSection({
           <div key={index} className="p-5 bg-[#f8f9fa] dark:bg-black/75 rounded-[20px] border border-gray-200 dark:border-white/5 relative group">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">{"Variable"}</label>
+                <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest mb-2 block">{"Variable"}</label>
                 <Select
                   value={condition.type}
                   onChange={(e) => updateCondition(index, 'type', e.target.value)}
@@ -74,7 +74,7 @@ export function DiscountConditionsSection({
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">{"Condition Value"}</label>
+                <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest mb-2 block">{"Condition Value"}</label>
                 {condition.type === 'specific_products' ? (
                   <div className="space-y-3">
                     <SharedSearchBar
@@ -93,7 +93,7 @@ export function DiscountConditionsSection({
                       className="rounded-2xl shadow-none"
                     />
                     <div className="flex items-center gap-3 p-3 bg-white dark:bg-surface rounded-xl border border-gray-50 dark:border-white/5">
-                      <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest shrink-0">{"Min Qty:"}</span>
+                      <span className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest shrink-0">{"Min Qty:"}</span>
                       <input
                         type="number"
                         min="1"

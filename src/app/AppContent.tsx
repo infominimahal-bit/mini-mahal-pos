@@ -120,7 +120,7 @@ export function AppContent() {
                       </div>
                       <div className="flex justify-between w-full mt-3">
                         <span className="text-[9px] font-black text-gray-600">STAGE {appSyncProgress.current}/{appSyncProgress.total}</span>
-                        {appSyncProgress.size && <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">{appSyncProgress.size} DATA</span>}
+                        {appSyncProgress.size && <span className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{appSyncProgress.size} DATA</span>}
                       </div>
                     </div>
                   )}

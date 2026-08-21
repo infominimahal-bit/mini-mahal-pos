@@ -84,7 +84,7 @@ export function PricingStockFields(props: ProductFormFieldsProps) {
                 {"enable_active_tracking"}
                 <HelpTooltip content="Maintains real-time stock balances across sales and returns. Disabling this treats the item as having infinite supply." />
               </div>
-              <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mt-0.5">
+              <div className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest mt-0.5">
                 {formData.productType === 'variable' ? 'MANAGED BY VARIATIONS' : "track_stock_alert"}
               </div>
             </div>

@@ -177,7 +177,7 @@ export function ExpensesReport({
             {filteredExpenses.length > 0 && (
               <tfoot>
                 <tr className="bg-gray-50 dark:bg-white/[0.04] border-t-2 border-gray-200 dark:border-white/10">
-                  <td colSpan={4} className="px-4 py-3 text-[9px] font-black text-gray-600 uppercase tracking-widest">{"TOTAL ({count} entries)".replace('{count}', filteredExpenses.length.toString())}</td>
+                  <td colSpan={4} className="px-4 py-3 text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"TOTAL ({count} entries)".replace('{count}', filteredExpenses.length.toString())}</td>
                   <td className="px-4 py-3 text-right font-black text-rose-600 dark:text-rose-400 text-sm">-{formatCurrency(totalExpenseAmount, currency)}</td>
                 </tr>
               </tfoot>

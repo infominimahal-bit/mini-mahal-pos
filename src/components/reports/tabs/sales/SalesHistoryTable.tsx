@@ -61,7 +61,7 @@ export function SalesHistoryTable({ filteredSales, currency, country, users }: P
           <Receipt className="h-5 w-5 mr-3 text-primary" />{"Detailed Sales History"}
         </h3>
         <div className="flex items-center gap-3">
-          <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest bg-gray-50 dark:bg-black/75 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/5">
+          <span className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest bg-gray-50 dark:bg-black/75 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/5">
             {filteredSales.length} {"Total Records"}
           </span>
           <ExportButton
@@ -135,7 +135,7 @@ export function SalesHistoryTable({ filteredSales, currency, country, users }: P
               <div className="space-y-1">
                 <p className="text-sm font-bold text-gray-800 dark:text-gray-200 leading-none">{sale.customerName || "Walk-in Customer"}</p>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">{t(sale.paymentMethod, sale.paymentMethod)}</span>
+                  <span className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{t(sale.paymentMethod, sale.paymentMethod)}</span>
                   <span className="text-[8px] text-gray-600">•</span>
                   <span className="text-[9px] font-black text-primary/80 uppercase tracking-widest">{"By"} {sale.cashier}</span>
                   {sale.salesmanName && (

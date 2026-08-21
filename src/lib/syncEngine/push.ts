@@ -124,6 +124,14 @@ export async function syncToCloud(options: { resetRetries?: boolean } = {}) {
                         return;
                     }
 
+                    // PHASE 30: a paused conflict must stay resolvable — never flip it
+                    // to failed/error, never drop it. Keep status='conflict'.
+                    if (errorMsg.includes('CONFLICT_PAUSED')) {
+                        await localDb.pendingOps.update(op.id!, { status: 'conflict', conflictState: 'conflict', lastError: errorMsg }).catch(() => {});
+                        window.dispatchEvent(new Event('pendingops-changed'));
+                        continue;
+                    }
+
                     syncState.offlineBackoff = 0;
                     const newRetries = (op.retries || 0) + 1;
                     const status = newRetries >= MAX_RETRIES ? 'error' : 'failed';

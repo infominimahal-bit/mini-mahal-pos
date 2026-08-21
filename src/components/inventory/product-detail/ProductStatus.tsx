@@ -13,7 +13,7 @@ export function ProductStatus({ d }: { d: ProductDetailController }) {
             <div className="p-3 bg-primary/10 text-primary rounded-[1.5rem]"><Tag className="w-6 h-6" /></div>
             <div>
               <h3 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tight">{t('product_status', 'Product Status')}</h3>
-              <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">{t('status_controls', 'Status & Controls')}</p>
+              <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{t('status_controls', 'Status & Controls')}</p>
             </div>
           </div>
           <div className="space-y-4">
@@ -112,7 +112,7 @@ export function ProductStatus({ d }: { d: ProductDetailController }) {
           <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-[1.5rem]"><Globe className="w-6 h-6" /></div>
           <div>
             <h3 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tight">E-Store Control</h3>
-            <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Visibility & Sorting</p>
+            <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">Visibility & Sorting</p>
           </div>
         </div>
         <div className="space-y-4">

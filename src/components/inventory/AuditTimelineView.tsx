@@ -143,7 +143,7 @@ export function AuditTimeline({ onViewProduct, onViewBill }: AuditTimelineProps)
       </div>
 
         <div className="flex items-center justify-between px-5 py-3 border border-gray-200 dark:border-white/5 bg-white/50 dark:bg-black/20 rounded-2xl shadow-sm">
-          <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">
+          <p className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">
             Page <span className="text-primary">{currentPage}</span> of {totalPages}
           </p>
           <Pagination mode="prevNext" page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage}
@@ -219,7 +219,7 @@ export function AuditTimeline({ onViewProduct, onViewBill }: AuditTimelineProps)
       </div>
 
         <div className="flex items-center justify-between p-2">
-          <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest italic">
+          <p className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest italic">
             Page {currentPage} / {totalPages}
           </p>
           <Pagination mode="prevNext" page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage}

@@ -123,30 +123,21 @@ export function LoginPage() {
                     required
                   />
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
-                    <Button
+                    <button
                       type="button"
                       onClick={() => handlePaste('email')}
-                      className="!min-h-0 !px-2 !py-1 !text-[10px] !tracking-wider !text-gray-400 hover:!text-primary dark:!text-gray-500 dark:hover:!text-emerald-400"
+                      className="px-2 py-1 text-[10px] tracking-wider font-bold text-gray-400 hover:text-emerald-600 dark:text-gray-500 dark:hover:text-emerald-400 transition-colors uppercase"
                     >
                       PASTE
-                    </Button>
+                    </button>
                   </div>
                 </div>
               </div>
 
               <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                    Password
-                  </label>
-                  <Button
-                    type="button"
-                    onClick={() => setMode('forgot_password')}
-                    className="!min-h-0 !px-0 !py-0 !text-xs !font-medium !normal-case !tracking-normal !text-primary dark:!text-emerald-400 hover:!text-emerald-800 dark:hover:!text-emerald-300"
-                  >
-                    Forgot password?
-                  </Button>
-                </div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  Password
+                </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600 dark:text-gray-500 h-4 w-4" />
                   <input
@@ -159,22 +150,22 @@ export function LoginPage() {
                     minLength={6}
                   />
                   <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center">
-                    <Button
+                    <button
                       type="button"
                       onClick={() => handlePaste('password')}
-                      className="!min-h-0 !px-2 !py-1 !text-[10px] !tracking-wider !text-gray-400 hover:!text-primary dark:!text-gray-500 dark:hover:!text-emerald-400"
+                      className="px-2 py-1 text-[10px] tracking-wider font-bold text-gray-400 hover:text-emerald-600 dark:text-gray-500 dark:hover:text-emerald-400 transition-colors uppercase"
                     >
                       PASTE
-                    </Button>
-                    <div className="w-[1px] h-4 bg-gray-200 dark:bg-white/10 mx-0.5"></div>
-                    <Button
+                    </button>
+                    <div className="w-[1px] h-4 bg-gray-200 dark:bg-white/10 mx-1"></div>
+                    <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      className="!min-h-0 !p-1.5 !text-gray-500 hover:!text-gray-700 dark:!text-gray-400 dark:hover:!text-gray-200"
+                      className="p-1.5 text-gray-400 hover:text-emerald-600 dark:text-gray-500 dark:hover:text-emerald-400 transition-colors rounded-full"
                     >
                       {showPassword ? <Moon className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
+                    </button>
                   </div>
                 </div>
               </div>

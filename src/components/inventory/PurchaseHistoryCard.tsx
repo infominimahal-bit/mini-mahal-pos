@@ -162,7 +162,7 @@ export function PurchaseHistoryMobileCard({ record, appProducts, currency }: Omi
         </div>
         <div className="text-right">
           <p className={`text-sm font-black ${record.quantity > 0 ? 'text-primary' : 'text-amber-500'}`}>{record.quantity > 0 ? '+' : ''}{record.quantity} PCS</p>
-          <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest">{record.supplier || 'Direct'} {record.addedBy ? `| By ${record.addedBy}` : ''}</p>
+          <p className="text-[9px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{record.supplier || 'Direct'} {record.addedBy ? `| By ${record.addedBy}` : ''}</p>
         </div>
       </div>
 
