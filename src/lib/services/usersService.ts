@@ -131,33 +131,9 @@ export const usersService = {
   },
 
   async delete(id: string): Promise<void> {
-    // PHASE 39A: SOFT delete. Keep the row + auth account so sales/audit history
-    // survives; login is permanently rejected by the deleted_at / active gates in
-    // signInLogic.ts + AuthContext. We do NOT hard-delete the auth user.
-    const now = new Date();
-    const existing = await localDb.users.get(id);
-
-    const syncPayload: any = {
-      id,
-      active: false,
-      deleted_at: now.toISOString(),
-      updated_at: now.toISOString()
-    };
-
-    if (existing) {
-      syncPayload.username = existing.username || existing.email?.split('@')[0] || 'user';
-      syncPayload.name = existing.name || 'Unknown';
-      syncPayload.email = existing.email;
-      syncPayload.role = existing.role || 'cashier';
-    } else {
-      syncPayload.username = `ghost_${id.substring(0, 8)}`;
-      syncPayload.name = 'Deleted User';
-      syncPayload.role = 'cashier';
-    }
-
-    await cloudWrite('users', 'update', id, syncPayload);
-    await localDb.users.update(id, { active: false, deletedAt: now, updatedAt: now } as any);
-    try { await supabase.rpc('revoke_user_sessions', { p_user_id: id }); } catch (e) { console.warn('[usersService] revoke sessions on delete failed:', e); }
+    const { error } = await supabase.rpc('admin_delete_user', { p_target_user_id: id });
+    if (error) throw error;
+    await localDb.users.delete(id);
   },
 
   async blockUser(userId: string) {

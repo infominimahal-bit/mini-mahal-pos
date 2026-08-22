@@ -52,6 +52,7 @@
 - `size="md"` (`btn-md`) is DEFAULT — all new buttons include it unless overriding
 - Variants: `primary` (save/confirm), `secondary` (cancel/back), `danger` (delete), `ghost` (subtle)
 - Compact buttons: `!min-h-0 !p-*` overrides (e.g. chips, inline actions)
+- **Loading states (Save / Update / Delete):** ALWAYS pass `loading={isProcessing}` to `Button`. This automatically activates the modern spinner and triggers a "slow network" toast if it takes too long. Never build a custom loader inside buttons.
 
 ## 4. MODALS & OVERLAYS
 

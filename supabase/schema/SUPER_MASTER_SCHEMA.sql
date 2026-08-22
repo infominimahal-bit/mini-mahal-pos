@@ -4046,3 +4046,17 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION commit_expense(jsonb, jsonb) TO anon, authenticated, service_role;
 
+
+-- [2026-08-22] Add admin_delete_user RPC for true deletion
+--   Migration: 20260822153500_admin_delete_user.sql
+CREATE OR REPLACE FUNCTION admin_delete_user(p_target_user_id UUID)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+BEGIN
+    IF (SELECT role FROM public.users WHERE id = auth.uid()) NOT IN ('admin', 'manager') THEN
+        RAISE EXCEPTION 'Unauthorized';
+    END IF;
+
+    DELETE FROM auth.users WHERE id = p_target_user_id;
+END;
+$$;
+
