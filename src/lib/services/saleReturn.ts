@@ -48,6 +48,9 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
 
     // Phase 1: collect reverse-stock movements for atomic cloud commit.
     const returnMovements: any[] = [];
+    const localProductUpdates: any[] = [];
+    const localStockHistoryAdds: any[] = [];
+    const localVariantHistoryAdds: any[] = [];
 
     const isFullRefund = !request || request.type === 'full';
     const itemsToReverse = isFullRefund ? sale.items.map((item, index) => {
@@ -89,10 +92,7 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
         const qty = Math.abs(Number(Math.abs(Number(reqItem.qty) || 0)) || 0);
         const newStock = (product.stock || 0) + qty;
 
-        await localDb.products.update(product.id, {
-          stock: newStock,
-          updatedAt: now
-        });
+        localProductUpdates.push({ id: product.id, data: { stock: newStock, updatedAt: now } });
 
         // Log Return in History (local cache) + movement for atomic cloud commit
         const retHistId = generateId();
@@ -106,7 +106,7 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
           cashierName: currentCashierName || sale.cashier || 'System',
           createdAt: now
         };
-        await localDb.stockHistory.add(retHistEntry);
+        localStockHistoryAdds.push(retHistEntry);
         returnMovements.push({
           id: retHistId,
           product_id: product.id,
@@ -126,10 +126,7 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
             const updatedVariantData = product.variantData.map(v =>
               v.id === variant.id ? { ...v, stock: newVariantStock } : v
             );
-            await localDb.products.update(product.id, {
-              variantData: updatedVariantData,
-              updatedAt: now
-            });
+            localProductUpdates.push({ id: product.id, data: { variantData: updatedVariantData, updatedAt: now } });
             const vRetHistId = generateId();
             const vRetHistEntry: VariantStockHistory = {
               id: vRetHistId,
@@ -144,7 +141,7 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
               cashierName: currentCashierName || sale.cashier || 'System',
               createdAt: now
             };
-            await localDb.variantStockHistory.add(vRetHistEntry);
+            localVariantHistoryAdds.push(vRetHistEntry);
             returnMovements.push({
               id: vRetHistId,
               product_id: product.id,
@@ -168,10 +165,7 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
             if (addonQtyToRestore <= 0) continue;
 
             const newAddonStock = (addonProduct.stock || 0) + addonQtyToRestore;
-            await localDb.products.update(addonProduct.id, {
-              stock: newAddonStock,
-              updatedAt: now
-            });
+            localProductUpdates.push({ id: addonProduct.id, data: { stock: newAddonStock, updatedAt: now } });
             // STRIP stock — cloud stock is updated ONLY via stock_history trigger (avoids double-count)
             const remoteRefundAddon = toRemoteProduct({ ...addonProduct, stock: newAddonStock, updatedAt: now });
             delete remoteRefundAddon.stock;
@@ -189,7 +183,7 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
               cashierName: currentCashierName || sale.cashier || 'System',
               createdAt: now
             };
-            await localDb.stockHistory.add(aHistoryEntry);
+            localStockHistoryAdds.push(aHistoryEntry);
             returnMovements.push({
               id: aHistId,
               product_id: addonProduct.id,
@@ -213,14 +207,14 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
         if (gp?.trackInventory) {
           const qty = Math.abs(Number((gift as any).quantity || 1));
           const newStock = (gp.stock || 0) + qty;
-          await localDb.products.update(gp.id, { stock: newStock, updatedAt: now });
+          localProductUpdates.push({ id: gp.id, data: { stock: newStock, updatedAt: now } });
           const hid = generateId();
           const he = {
             id: hid, productId: gp.id, changeQty: qty, type: 'return' as const,
             referenceId: id, note: `Sale #${sale.invoiceNumber} Refunded (Free Gift)`,
             balanceAfter: newStock, cashierName: currentCashierName || 'System', createdAt: now,
           };
-          await localDb.stockHistory.add(he);
+          localStockHistoryAdds.push(he);
           returnMovements.push({ id: hid, product_id: gp.id, change_qty: qty, type: 'return',
             note: he.note, variant_id: '', variant_label: '', cashier_name: he.cashierName });
         }
@@ -265,6 +259,17 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
     const returnsCommitted = await refundSaleAtomic(id, returnMovements, finalStatus, newRefundedAmount);
     if (!returnsCommitted) {
       throw new Error('Cloud refund failed. Please retry — stock was not reversed.');
+    }
+
+    // Apply deferred local db updates
+    for (const update of localProductUpdates) {
+      await localDb.products.update(update.id, update.data);
+    }
+    for (const hist of localStockHistoryAdds) {
+      await localDb.stockHistory.add(hist);
+    }
+    for (const vHist of localVariantHistoryAdds) {
+      await localDb.variantStockHistory.add(vHist);
     }
 
     // Mirror sale status/payment_status to cloud (display cache sync).

@@ -130,7 +130,7 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
       ] = await Promise.allSettled([
         cloudFetch('products', mapProduct),
         cloudFetch('customers', mapCustomer),
-        usersService.getAll().catch(() => []),
+        usersService.fetchRemote().catch(() => []),
         cloudFetch('salesmen', mapSalesman),
         cloudFetch('discounts', mapDiscount),
         cloudFetch('payment_modes', mapPaymentMode),

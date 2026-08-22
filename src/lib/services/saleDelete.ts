@@ -34,6 +34,9 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
   // Phase 1: collect reverse-stock movements so they commit atomically via
   // `delete_sale_atomic` (no per-op queue → no divergence on deletes/returns).
   const returnMovements: any[] = [];
+  const localProductUpdates: any[] = [];
+  const localStockHistoryAdds: any[] = [];
+  const localVariantHistoryAdds: any[] = [];
 
   // 1. Reverse Stock (Only restore what has not been refunded/returned yet)
   // Pending drafts never deducted stock initially, so we don't restore it.
@@ -63,11 +66,8 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
         if (netQtyMag <= 0) continue;
         const newStock = (product.stock || 0) + qty;
 
-        // Update Local Product
-        await localDb.products.update(product.id, {
-          stock: newStock,
-          updatedAt: now
-        });
+        // Defer Local Product update
+        localProductUpdates.push({ id: product.id, data: { stock: newStock, updatedAt: now } });
         const updatedProduct = { ...product, stock: newStock, updatedAt: now };
         affectedProducts.push(updatedProduct);
 
@@ -90,7 +90,7 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
           cashierName: currentCashierName || sale.cashier || 'System',
           createdAt: now
         };
-        await localDb.stockHistory.add(historyEntry);
+        localStockHistoryAdds.push(historyEntry);
         returnMovements.push({
           id: histId,
           product_id: product.id,
@@ -110,10 +110,7 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
             const updatedVariantData = product.variantData.map(v =>
               v.id === variant.id ? { ...v, stock: newVariantStock } : v
             );
-            await localDb.products.update(product.id, {
-              variantData: updatedVariantData,
-              updatedAt: now
-            });
+            localProductUpdates.push({ id: product.id, data: { variantData: updatedVariantData, updatedAt: now } });
             const vHistId = generateId();
             const vHistEntry: any = {
               id: vHistId,
@@ -128,7 +125,7 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
               cashierName: currentCashierName || sale.cashier || 'System',
               createdAt: now
             };
-            await localDb.variantStockHistory.add(vHistEntry);
+            localVariantHistoryAdds.push(vHistEntry);
             returnMovements.push({
               id: vHistId,
               product_id: product.id,
@@ -152,10 +149,7 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
 
               const newAddonStock = (addonProduct.stock || 0) + addonQty;
 
-              await localDb.products.update(addonProduct.id, {
-                stock: newAddonStock,
-                updatedAt: now
-              });
+              localProductUpdates.push({ id: addonProduct.id, data: { stock: newAddonStock, updatedAt: now } });
               const updatedAddonProduct = { ...addonProduct, stock: newAddonStock, updatedAt: now };
               affectedProducts.push(updatedAddonProduct);
               // STRIP stock — cloud stock is updated ONLY via stock_history trigger (avoids double-count)
@@ -176,7 +170,7 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
                 cashierName: currentCashierName || sale.cashier || 'System',
                 createdAt: now
               };
-              await localDb.stockHistory.add(aHistoryEntry);
+              localStockHistoryAdds.push(aHistoryEntry);
               returnMovements.push({
                 id: aHistId,
                 product_id: addonProduct.id,
@@ -203,14 +197,14 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
       if (gp?.trackInventory) {
         const qty = Math.abs(Number((gift as any).quantity || 1));
         const newStock = (gp.stock || 0) + qty;
-        await localDb.products.update(gp.id, { stock: newStock, updatedAt: now });
+        localProductUpdates.push({ id: gp.id, data: { stock: newStock, updatedAt: now } });
         const hid = generateId();
         const he = {
           id: hid, productId: gp.id, changeQty: qty, type: 'return' as const,
           referenceId: id, note: `Sale #${sale.invoiceNumber} Deleted (Free Gift)${editTag}`,
           balanceAfter: newStock, cashierName: currentCashierName || sale.cashier || 'System', createdAt: now,
         };
-        await localDb.stockHistory.add(he);
+        localStockHistoryAdds.push(he);
         returnMovements.push({ id: hid, product_id: gp.id, change_qty: qty, type: 'return',
           note: he.note, variant_id: '', variant_label: '', cashier_name: he.cashierName });
       }
@@ -223,6 +217,17 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
   const deleteCommitted = await deleteSaleAtomic(id, returnMovements);
   if (!deleteCommitted) {
     throw new Error('Cloud delete failed. Please retry — stock was not reversed.');
+  }
+
+  // 1b2. Execute deferred local DB updates now that cloud succeeded
+  for (const update of localProductUpdates) {
+    await localDb.products.update(update.id, update.data);
+  }
+  for (const hist of localStockHistoryAdds) {
+    await localDb.stockHistory.add(hist);
+  }
+  for (const vHist of localVariantHistoryAdds) {
+    await localDb.variantStockHistory.add(vHist);
   }
 
   // 1c. Reverse wallet balances for the un-refunded portion (split-aware)

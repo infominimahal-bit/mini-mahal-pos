@@ -51,6 +51,10 @@ export async function signInLogic(
     if (authData.user?.email) {
       localStorage.setItem(`action_hash_${authData.user.email}`, hash);
     }
+    if (authData.user) {
+      // Heal legacy users by writing the action_hash to their profile on login
+      await supabase.from('users').update({ action_hash: hash }).eq('id', authData.user.id);
+    }
   } catch (error: any) {
     setLoading(false);
     sonner.error(`Sign In Failed: ${getAuthErrorMessage(error.message || error.toString())}`);
