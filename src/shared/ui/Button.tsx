@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { sonner } from '../../lib/sonner';
 
 /**
  * Button — the single standardized button for all non-POS routes.
@@ -50,6 +51,19 @@ export function Button({
   type = 'button',
   ...rest
 }: ButtonProps) {
+  useEffect(() => {
+    let timeout: any;
+    if (loading) {
+      timeout = setTimeout(() => {
+        sonner.info('Network is slow, please wait...', { id: 'slow_net_warning', duration: 4000 });
+      }, 4000);
+    }
+    return () => {
+      if (timeout) clearTimeout(timeout);
+      sonner.dismiss('slow_net_warning');
+    };
+  }, [loading]);
+
   const iconEl = loading ? <Loader2 className="h-4 w-4 animate-spin" /> : icon;
 
   return (

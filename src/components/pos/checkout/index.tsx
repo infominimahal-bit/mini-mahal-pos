@@ -4,6 +4,7 @@ import { Sale } from '../../../types';
 import { KOTPrint } from '../KOTPrint';
 import { ReceiptPrint } from '../ReceiptPrint';
 import { Modal } from '../../../shared/ui/Modal';
+import { Button } from '../../../shared/ui/Button';
 import { ShortcutsModal } from '../ShortcutsModal';
 import { PaymentForm } from './PaymentForm';
 import { OrderSummary } from './OrderSummary';
@@ -52,14 +53,15 @@ export function CheckoutPage({ onClose, onComplete }: CheckoutPageProps) {
         <span className="hidden sm:inline text-[9px] font-black uppercase tracking-widest leading-none">{"Shortcuts"}</span>
       </button>
 
-      <button
+      <Button
         onClick={handlePayment}
         disabled={!canProcessPayment() || isProcessing}
-        className="btn btn-md btn-primary md:hidden !px-3 !py-2 !text-[8px] max-w-[120px]"
+        loading={isProcessing}
+        icon={<Check className="h-3.5 w-3.5 shrink-0" />}
+        className="md:hidden !px-3 !py-2 !text-[8px] max-w-[120px]"
       >
-        {isProcessing ? <RefreshCw className="h-3 w-3 animate-spin shrink-0" /> : <Check className="h-3.5 w-3.5 shrink-0" />}
         <span className="truncate">{"SAVE"}</span>
-      </button>
+      </Button>
 
       <div className="hidden sm:flex flex-col items-end">
         <p className="text-[8px] sm:text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest leading-none">{"Net Total"}</p>
@@ -97,17 +99,15 @@ export function CheckoutPage({ onClose, onComplete }: CheckoutPageProps) {
           className="px-5 py-2.5 h-[40px] rounded-full border border-rose-500/20 text-[#ff4b6e] hover:bg-rose-500/10 text-[9px] font-black uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center shrink-0">
           {"Cancel"}
         </button>
-        <button onClick={handlePayment} disabled={!canProcessPayment() || isProcessing}
-          className="btn btn-md btn-primary flex-1 !rounded-full !h-[40px] !py-2.5 !text-[9px] font-black uppercase tracking-widest active:scale-[0.98] shadow-lg shadow-emerald-500/20 disabled:grayscale transition-all">
-          {isProcessing ? (
-            <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-          ) : (
-            <>
-              <Check className="h-4 w-4 sm:h-5 sm:w-5" />
-              <span>{"Process Payment"}</span>
-            </>
-          )}
-        </button>
+        <Button 
+          onClick={handlePayment} 
+          disabled={!canProcessPayment() || isProcessing}
+          loading={isProcessing}
+          icon={<Check className="h-4 w-4 sm:h-5 sm:w-5" />}
+          className="flex-1 !rounded-full !h-[40px] !py-2.5 !text-[9px] font-black uppercase tracking-widest active:scale-[0.98] shadow-lg shadow-emerald-500/20 disabled:grayscale transition-all"
+        >
+          <span>{"Process Payment"}</span>
+        </Button>
       </div>
     </div>
   );
