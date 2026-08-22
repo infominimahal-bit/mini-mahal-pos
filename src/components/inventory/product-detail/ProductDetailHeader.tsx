@@ -20,14 +20,16 @@ export function ProductDetailHeader({ d }: { d: ProductDetailController }) {
             {formData.image ? <img src={formData.image} className="h-full w-full object-cover" /> : <Package className="h-8 w-8 sm:h-8 text-primary dark:text-emerald-400" />}
           </div>
 
-          <div className="absolute -bottom-1 -right-1">
-            <Button
-              variant="ghost"
-              onClick={() => setShowMediaLibrary(true)}
-              className={`!min-h-0 !p-3 !rounded-2xl !shadow-lg !border-2 !border-white dark:!border-[#171717] active:!scale-95 ${isEditMode ? '!bg-primary !text-white scale-110' : '!bg-white dark:!bg-[#262626] !text-gray-600 scale-90'}`}
-              icon={<Camera className="w-5 h-5" />}
-            />
-          </div>
+          {isEditMode && (
+            <div className="absolute -bottom-1 -right-1">
+              <Button
+                variant="ghost"
+                onClick={() => setShowMediaLibrary(true)}
+                className={`!min-h-0 !p-3 !rounded-2xl !shadow-lg !border-2 !border-white dark:!border-[#171717] active:!scale-95 !bg-primary !text-white scale-110`}
+                icon={<Camera className="w-5 h-5" />}
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col items-center sm:items-start text-center sm:text-left flex-1 min-w-0">
@@ -50,7 +52,7 @@ export function ProductDetailHeader({ d }: { d: ProductDetailController }) {
               onClick={() => setIsEditMode(!isEditMode)}
               className={`!p-1.5 !px-3 !rounded-xl !text-[10px] !font-black !shadow-sm ml-auto sm:ml-2 ${isEditMode ? '!bg-rose-500 !text-white !shadow-rose-500/20' : '!bg-white dark:!bg-white/5 !border-gray-200 dark:!border-white/10 !text-gray-700 dark:!text-gray-300'}`}
             >
-              {isEditMode ? <><X className="h-3 w-3 mr-1" /> {"Stop"}</> : <><Edit3 className="h-3 w-3 mr-1" /> {"Edit"}</>}
+              {isEditMode ? <><X className="h-3 w-3 mr-1" /> {"Cancel Edit"}</> : <><Edit3 className="h-3 w-3 mr-1" /> {"Edit"}</>}
             </Button>
           </div>
 

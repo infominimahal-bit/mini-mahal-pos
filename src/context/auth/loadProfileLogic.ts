@@ -37,6 +37,7 @@ export async function loadProfileLogic(userId: string, setProfile: any, setUser:
 
       const { enableFullAuthInit } = await import('../../lib/supabase');
       enableFullAuthInit();
+      setLoading(false);
     } else {
       await signOutLogic(setLoading, () => {}, setUser, setProfile);
       sonner.error('Session Invalid', 'Your account no longer exists. Please sign in again.');

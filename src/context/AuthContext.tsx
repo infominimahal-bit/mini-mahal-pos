@@ -87,27 +87,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (supabase.auth as any)._initCalled = true;
     supabase.auth.stopAutoRefresh?.().catch(() => { });
 
-    const AUTH_KEY = 'sb-zaynah-pos-auth-auth-token';
-    function readStoredSession(): Session | null {
+    const initSession = async () => {
       try {
-        const raw = localStorage.getItem(AUTH_KEY);
-        if (!raw) return null;
-        return JSON.parse(raw) as Session;
-      } catch { return null; }
-    }
+        const { data: { session: storedSession } } = await supabase.auth.getSession();
+        setSession(storedSession ?? null);
+        setUser(storedSession?.user ?? null);
+        
+        if (storedSession?.access_token) {
+          try { supabase.realtime.setAuth(storedSession.access_token); } catch { /* noop */ }
+        }
 
-    const initSession = () => {
-      const storedSession = readStoredSession();
-      setSession(storedSession ?? null);
-      setUser(storedSession?.user ?? null);
-      // Prime the Realtime socket with the restored token on cold start.
-      if (storedSession?.access_token) {
-        try { supabase.realtime.setAuth(storedSession.access_token); } catch { /* noop */ }
-      }
-
-      if (storedSession?.user) {
-        loadProfileLogic(storedSession.user.id, setProfile, setUser, setLoading);
-      } else {
+        if (storedSession?.user) {
+          await loadProfileLogic(storedSession.user.id, setProfile, setUser, setLoading);
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
         setLoading(false);
       }
     };
