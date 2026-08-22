@@ -50,8 +50,8 @@ export async function editSaleAtomic(oldSale: any, newSale: any, cashier: string
   // 1. Payment balances: reverse old (refund-aware, mirrors deleteSale), apply new.
   if (!isDraft) {
     const delRatio = oldSale.total > 0 ? (oldSale.total - (oldSale.refundedAmount || 0)) / oldSale.total : 0;
-    await adjustPaymentBalances(buildReversePaymentMoves(oldSale, delRatio));
-    await adjustPaymentBalances(buildSalePaymentMoves(newSale));
+    await adjustPaymentBalances(buildReversePaymentMoves(oldSale, delRatio), { batchId: oldSale.id });
+    await adjustPaymentBalances(buildSalePaymentMoves(newSale), { batchId: newSale.id });
   }
 
   // 2. Customer stats + ledger: reverse old sale, apply new sale.

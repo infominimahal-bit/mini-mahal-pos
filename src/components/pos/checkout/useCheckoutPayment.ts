@@ -186,7 +186,7 @@ export function useCheckoutPayment({
         editNewIdRef.current = null;
       } else {
         savedSale = await salesService.create(sale);
-        await adjustPaymentBalances(buildSalePaymentMoves(sale));
+        await adjustPaymentBalances(buildSalePaymentMoves(sale), { batchId: sale.id });
       }
 
       if ((savedSale as any).wasOversold) {
