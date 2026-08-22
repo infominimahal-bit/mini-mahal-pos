@@ -104,7 +104,7 @@ export function ProductHistory({ d }: { d: ProductDetailController }) {
                     )}
                   </td>
                   <td className={`px-8 py-4 text-right font-black text-xs ${h.color}`}>
-                    {h.qty > 0 ? '+' : ''}{h.qty} <span className="text-[9px] opacity-70 ml-1 font-bold">{h.type}</span>
+                    {h.type === 'IN' ? '+' : '-'}{h.qty} <span className="text-[9px] opacity-70 ml-1 font-bold">{h.type}</span>
                   </td>
                 </tr>
               ))}
@@ -130,7 +130,7 @@ export function ProductHistory({ d }: { d: ProductDetailController }) {
                   </div>
                 </div>
                 <div className={`text-sm font-black ${h.color}`}>
-                  {h.qty > 0 ? '+' : ''}{h.qty} <span className="text-[9px] opacity-70 font-bold uppercase">{h.type}</span>
+                  {h.type === 'IN' ? '+' : '-'}{h.qty} <span className="text-[9px] opacity-70 font-bold uppercase">{h.type}</span>
                 </div>
               </div>
               <div className="flex items-center justify-between bg-gray-50 dark:bg-white/5 p-2 rounded-xl">

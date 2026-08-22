@@ -49,7 +49,7 @@ export const toRemoteStockHistory = (h: any) => {
   if ('cashierId' in h) { remote.cashier_id = h.cashierId; delete remote.cashierId; }
   if ('cashierName' in h) { remote.cashier_name = h.cashierName; delete remote.cashierName; }
   // Strip bad properties
-  if ('note' in h) { remote.note = h.note; delete remote.note; } else if ('notes' in h) { remote.note = h.notes; delete remote.notes; }
+  if ('notes' in h) { remote.note = h.notes; delete remote.notes; }
   if ('quantity' in remote) { if (!remote.change_qty) remote.change_qty = remote.quantity; delete remote.quantity; }
   if ('newStock' in remote) { if (!remote.balance_after) remote.balance_after = remote.newStock; delete remote.newStock; }
   if ('previousStock' in remote) delete remote.previousStock;
