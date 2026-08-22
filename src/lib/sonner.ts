@@ -83,6 +83,11 @@ export const sonner = {
   dismissAll: () => {
     toast.dismiss();
     dialog.close();
+  },
+  
+  // Dismiss a specific notification by ID
+  dismiss: (id?: string | number) => {
+    toast.dismiss(id);
   }
 };
 
