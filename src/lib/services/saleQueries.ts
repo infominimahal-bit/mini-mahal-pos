@@ -1,6 +1,7 @@
 import { supabase } from '../supabase';
 import { Sale } from '../../types';
-import { localDb, queueOp, generateId } from '../localDb';
+import { localDb, generateId } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 import { mapSale, toRemoteSale } from './mappers';
 import { fetchAllPages } from './utils';
 
@@ -96,14 +97,11 @@ export async function updateSale(id: string, updates: Partial<Sale>): Promise<Sa
   if (!existing) throw new Error('Sale not found');
 
   const updated = { ...existing, ...updates, updatedAt: new Date() };
+
+  // Cloud FIRST — authoritative. Throw on failure so the local cache never diverges.
+  await cloudWrite('sales', 'update', id, toRemoteSale(updated));
+
   await localDb.sales.put(updated);
-
-  // Process status changes for stock restoration if needed
-  if (updates.status === 'refunded' && existing.status !== 'refunded') {
-    // Stock restoration is handled in returnSale, but this handles direct updates
-  }
-
-  await queueOp('sales', 'update', id, toRemoteSale(updated));
   return updated;
 }
 
@@ -219,17 +217,17 @@ export async function patchLegacySales(onProgress?: (percent: number) => void): 
   const CHUNK_SIZE = 50;
   for (let i = 0; i < toUpdate.length; i += CHUNK_SIZE) {
     const chunk = toUpdate.slice(i, i + CHUNK_SIZE);
-    await localDb.sales.bulkPut(chunk);
 
     const remoteChunk = chunk
       .filter(sale => !sale.invoiceNumber?.startsWith('DRAFT-'))
       .map(toRemoteSale);
 
-    // OFFLINE-FIRST: queue each patched sale (SyncEngine replicates). Avoids a direct
-    // supabase upsert that bypasses the queue and can crash the sync engine with 5000+ ops.
+    // Cloud FIRST — authoritative repair. Throw on failure keeps the local cache untouched.
     for (const s of remoteChunk) {
-      await queueOp('sales', 'update', (s as any).id, s);
+      await cloudWrite('sales', 'update', (s as any).id, s);
     }
+
+    await localDb.sales.bulkPut(chunk);
 
     if (onProgress) {
       onProgress(Math.floor(((i + chunk.length) / toUpdate.length) * 100));
@@ -237,14 +235,6 @@ export async function patchLegacySales(onProgress?: (percent: number) => void): 
 
     // Add a small delay to allow UI to breathe
     await new Promise(resolve => setTimeout(resolve, 50));
-  }
-
-  // Clear any stuck pending ops for sales updates to recover browsers that got locked up in previous repair attempts
-  const pendingSalesUpdates = await localDb.pendingOps
-    .filter(op => op.table === 'sales' && op.action === 'update')
-    .primaryKeys();
-  if (pendingSalesUpdates.length > 0) {
-    await localDb.pendingOps.bulkDelete(pendingSalesUpdates);
   }
 
   if (onProgress) onProgress(100);

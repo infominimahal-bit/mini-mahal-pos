@@ -10,23 +10,23 @@ export async function performQuickRestock(ctx: DetailCtx) {
   const supplier = ctx.restockData.supplier.trim();
 
   if (!supplier) {
-    sonner.error(ctx.t('supplier_required', 'Select a supplier to continue'));
+    sonner.error('Select a supplier to continue');
     return;
   }
 
   const result = await sonner.confirm(
-    ctx.t('confirm_restock_title', 'Confirm Quick Restock?'),
-    ctx.t('confirm_restock_desc', 'Add <strong>{qty} units</strong> of <strong>{name}</strong> to inventory counts for <strong>{total}</strong>.')
+    'Confirm Quick Restock?',
+    'Add <strong>{qty} units</strong> of <strong>{name}</strong> to inventory counts for <strong>{total}</strong>.'
       .replace('{qty}', String(qty))
       .replace('{name}', ctx.product.name)
       .replace('{total}', formatCurrency(qty * cost, ctx.currency)),
-    ctx.t('yes_restock', 'Yes, Add Stock')
+    'Yes, Add Stock'
   );
 
   if (!result.isConfirmed) return;
 
   ctx.setIsUpdating(true);
-  sonner.loading(ctx.t('restocking', 'Adding stock...'));
+  sonner.loading('Adding stock...');
 
   try {
     await commitStockInToInventory({
@@ -42,14 +42,13 @@ export async function performQuickRestock(ctx: DetailCtx) {
       }],
       recordAsSupplierBill: ctx.restockData.recordAsSupplierBill,
       suppliers: ctx.appSuppliers,
-      profile: ctx.profile,
-      dispatch
+      profile: ctx.profile
     });
 
     const newStock = (ctx.product.stock || 0) + qty;
     ctx.setFormData(prev => ({ ...prev, stock: String(newStock) }));
 
-    sonner.success(ctx.t('restock_success', 'Stock added successfully'));
+    sonner.success('Stock added successfully');
     ctx.setShowRestock(false);
     ctx.setRestockData({
       quantity: '1',
@@ -59,7 +58,7 @@ export async function performQuickRestock(ctx: DetailCtx) {
     });
   } catch (error) {
     console.error('Quick restock failed:', error);
-    sonner.error(ctx.t('restock_error', 'Failed to add stock'));
+    sonner.error('Failed to add stock');
   } finally {
     ctx.setIsUpdating(false);
     sonner.close();

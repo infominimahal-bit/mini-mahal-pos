@@ -40,13 +40,8 @@ export function useInvoiceGeneration() {
     let isCollision = true;
     while (isCollision) {
         const existingSale = await localDb.sales.where('invoiceNumber').equals(invoiceNumber).first();
-        
-        // Check pendingOps for un-synced sales using this invoice number
-        const pendingSales = await localDb.pendingOps
-            .filter(op => op.entity === 'sales' && op.opType === 'create' && op.payload?.invoiceNumber === invoiceNumber)
-            .toArray();
             
-        if (!existingSale && pendingSales.length === 0) {
+        if (!existingSale) {
             isCollision = false;
         } else {
             console.warn(`[Invoice] Collision detected for ${invoiceNumber}, auto-incrementing to next.`);

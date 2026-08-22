@@ -1,9 +1,9 @@
 import { supabase } from '../supabase';
 import {
   localDb,
-  queueOp,
   generateId,
 } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 import {
   ProductAddon,
 } from '../../types';
@@ -22,19 +22,19 @@ export const productAddonsService = {
     const id = generateId();
     const now = new Date();
     const newAddon = { ...addon, id, createdAt: now } as ProductAddon;
+    await cloudWrite('product_addons', 'create', id, toRemoteProductAddon(newAddon));
     await localDb.productAddons.add(newAddon);
-    await queueOp('product_addons', 'create', id, toRemoteProductAddon(newAddon));
     return newAddon;
   },
 
   async update(id: string, updates: Partial<ProductAddon>): Promise<void> {
+    await cloudWrite('product_addons', 'update', id, toRemoteProductAddon({ ...updates, id }));
     await localDb.productAddons.update(id, updates);
-    await queueOp('product_addons', 'update', id, toRemoteProductAddon({ ...updates, id }));
   },
 
   async delete(id: string): Promise<void> {
+    await cloudWrite('product_addons', 'delete', id, {});
     await localDb.productAddons.delete(id);
-    await queueOp('product_addons', 'delete', id, {});
   },
 
   async fetchRemote(lastSyncTime?: Date): Promise<ProductAddon[]> {

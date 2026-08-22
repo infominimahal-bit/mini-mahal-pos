@@ -1,6 +1,5 @@
 import { memo } from 'react';
-import { Plus, Minus, Gift, Flame, Package } from 'lucide-react';
-import { useTranslation } from '../../../hooks/useTranslation';
+import { Plus, Minus, Gift, Package } from 'lucide-react';
 
 interface BundleCardProps {
   item: any;
@@ -103,7 +102,6 @@ export const BundleCard = memo(
 
           {!isGroup && item.discountValue > 0 && (
             <div className="absolute top-1 left-1 bg-violet-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-lg shadow-lg z-10 flex items-center gap-1">
-              {item.scheduleType === 'scheduled' && <Flame className="h-2.5 w-2.5" />}
               -{item.discountValue}{item.discountType === 'percentage' ? '%' : ` ${currency}`}
             </div>
           )}
@@ -115,7 +113,7 @@ export const BundleCard = memo(
           )}
 
           <div className="absolute top-1 right-1 flex items-center bg-violet-500/90 text-white p-1 rounded-lg text-[8px] font-black shadow-md z-10">
-            {item.scheduleType === 'scheduled' ? <Flame className="h-2.5 w-2.5" /> : <Gift className="h-2.5 w-2.5" />}
+            <Gift className="h-2.5 w-2.5" />
           </div>
 
           {bundleQty > 0 && (
@@ -155,11 +153,6 @@ export const BundleCard = memo(
               <span className="text-primary dark:text-emerald-400 font-black text-[10px] sm:text-xs shrink-0">
                 From {currency}{minPrice.toLocaleString()}
               </span>
-            ) : item.isCombo && item.bundleMinPrice != null && item.bundleMaxPrice != null && Math.abs(item.bundleMaxPrice - item.bundleMinPrice) > 0.001 ? (
-              <>
-                <span className="text-[9px] text-gray-400 line-through truncate">{currency}{item.totalPrice.toLocaleString()}</span>
-                <span className="text-primary dark:text-emerald-400 font-black text-[10px] sm:text-xs shrink-0">{currency}{item.bundleMinPrice.toLocaleString()} – {currency}{item.bundleMaxPrice.toLocaleString()}</span>
-              </>
             ) : (
               <>
                 <span className="text-[9px] text-gray-400 line-through truncate">{currency}{item.totalPrice.toLocaleString()}</span>
@@ -185,7 +178,6 @@ export const BundleCard = memo(
       prev.item.name === next.item.name &&
       prev.item.finalPrice === next.item.finalPrice &&
       prev.item.totalPrice === next.item.totalPrice &&
-      prev.item.isCombo === next.item.isCombo &&
       prev.item.bundleMinPrice === next.item.bundleMinPrice &&
       prev.item.bundleMaxPrice === next.item.bundleMaxPrice &&
       JSON.stringify(prev.visibleProducts) === JSON.stringify(next.visibleProducts)

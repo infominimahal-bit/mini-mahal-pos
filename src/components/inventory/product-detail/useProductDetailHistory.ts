@@ -42,14 +42,18 @@ export function useProductDetailHistory({
         color = 'text-purple-500 font-black';
         bg = 'bg-purple-500/10';
         icon = isOut ? ArrowUpRight : ArrowDownLeft;
+      } else if (note.includes('deleted')) {
+        label = 'Sale Deleted';
+        color = 'text-yellow-500 font-black';
+        bg = 'bg-yellow-500/10';
+        icon = isOut ? ArrowUpRight : ArrowDownLeft;
       } else if (h.type === 'sale') {
         label = 'POS Sale';
         color = 'text-red-500';
         bg = 'bg-red-500/10';
         icon = ArrowUpRight;
       } else if (h.type === 'return') {
-        const isDeleted = note.includes('deleted');
-        label = isDeleted ? 'Sale Deleted' : (note.includes('partial') ? 'Partial Refund' : 'POS Return');
+        label = note.includes('partial') ? 'Partial Refund' : 'POS Return';
         color = 'text-yellow-500 font-black';
         bg = 'bg-yellow-500/10';
         icon = ArrowDownLeft;

@@ -142,7 +142,6 @@ export function PurchaseHistoryCard({ record, appProducts, currency, onDelete }:
 }
 
 export function PurchaseHistoryMobileCard({ record, appProducts, currency }: Omit<PurchaseHistoryCardProps, 'onDelete'>) {
-  const { t } = useTranslation();
   return (
     <div
       key={record.id}

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Gift, Package, ShoppingBag } from 'lucide-react';
 import { formatCurrency } from '../../lib/currencies';
-import { useTranslation } from '../../hooks/useTranslation';
 import { sonner } from '../../lib/sonner';
 
 interface Props {
@@ -20,8 +19,6 @@ export function TransactionItemsTable({
   items, appBundles, appProducts, appSettings, showDiscount,
   isAdmin, profile, transactionId, onNavigateToProduct
 }: Props) {
-  const { t } = useTranslation();
-
   const groupItems = (items: any[]) => {
     const bundlesMap = new Map<string, any>();
     const standaloneItems: any[] = [];

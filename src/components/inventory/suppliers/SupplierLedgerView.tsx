@@ -19,7 +19,6 @@ interface SupplierLedgerProps {
 export function SupplierLedger({ supplier, onBack, startDate, endDate, dateFilter }: SupplierLedgerProps) {
   const {
     appSettings,
-    t,
     balance,
     loading,
     searchTerm,
@@ -158,7 +157,6 @@ export function SupplierLedger({ supplier, onBack, startDate, endDate, dateFilte
           setPageSize={setPageSize}
           handleDeleteTransaction={handleDeleteTransaction}
           appSettings={appSettings}
-          t={t}
         />
       </div>
 
@@ -178,7 +176,6 @@ export function SupplierLedger({ supplier, onBack, startDate, endDate, dateFilte
         setIsPaymentManualOverride={setIsPaymentManualOverride}
         submitPayment={submitPayment}
         formLoading={formLoading}
-        t={t}
       />
 
       <BillModal
@@ -192,7 +189,6 @@ export function SupplierLedger({ supplier, onBack, startDate, endDate, dateFilte
         setIsBillManualOverride={setIsBillManualOverride}
         submitBill={submitBill}
         formLoading={formLoading}
-        t={t}
       />
     </div>
   );

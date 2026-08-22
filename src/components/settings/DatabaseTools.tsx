@@ -18,7 +18,6 @@ const STORE_OPTIONS = [
   { key: 'settings', label: 'Settings', icon: Settings, color: 'text-gray-600' },
   { key: 'categories', label: 'Categories', icon: Tag, color: 'text-primary' },
   { key: 'suppliers', label: 'Suppliers', icon: Truck, color: 'text-orange-500' },
-  { key: 'productBatches', label: 'Product Batches', icon: ClipboardList, color: 'text-pink-500' },
   { key: 'purchaseRecords', label: 'Purchase Records', icon: ClipboardList, color: 'text-lime-600' },
   { key: 'purchase_orders', label: 'Purchase Orders', icon: ClipboardList, color: 'text-orange-600', dbKey: 'purchaseOrders' },
   { key: 'purchase_order_items', label: 'PO Items', icon: Package, color: 'text-orange-400', dbKey: 'purchaseOrderItems' },
@@ -28,8 +27,6 @@ const STORE_OPTIONS = [
   { key: 'variant_stock_history', label: 'Variant Stock History', icon: History, color: 'text-gray-500', dbKey: 'variantStockHistory' },
   { key: 'bundles', label: 'Bundles & Deals', icon: Tag, color: 'text-purple-500' },
   { key: 'bundle_items', label: 'Bundle Items', icon: Package, color: 'text-purple-400', dbKey: 'bundleItems' },
-  { key: 'bundle_slots', label: 'Bundle Slots', icon: Layers, color: 'text-purple-300', dbKey: 'bundleSlots' },
-  { key: 'bundle_slot_options', label: 'Slot Options', icon: CheckCircle2, color: 'text-purple-200', dbKey: 'bundleSlotOptions' },
   { key: 'toppings', label: 'Toppings', icon: Layers, color: 'text-amber-400' },
   { key: 'productAddons', label: 'Product Addons', icon: Package, color: 'text-teal-500' },
 ];

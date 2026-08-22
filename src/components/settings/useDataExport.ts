@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { localDb, queueOp, SETTINGS_ID } from '../../lib/localDb';
+import { localDb, SETTINGS_ID } from '../../lib/localDb';
 import { useSettingsStore, useAppStore } from '../../stores';
 import { sonner } from '../../lib/sonner';
 
@@ -23,7 +23,6 @@ const DISPATCH_MAP: Record<string, string> = {
   purchaseRecords: 'SET_PURCHASE_RECORDS',
   categories: 'SET_CATEGORIES',
   suppliers: 'SET_SUPPLIERS',
-  productBatches: 'SET_PRODUCT_BATCHES',
   supplier_transactions: 'SET_SUPPLIER_TRANSACTIONS',
   payments: 'SET_PAYMENTS',
   purchase_orders: 'SET_PURCHASE_ORDERS',
@@ -67,8 +66,6 @@ export function useDataExport(selectedStores: Set<string>, canExportDb: boolean)
           variant_stock_history: 'variantStockHistory',
           bundles: 'bundles',
           bundle_items: 'bundleItems',
-          bundle_slots: 'bundleSlots',
-          bundle_slot_options: 'bundleSlotOptions',
         };
         const dbKey = dbKeyMap[store] || store;
         const table = (localDb as any)[dbKey];
@@ -158,11 +155,9 @@ export function useDataExport(selectedStores: Set<string>, canExportDb: boolean)
             try {
               const mergedSettings = existing ? { ...existing, ...settingsData, id: SETTINGS_ID } : { ...settingsData, id: SETTINGS_ID };
               await localDb.appSettings.put(mergedSettings);
-              try {
-                await queueOp('settings', 'upsert', 'singleton', mergedSettings);
-              } catch (qErr) {
-                console.warn('Could not queue op for settings sync:', qErr);
-              }
+              // Backup restore seeds the LOCAL cache only. Cloud is the single source
+              // of truth; the reload at the end re-pulls from cloud. (A true cloud
+              // restore would need per-table remote mappers — out of scope here.)
               useSettingsStore.getState().setSettings({ ...useSettingsStore.getState().settings, ...mergedSettings } as any);
               summaries.push({ table: 'SETTINGS', total: 1, imported: 1, skipped: 0, failed: 0, duplicate: 0 });
             } catch (e) {
@@ -189,8 +184,6 @@ export function useDataExport(selectedStores: Set<string>, canExportDb: boolean)
           variant_stock_history: 'variantStockHistory',
           bundles: 'bundles',
           bundle_items: 'bundleItems',
-          bundle_slots: 'bundleSlots',
-          bundle_slot_options: 'bundleSlotOptions',
         };
         const dbKey = dbKeyMap[storeKey] || storeKey;
         const table = (localDb as any)[dbKey];
@@ -222,13 +215,6 @@ export function useDataExport(selectedStores: Set<string>, canExportDb: boolean)
                 }
                 
                 await table.add(record);
-                
-                try {
-                  await queueOp(dbKey, 'insert', record.id, record);
-                } catch (qErr) {
-                  // just warn if sync queue fails
-                }
-                
                 imported++;
               } catch (e) {
                 failed++;

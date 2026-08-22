@@ -9,7 +9,7 @@ import { cn } from '../../lib/utils';
  * `premium-card` / `glass-card` CSS classes are rescued and exposed as
  * variants rather than left as dead code.
  *
- * `className` is an escape hatch (estore theme vars, page-specific tweaks).
+ * `className` is an escape hatch (page-specific tweaks).
  */
 export type CardVariant = 'default' | 'stat' | 'premium' | 'glass' | 'listRow';
 export type CardPadding = 'none' | 'sm' | 'md' | 'lg';

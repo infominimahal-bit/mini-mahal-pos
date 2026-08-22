@@ -1,19 +1,15 @@
 import {
   localDb,
-  queueOp,
 } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 
-/** Delete bundle and all its items (offline-first) */
+/** Delete bundle and all its items (cloud-direct: cloud is the single source of truth) */
 export async function deleteBundle(bundleId: string): Promise<void> {
-  // Optimistic local delete
-  await localDb.bundleItems.where('bundleId').equals(bundleId).delete();
-  const oldSlots = await localDb.bundleSlots.where('bundleId').equals(bundleId).toArray();
-  for (const oldSlot of oldSlots) {
-    await localDb.bundleSlotOptions.where('slotId').equals(oldSlot.id).delete();
-  }
-  await localDb.bundleSlots.where('bundleId').equals(bundleId).delete();
-  await localDb.bundles.delete(bundleId);
+  // Cloud FIRST — cloud FK cascade removes bundle_items. Throw on failure keeps the
+  // local cache intact (no divergence).
+  await cloudWrite('bundles', 'delete', bundleId, {});
 
-  // OFFLINE-FIRST: queue the delete; SyncEngine replicates to cloud (never direct supabase write).
-  await queueOp('bundles', 'delete', bundleId, {});
+  // Local cache cleanup.
+  await localDb.bundleItems.where('bundleId').equals(bundleId).delete();
+  await localDb.bundles.delete(bundleId);
 }

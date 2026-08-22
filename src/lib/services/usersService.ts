@@ -11,7 +11,6 @@ import {
   Category,
   Supplier,
   PurchaseRecord,
-  ProductBatch,
   SupplierTransaction,
   StockHistory,
   Payment,
@@ -21,11 +20,11 @@ import {
   CartItem,
   RefundRequest,
   Topping,
-  ExtraTopping,
   VariantStockHistory,
   ProductAddon,
 } from '../../types';
-import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
+import { localDb, generateId, SETTINGS_ID } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { signAction, withActor } from '../actionToken';
 import { hashPasswordString } from '../authUtils';
@@ -60,8 +59,8 @@ export const salesmenService = {
       active: salesman.active,
       created_at: newSalesman.createdAt.toISOString()
     };
+    await cloudWrite('salesmen', 'create', id, remote);
     await localDb.salesmen.put(newSalesman);
-    await queueOp('salesmen', 'create', id, remote);
     return newSalesman;
   },
   async update(id: string, updates: any) {
@@ -70,14 +69,14 @@ export const salesmenService = {
     if ('phone' in updates) remote.phone = updates.phone;
     if ('active' in updates) remote.active = updates.active;
 
+    await cloudWrite('salesmen', 'update', id, { ...remote, id });
     await localDb.salesmen.update(id, { ...updates, updatedAt: new Date() });
-    await queueOp('salesmen', 'update', id, remote);
     const updated = await localDb.salesmen.get(id);
     return updated;
   },
   async delete(id: string) {
+    await cloudWrite('salesmen', 'delete', id, {});
     await localDb.salesmen.delete(id);
-    await queueOp('salesmen', 'delete', id, {});
   }
 };
 
@@ -86,7 +85,8 @@ export const salesmenService = {
  */
 export const usersService = {
   async getAll(): Promise<User[]> {
-    return await localDb.users.toArray();
+    const users = await localDb.users.toArray();
+    return users.filter((u: any) => !u.deleted_at && !u.deletedAt);
   },
 
   async fetchRemote(lastSyncTime?: Date): Promise<User[]> {
@@ -104,7 +104,6 @@ export const usersService = {
     if (!existing) throw new Error('User not found');
 
     const updated = { ...existing, ...updates, updatedAt: new Date() };
-    await localDb.users.put(updated);
 
     const syncPayload: any = {
       id: updated.id,
@@ -126,7 +125,8 @@ export const usersService = {
       updated_at: new Date().toISOString()
     };
 
-    await queueOp('users', 'update', id, syncPayload);
+    await cloudWrite('users', 'update', id, syncPayload);
+    await localDb.users.put(updated);
     return updated;
   },
 
@@ -135,8 +135,28 @@ export const usersService = {
     // survives; login is permanently rejected by the deleted_at / active gates in
     // signInLogic.ts + AuthContext. We do NOT hard-delete the auth user.
     const now = new Date();
+    const existing = await localDb.users.get(id);
+
+    const syncPayload: any = {
+      id,
+      active: false,
+      deleted_at: now.toISOString(),
+      updated_at: now.toISOString()
+    };
+
+    if (existing) {
+      syncPayload.username = existing.username || existing.email?.split('@')[0] || 'user';
+      syncPayload.name = existing.name || 'Unknown';
+      syncPayload.email = existing.email;
+      syncPayload.role = existing.role || 'cashier';
+    } else {
+      syncPayload.username = `ghost_${id.substring(0, 8)}`;
+      syncPayload.name = 'Deleted User';
+      syncPayload.role = 'cashier';
+    }
+
+    await cloudWrite('users', 'update', id, syncPayload);
     await localDb.users.update(id, { active: false, deletedAt: now, updatedAt: now } as any);
-    await queueOp('users', 'update', id, { active: false, deleted_at: now.toISOString(), updated_at: now.toISOString() });
     try { await supabase.rpc('revoke_user_sessions', { p_user_id: id }); } catch (e) { console.warn('[usersService] revoke sessions on delete failed:', e); }
   },
 
@@ -154,10 +174,10 @@ export const usersService = {
       p_new_password: newPassword
     });
     if (error) throw error;
-    // PHASE 39A: rotate the stored offline hash so old signed tokens become invalid,
+    // PHASE 39A: rotate the stored action hash so old signed tokens become invalid,
     // and revoke active sessions so stale logins expire.
     const newHash = await hashPasswordString(newPassword);
-    await supabase.from('users').update({ offline_hash: newHash } as any).eq('id', userId).then(() => {}).catch(() => {});
+    await supabase.from('users').update({ action_hash: newHash } as any).eq('id', userId).then(() => {}).catch(() => {});
     try { await supabase.rpc('revoke_user_sessions', { p_user_id: userId }); } catch (e) { console.warn('[usersService] revoke sessions on pw change failed:', e); }
   }
 };
@@ -177,9 +197,8 @@ export const seedMissingBarcodes = async (): Promise<{ count: number; updated: s
   const updatedNames: string[] = [];
   for (const prod of products) {
     const val = prod.barcode || generateBarcodeValue(prod.name || prod.id);
-    // OFFLINE-FIRST: update local + queue (never direct supabase write).
+    await cloudWrite('products', 'update', prod.id, { id: prod.id, barcode_value: val, barcode: val, updated_at: new Date().toISOString() } as any);
     await localDb.products.where('id').equals(prod.id).modify({ barcodeValue: val, barcode: val });
-    await queueOp('products', 'update', prod.id, { barcode_value: val, barcode: val } as any);
     updatedNames.push(prod.name);
   }
 

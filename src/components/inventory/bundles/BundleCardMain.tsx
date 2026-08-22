@@ -39,32 +39,14 @@ export function BundleCard({
   let itemCount = 0;
   let productImages: { bi: any; product: any }[] = [];
 
-  if (bundle.isCombo && bundle.slots) {
-    totalPrice = bundle.slots.reduce((sum: number, slot: any) => {
-      const maxPriceOpt = slot.options.reduce((max: number, opt: any) => {
-        const p = products.find(pr => pr.id === opt.productId);
-        return Math.max(max, p ? p.price : 0);
-      }, 0);
-      return sum + (maxPriceOpt * slot.requiredQuantity);
-    }, 0);
-    itemCount = bundle.slots.reduce((s, slot: any) => s + (slot.requiredQuantity || 1), 0);
-    productImages = bundle.slots.reduce((acc: any[], slot: any) => {
-      const opts = slot.options.map((opt: any) => ({
-        bi: { id: opt.id, quantity: 1 },
-        product: products.find(p => p.id === opt.productId)
-      })).filter(x => !!x.product);
-      return [...acc, ...opts];
-    }, []);
-  } else {
-    totalPrice = (bundle.items || []).reduce((sum, bi) => {
-      const p = products.find(pr => pr.id === bi.productId);
-      return sum + (p ? p.price * bi.quantity : 0);
-    }, 0);
-    itemCount = (bundle.items || []).reduce((s, bi) => s + (bi.quantity || 1), 0);
-    productImages = (bundle.items || [])
-      .map(bi => ({ bi, product: products.find(p => p.id === bi.productId) }))
-      .filter((x): x is { bi: typeof bi; product: NonNullable<typeof x.product> } => !!x.product);
-  }
+  totalPrice = (bundle.items || []).reduce((sum, bi) => {
+    const p = products.find(pr => pr.id === bi.productId);
+    return sum + (p ? p.price * bi.quantity : 0);
+  }, 0);
+  itemCount = (bundle.items || []).reduce((s, bi) => s + (bi.quantity || 1), 0);
+  productImages = (bundle.items || [])
+    .map(bi => ({ bi, product: products.find(p => p.id === bi.productId) }))
+    .filter((x): x is { bi: typeof bi; product: NonNullable<typeof x.product> } => !!x.product);
 
   const discAmt = bundle.discountType === 'percentage'
     ? (totalPrice * bundle.discountValue) / 100

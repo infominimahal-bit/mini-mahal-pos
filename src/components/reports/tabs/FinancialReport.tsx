@@ -1,6 +1,5 @@
 import { TrendingUp, TrendingDown, DollarSign, Wallet, Banknote, CreditCard, Smartphone, Building2, FileText } from 'lucide-react';
 import { formatCurrency, getCurrencySymbol } from '../../../lib/currencies';
-import { useTranslation } from '../../../hooks/useTranslation';
 import { ExportButton } from '../../../shared/export';
 import { useMemo } from 'react';
 
@@ -28,8 +27,6 @@ export function FinancialReport({
   totalRevenue, totalTransactions, totalCostOfGoods, grossProfit,
   totalExpenseAmount, filteredExpensesCount, netProfit, walletStats, currency
 }: FinancialReportProps) {
-  const { t } = useTranslation();
-
   const exportColumns = [
     { key: 'metric', label: "Metric" },
     { key: 'value', label: "Value" },
@@ -48,7 +45,7 @@ export function FinancialReport({
       rows.push({ metric: `${"Wallet Net"} (${w.method})`, value: w.net });
     });
     return rows;
-  }, [t, totalRevenue, totalTransactions, totalCostOfGoods, grossProfit, totalExpenseAmount, netProfit, walletStats]);
+  }, [totalRevenue, totalTransactions, totalCostOfGoods, grossProfit, totalExpenseAmount, netProfit, walletStats]);
 
   return (
     <div className="space-y-6">

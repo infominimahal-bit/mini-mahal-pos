@@ -67,13 +67,10 @@ export function useReportFilters(appSettings: any, appSales: any, appExpenses: a
   const [reportRefreshKey, setReportRefreshKey] = useState(0);
 
   useEffect(() => {
-    const handleSync = () => { reportCache.current = {}; setReportRefreshKey(k => k + 1); };
-    window.addEventListener('pendingops-changed', handleSync);
     const handleFocus = () => { reportCache.current = {}; setReportRefreshKey(k => k + 1); };
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') handleFocus(); });
     return () => {
-      window.removeEventListener('pendingops-changed', handleSync);
       window.removeEventListener('focus', handleFocus);
     };
   }, []);

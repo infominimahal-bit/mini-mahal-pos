@@ -11,7 +11,6 @@ import {
   Category,
   Supplier,
   PurchaseRecord,
-  ProductBatch,
   SupplierTransaction,
   StockHistory,
   Payment,
@@ -21,11 +20,11 @@ import {
   CartItem,
   RefundRequest,
   Topping,
-  ExtraTopping,
   VariantStockHistory,
   ProductAddon,
 } from '../../types';
-import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
+import { localDb, generateId, SETTINGS_ID } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { signAction, withActor } from '../actionToken';
 import { fetchAllPages } from './utils';
@@ -60,15 +59,13 @@ export const settingsService = {
     // Safety: ensure timestamps are updated
     if (!updated.createdAt) updated.createdAt = now;
 
-    // 1. Update local cache immediately
-    await localDb.appSettings.put(updated);
-
-    // 2. Map for remote sync
+    // Map for remote sync
     const remotePayload = toRemoteSettings(updated);
     remotePayload.id = SETTINGS_ID;
 
-    // 3. Queue for cloud sync
-    await queueOp('app_settings', 'update', SETTINGS_ID, remotePayload);
+    // Cloud-direct (authoritative, role-gated inside cloudWrite), then local cache.
+    await cloudWrite('app_settings', 'update', SETTINGS_ID, remotePayload);
+    await localDb.appSettings.put(updated);
   }
 };
 

@@ -3,8 +3,8 @@
  * non-POS routes.
  *
  * POS (`src/components/pos/**`) is completely excluded and keeps its own
- * markup. Estore keeps its CSS-variable theme; components here accept
- * `className` escape hatches for it.
+ * markup. Components here accept `className` escape hatches for
+ * page-specific tweaks.
  */
 export { Button, type ButtonProps, type ButtonVariant, type ButtonSize } from './Button';
 export { Card, type CardProps, type CardVariant, type CardPadding } from './Card';
@@ -28,3 +28,4 @@ export { BottomSheet, type BottomSheetProps } from './BottomSheet';
 export { Select, type SelectProps } from './Select';
 export { Modal } from './Modal';
 export { SearchableSelect, type SearchableSelectProps } from './SearchableSelect';
+export { HelpTooltip } from './HelpTooltip';

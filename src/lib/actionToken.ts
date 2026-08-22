@@ -1,28 +1,27 @@
 // ============================================================================
-// ACTION TOKEN — client-side signed role proof (MASTER §2.1.4, offline-safe)
+// ACTION TOKEN — client-side signed role proof (MASTER §2.1.4)
 // ----------------------------------------------------------------------------
-// WHY: this POS uses the PUBLIC anon key + an offline-login fallback, so the
-// server cannot trust auth.uid() (it is NULL for offline users). Per-role RLS
-// therefore cannot be enforced by Supabase natively without breaking offline.
+// WHY: this POS uses the PUBLIC anon key, so the
+// server cannot trust auth.uid() in all contexts. Per-role RLS
+// therefore cannot be enforced by Supabase natively.
 //
 // FIX: every sensitive RPC call carries a signature over
-//   SHA256( offline_hash + '|' + user_id + '|' + role + '|' + action )
-// keyed by the user's `offline_hash` (a SHA-256 of their password, known only
+//   SHA256( action_hash + '|' + user_id + '|' + role + '|' + action )
+// keyed by the user's `action_hash` (a SHA-256 of their password, known only
 // to the legit user + stored server-side). The RPC recomputes the digest and
 // rejects if it does not match or if the claimed role != stored role. An
-// attacker without the password cannot forge another role. Works online AND
-// offline (the hash is available in both states).
+// attacker without the password cannot forge another role.
 //
 // A pure-JS SHA-256 is included so it also works on tablet LAN IPs where
 // crypto.subtle (secure context only) is unavailable.
 // ============================================================================
 
-const ACTOR_KEY = 'pos_offline_profile';
+const ACTOR_KEY = 'pos_actor_profile';
 
 export interface Actor {
   id: string;
   role: string;
-  offlineHash?: string;
+  actionHash?: string;
 }
 
 export function getActor(): Actor | null {
@@ -30,13 +29,13 @@ export function getActor(): Actor | null {
     const raw = localStorage.getItem(ACTOR_KEY);
     if (!raw) return null;
     const p = JSON.parse(raw);
-    let hash: string | undefined = p.offlineHash ?? p.offline_hash;
-    // Fallback: older cached profiles didn't store offlineHash; recover it from the
+    let hash: string | undefined = p.actionHash ?? p.action_hash;
+    // Fallback: older cached profiles didn't store actionHash; recover it from the
     // per-email key AuthContext writes on every password login.
     if (!hash && p.email) {
-      hash = localStorage.getItem(`offline_hash_${p.email}`) ?? undefined;
+      hash = localStorage.getItem(`action_hash_${p.email}`) ?? undefined;
     }
-    return { id: p.id, role: p.role, offlineHash: hash };
+    return { id: p.id, role: p.role, actionHash: hash };
   } catch {
     return null;
   }
@@ -63,8 +62,8 @@ export async function signAction(action: string): Promise<{
   p_sig: string;
 } | null> {
   const actor = getActor();
-  if (!actor || !actor.offlineHash) return null;
-  const message = `${actor.offlineHash}|${actor.id}|${actor.role}|${action}`;
+  if (!actor || !actor.actionHash) return null;
+  const message = `${actor.actionHash}|${actor.id}|${actor.role}|${action}`;
   const sig = await sha256Hex(message);
   return { p_user_id: actor.id, p_role: actor.role, p_sig: sig };
 }
@@ -72,7 +71,7 @@ export async function signAction(action: string): Promise<{
 // Tables whose DIRECT writes must carry a signed actor proof (MASTER §2.1.4).
 // NOTE: `products` is intentionally EXCLUDED. Cashiers push product.stock
 // updates through this table on every sale; requiring admin/manager there would
-// break multi-terminal stock sync (the Aug-18 disaster). Product edits are still
+// break multi-terminal stock sync. Product edits are still
 // blocked client-side via RequireAccess. Server-side product-write protection
 // needs a granular (per-column) design later.
 export const PROTECTED_TABLES: Record<string, string> = {
@@ -91,8 +90,8 @@ export async function withActor(payload: any, table: string): Promise<any> {
   const action = PROTECTED_TABLES[table];
   if (!action) return payload;
   const actor = getActor();
-  if (!actor || !actor.offlineHash) return payload; // legacy: server allows when offline_hash NULL
-  const message = `${actor.offlineHash}|${actor.id}|${actor.role}|${action}`;
+  if (!actor || !actor.actionHash) return payload; // legacy: server allows when action_hash NULL
+  const message = `${actor.actionHash}|${actor.id}|${actor.role}|${action}`;
   const sig = await sha256Hex(message);
   return {
     ...payload,

@@ -1,5 +1,4 @@
 import { BundleItem } from './bundle';
-import { BundleSlotOption } from './bundle';
 
 export interface ProductVariant {
   name: string;      // e.g. "Size", "Color"
@@ -55,8 +54,6 @@ export interface Product {
   isWeightBased?: boolean;
   pricePerUnit?: number; // For weight-based pricing (per kg, per lb, etc.)
   unit?: string; // kg, lb, piece, etc.
-  // batches: legacy simple-stock batch helper (deprecated but ProductModal still uses it)
-  batches?: ProductBatch[];
   trackInventory?: boolean; // Whether to track and manage inventory for this product
   variants?: ProductVariant[];
   variantData?: VariantData[]; // Advanced variant pricing, stock, barcodes
@@ -66,21 +63,6 @@ export interface Product {
   isService?: boolean;
   requireSerial?: boolean;
   productAddons?: ProductAddon[]; // Inventory-tracked linked add-ons
-}
-
-export interface ProductBatch {
-  id: string;
-  productId?: string;
-  quantity?: number;
-  qtyRemaining?: number;
-  qty_remaining?: number;
-  cost?: number;
-  price?: number;
-  expiryDate?: string;
-  batchNumber?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  [key: string]: any;
 }
 
 export interface Category {

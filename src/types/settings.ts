@@ -74,9 +74,6 @@ export interface AppSettings {
   barcodeGapX?: number;
   barcodeGapY?: number;
   barcodeBarWidth?: number;
-  // Offline & Sync Settings
-  offlineMode?: boolean;
-  autoSync?: boolean;
   // Global Localization & Industry
   country: string;
   taxId?: string;
@@ -84,15 +81,6 @@ export interface AppSettings {
   // New System Toggles
   retailEnabled: boolean;
   wholesaleEnabled: boolean;
-  storeType?: 'physical' | 'online' | 'both';
-  storeLatitude?: number;
-  storeLongitude?: number;
-  shopOpenTime?: string;      // HH:mm
-  shopCloseTime?: string;     // HH:mm
-  deliveryStartTime?: string; // HH:mm
-  deliveryEndTime?: string;   // HH:mm
-  pickupStartTime?: string;   // HH:mm
-  pickupEndTime?: string;     // HH:mm
   defaultSaleType?: 'retail' | 'wholesale';
   touchKeyboardEnabled: boolean;
   soundEnabled: boolean;

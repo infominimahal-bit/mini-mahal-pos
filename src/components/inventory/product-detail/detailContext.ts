@@ -4,7 +4,6 @@ export interface DetailCtx {
   product: Product;
   profile: any;
   currency: string;
-  t: (key: string, fallback?: string) => string;
   appSuppliers: any[];
   isUpdating: boolean;
   isEditMode: boolean;

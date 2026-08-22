@@ -15,7 +15,7 @@ export function ProductDetailHub(props: ProductDetailHubProps) {
   const {
     product, showStockIn, setShowStockIn, showBatchStockIn, setShowBatchStockIn,
     selectedSale, setSelectedSale, productSales, setClickedRowId,
-    handleSave, isUpdating, isEditMode, setIsEditMode, t,
+    handleSave, isUpdating, isEditMode, setIsEditMode,
   } = d;
 
   return (
@@ -46,7 +46,7 @@ export function ProductDetailHub(props: ProductDetailHubProps) {
         isSaving={isUpdating}
         onDiscard={() => setIsEditMode(false)}
         onSave={handleSave}
-        saveLabel={t('commit_changes', 'Confirm Changes')}
+        saveLabel={"Confirm Changes"}
         unsaved={true}
       />
 

@@ -5,7 +5,7 @@ import { sonner } from '../../lib/sonner';
 export interface DiscountFormData {
   name: string;
   description: string;
-  type: 'percentage' | 'fixed' | 'free_gift' | 'bogo' | 'mix_and_match';
+  type: 'percentage' | 'fixed';
   value: string;
   minAmount: string;
   maxDiscount: string;
@@ -20,10 +20,9 @@ export function createDiscountSubmit(params: {
   onClose: () => void;
   formData: DiscountFormData;
   conditions: DiscountCondition[];
-  freeGiftProducts: string[];
   validDays: number[];
 }) {
-  const { discount, onClose, formData, conditions, freeGiftProducts, validDays } = params;
+  const { discount, onClose, formData, conditions, validDays } = params;
 
   return async () => {
     if (!formData.name.trim()) {
@@ -31,7 +30,7 @@ export function createDiscountSubmit(params: {
       return;
     }
 
-    if (formData.type !== 'free_gift' && formData.type !== 'mix_and_match' && (!formData.value || parseFloat(formData.value) <= 0)) {
+    if (!formData.value || parseFloat(formData.value) <= 0) {
       sonner.warning("discount_value_warning");
       return;
     }
@@ -76,9 +75,8 @@ export function createDiscountSubmit(params: {
       name: formData.name,
       description: formData.description,
       type: formData.type,
-      value: (formData.type === 'free_gift' || formData.type === 'mix_and_match') ? 0 : parseFloat(formData.value),
+      value: parseFloat(formData.value),
       conditions,
-      freeGiftProducts: formData.type === 'free_gift' ? freeGiftProducts : undefined,
       minAmount: formData.minAmount ? parseFloat(formData.minAmount) : undefined,
       maxDiscount: formData.maxDiscount ? parseFloat(formData.maxDiscount) : undefined,
       validFrom: new Date(formData.validFrom),

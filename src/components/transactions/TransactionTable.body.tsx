@@ -8,7 +8,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useCartStore, useCustomersStore, useSalesStore } from '../../stores';
 import { salesService } from '../../lib/services';
 import { sonner } from '../../lib/sonner';
-import { useTranslation } from '../../hooks/useTranslation';
 import { Badge, Button, Pagination } from '../../shared/ui';
 import { getStatusTone } from './TransactionTable.utils';
 
@@ -45,7 +44,6 @@ export function TransactionTable({
   pageSize,
   onPageSizeChange,
 }: TransactionTableProps) {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const { profile } = useAuth();
   const appCustomers = useCustomersStore(s => s.customers);

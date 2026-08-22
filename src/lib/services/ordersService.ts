@@ -1,5 +1,6 @@
 import { SalesTab } from '../../types';
-import { localDb, queueOp, generateId } from '../localDb';
+import { localDb, generateId } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 
 
 
@@ -40,22 +41,22 @@ export const salesTabsService = {
     const id = generateId();
     const now = new Date();
     const newTab = { ...tab, id, userId, createdAt: now } as SalesTab;
+    await cloudWrite('sales_tabs', 'create', id, toRemoteSalesTab(newTab));
     await localDb.salesTabs.add(newTab);
-    await queueOp('sales_tabs', 'create', id, toRemoteSalesTab(newTab));
     return newTab;
   },
   async update(id: string, updates: Partial<SalesTab>): Promise<void> {
     const existing = await localDb.salesTabs.get(id);
     const updated = { ...(existing || {}), ...updates, id } as SalesTab;
-    await localDb.salesTabs.put(updated);
 
-    // Use 'update' opType so syncEngine uses .update() instead of .upsert()
-    // This prevents overwriting other columns (like 'name') with null if they are missing from updates.
-    await queueOp('sales_tabs', 'update', id, toRemoteSalesTab(updates));
+    // Partial upsert (only provided columns) so we never overwrite other columns
+    // (like 'name') with null. id is always included so the row is targeted.
+    await cloudWrite('sales_tabs', 'update', id, { ...toRemoteSalesTab(updates), id });
+    await localDb.salesTabs.put(updated);
   },
   async delete(id: string): Promise<void> {
+    await cloudWrite('sales_tabs', 'delete', id, {});
     await localDb.salesTabs.delete(id);
-    queueOp('sales_tabs', 'delete', id, {});
   }
 };
 

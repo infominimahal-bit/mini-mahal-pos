@@ -3,7 +3,7 @@ import { HelpTooltip } from '../../../shared/ui/HelpTooltip';
 import type { ProductDetailController } from './useProductDetail';
 
 export function ProductStatus({ d }: { d: ProductDetailController }) {
-  const { t, formData, setFormData, setShowStockIn } = d;
+  const { formData, setFormData, setShowStockIn } = d;
 
   return (
     <div className="lg:col-span-4 space-y-8">
@@ -12,18 +12,18 @@ export function ProductStatus({ d }: { d: ProductDetailController }) {
           <div className="flex items-center gap-3 mb-8">
             <div className="p-3 bg-primary/10 text-primary rounded-[1.5rem]"><Tag className="w-6 h-6" /></div>
             <div>
-              <h3 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tight">{t('product_status', 'Product Status')}</h3>
-              <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{t('status_controls', 'Status & Controls')}</p>
+              <h3 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tight">{"Product Status"}</h3>
+              <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"Status & Controls"}</p>
             </div>
           </div>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/[0.03] rounded-[1.5rem] border border-gray-200 dark:border-white/5">
               <div className="flex flex-col">
                 <span className="text-[11px] font-black text-gray-700 dark:text-gray-300 uppercase tracking-wider flex items-center">
-                  {t('active_status', 'Active Status')}
+                  {"Active Status"}
                   <HelpTooltip content="Toggles whether this item is selectable or scannable at the POS checkout." />
                 </span>
-                <span className="text-[9px] font-bold text-gray-600 uppercase">{t('visible_in_pos', 'Visible in POS')}</span>
+                <span className="text-[9px] font-bold text-gray-600 uppercase">{"Visible in POS"}</span>
               </div>
               <label className="relative inline-flex items-center cursor-pointer scale-110">
                 <input
@@ -43,11 +43,11 @@ export function ProductStatus({ d }: { d: ProductDetailController }) {
             }`}>
               <div className="flex flex-col">
                 <span className="text-[11px] font-black text-gray-700 dark:text-gray-300 uppercase tracking-wider flex items-center">
-                  {t('track_stock', 'Track Stock')}
+                  {"Track Stock"}
                   <HelpTooltip content="Maintains physical inventory balance. Unchecking allows infinite sales without stock validation." />
                 </span>
                 <span className="text-[9px] font-bold text-gray-600 uppercase">
-                  {formData.productType === 'variable' ? 'MANAGED BY VARIATIONS' : t('inventory_control', 'Inventory Control')}
+                  {formData.productType === 'variable' ? 'MANAGED BY VARIATIONS' : 'Inventory Control'}
                 </span>
               </div>
               <label className={`relative inline-flex items-center scale-110 ${formData.productType === 'variable' ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
@@ -69,10 +69,10 @@ export function ProductStatus({ d }: { d: ProductDetailController }) {
             <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/[0.03] rounded-[1.5rem] border border-gray-200 dark:border-white/5">
               <div className="flex flex-col">
                 <span className="text-[11px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-wider flex items-center">
-                  {t('service_item', 'Service Item')}
+                  {"Service Item"}
                   <HelpTooltip content="Flags item as labor or consultation. Auto-disables stock tracking and ignores low stock warnings." />
                 </span>
-                <span className="text-[9px] font-bold text-gray-600 uppercase">{t('no_stock_tracking', 'No Stock Tracking')}</span>
+                <span className="text-[9px] font-bold text-gray-600 uppercase">{"No Stock Tracking"}</span>
               </div>
               <label className="relative inline-flex items-center cursor-pointer scale-110">
                 <input
@@ -88,10 +88,10 @@ export function ProductStatus({ d }: { d: ProductDetailController }) {
             <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/[0.03] rounded-[1.5rem] border border-gray-200 dark:border-white/5">
               <div className="flex flex-col">
                 <span className="text-[11px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center">
-                  {t('require_serial_imei', 'Require Serial/IMEI')}
+                  {"Require Serial/IMEI"}
                   <HelpTooltip content="Forces scanner or keyboard prompt at POS for unique serial number / IMEI registration." />
                 </span>
-                <span className="text-[9px] font-bold text-gray-600 uppercase">{t('prompt_on_pos', 'Prompt on POS')}</span>
+                <span className="text-[9px] font-bold text-gray-600 uppercase">{"Prompt on POS"}</span>
               </div>
               <label className="relative inline-flex items-center cursor-pointer scale-110">
                 <input
@@ -111,16 +111,16 @@ export function ProductStatus({ d }: { d: ProductDetailController }) {
         <div className="flex items-center gap-3 mb-8">
           <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-[1.5rem]"><Globe className="w-6 h-6" /></div>
           <div>
-            <h3 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tight">E-Store Control</h3>
-            <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">Visibility & Sorting</p>
+            <h3 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tight">Featured Product</h3>
+            <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">Highlight & Sorting</p>
           </div>
         </div>
         <div className="space-y-4">
           <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/[0.03] rounded-[1.5rem] border border-gray-200 dark:border-white/5">
             <div className="flex flex-col">
               <span className="text-[11px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center">
-                {t('featured', 'Featured')}
-                <HelpTooltip content="Sorts to top of E-Store and highlights with a gold star badge across inventory." />
+                {"Featured"}
+                <HelpTooltip content="Highlights the product with a gold star badge and sorts it to the top across inventory and POS." />
               </span>
               <span className="text-[9px] font-bold text-gray-600 uppercase">Star Product</span>
             </div>

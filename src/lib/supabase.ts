@@ -42,8 +42,26 @@ export async function adminUserAction(action: string, payload: any): Promise<any
   const { data, error } = await supabase.functions.invoke('admin-users', {
     body: { action, payload },
   })
-  if (error) throw new Error(error.message || 'Admin user action failed');
-  return (data as any)?.data
+  if (error) {
+    // FunctionsHttpError: on a non-2xx the real reason is in the response body
+    // ({ error: "..." }), NOT error.message (which is the generic status text).
+    let detail = error.message || 'Admin user action failed';
+    try {
+      const body = await (error as any).context?.json?.();
+      if (body?.error) detail = body.error;
+    } catch { /* body not JSON — keep generic message */ }
+    throw new Error(detail);
+  }
+  // The edge fn response may omit `Content-Type: application/json`, in which case
+  // supabase-js hands us the body as a raw STRING instead of a parsed object.
+  // Parse it back before unwrapping, otherwise every field lookup is undefined.
+  let body: any = data;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch { /* not JSON — leave as-is */ }
+  }
+  // Deployed fn versions differ: some wrap the result in { data }, some don't.
+  // Return the unwrapped payload if present, else the raw body.
+  return body?.data ?? body
 }
 
 // ── Refresh token management (prevents retry storm on DNS failure) ─────────

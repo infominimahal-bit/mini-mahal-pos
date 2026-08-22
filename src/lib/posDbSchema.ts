@@ -17,7 +17,6 @@ export const SCHEMA_V19 = {
   stockHistory: 'id, productId, timestamp, type',
   salesTabs: 'id, userId',
   appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns, enableSplitPayment',
-  pendingOps: '++id, [entity+entityId], status, createdAt',
   syncHistory: '++id, timestamp',
   bundles: 'id, name, active',
   bundleItems: 'id, bundleId, productId',
@@ -49,7 +48,6 @@ export const SCHEMA_V20 = {
   stockHistory: 'id, productId, timestamp, type',
   salesTabs: 'id, userId',
   appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns, enableSplitPayment',
-  pendingOps: '++id, [entity+entityId], status, createdAt',
   syncHistory: '++id, timestamp',
   bundles: 'id, name, active',
   bundleItems: 'id, bundleId, productId',
@@ -63,7 +61,6 @@ export const SCHEMA_V20 = {
 };
 
 export const SCHEMA_V21 = {
-  pendingOps: '++id, [entity+entityId], status, createdAt, batchId'
 };
 
 export const SCHEMA_V22 = {
@@ -92,7 +89,6 @@ export const SCHEMA_V16 = {
   stockHistory: 'id, productId, timestamp, type',
   salesTabs: 'id, userId',
   appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns, enableSplitPayment',
-  pendingOps: '++id, [entity+entityId], status, createdAt',
   syncHistory: '++id, timestamp',
   bundles: 'id, name, active',
   bundleItems: 'id, bundleId, productId',
@@ -121,7 +117,6 @@ export const SCHEMA_V15 = {
   stockHistory: 'id, productId, timestamp, type',
   salesTabs: 'id, userId',
   appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns, enableSplitPayment',
-  pendingOps: '++id, [entity+entityId], status, createdAt',
   syncHistory: '++id, timestamp',
   bundles: 'id, name, active',
   bundleItems: 'id, bundleId, productId',
@@ -148,7 +143,6 @@ export const SCHEMA_V14 = {
   stockHistory: 'id, productId, timestamp, type',
   salesTabs: 'id, userId',
   appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns, enableSplitPayment',
-  pendingOps: '++id, [entity+entityId], status, createdAt',
   syncHistory: '++id, timestamp',
   app_settings: 'id, storeName, currency, enableSplitPayment, enableExtraCharges',
   purchase_records: 'id, productId, supplierId, date'
@@ -193,7 +187,6 @@ export const SCHEMA_V1 = {
   salesTabs: 'id, userId',
   expenses: 'id, category, date',
   appSettings: 'id',
-  pendingOps: '++id, [entity+entityId], status, createdAt',
   syncHistory: '++id, timestamp'
 };
 
@@ -219,7 +212,6 @@ export const SCHEMA_V5 = {
   salesTabs: 'id, userId',
   expenses: 'id, category, date',
   appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType',
-  pendingOps: '++id, [entity+entityId], status, createdAt',
   syncHistory: '++id, timestamp'
 };
 
@@ -241,7 +233,6 @@ export const SCHEMA_V6 = {
   salesTabs: 'id, userId',
   expenses: 'id, category, date',
   appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns',
-  pendingOps: '++id, [entity+entityId], status, createdAt',
   syncHistory: '++id, timestamp'
 };
 

@@ -54,6 +54,29 @@ Deno.serve(async (req) => {
       result = await admin.auth.admin.deleteUser(payload.id)
     } else if (action === 'createUser') {
       result = await admin.auth.admin.createUser(payload)
+      // ── Self-heal orphaned auth users ──────────────────────────────────────
+      // If this email already exists (e.g. a previously-failed create where the
+      // public.users row never got written), don't fail. Find that auth user,
+      // reset its password + metadata to the new values, and return it — so the
+      // same email "just works" and the caller can link the public.users row.
+      if (result.error && /already|exist|registered|duplicate/i.test(result.error.message || '')) {
+        const targetEmail = String(payload.email || '').toLowerCase()
+        let existing: any = null
+        for (let page = 1; page <= 25 && !existing; page++) {
+          const { data: list } = await admin.auth.admin.listUsers({ page, perPage: 200 })
+          const users = list?.users || []
+          existing = users.find((u: any) => String(u.email || '').toLowerCase() === targetEmail) || null
+          if (users.length < 200) break
+        }
+        if (existing) {
+          const upd = await admin.auth.admin.updateUserById(existing.id, {
+            password: payload.password,
+            email_confirm: true,
+            user_metadata: payload.user_metadata,
+          })
+          result = upd.error ? { data: { user: existing }, error: null } : upd
+        }
+      }
     } else if (action === 'updateUser') {
       result = await admin.auth.admin.updateUserById(payload.id, payload.updates)
     } else {

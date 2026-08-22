@@ -10,7 +10,6 @@ import { Product } from '../../types';
 import { formatCurrency } from '../../lib/currencies';
 import { commitStockInToInventory } from '../../lib/stockInCommit';
 import { Modal } from '../../shared/ui/Modal';
-import { useTranslation } from '../../hooks/useTranslation';
 
 import { StockInMetadata } from './StockIn/StockInMetadata';
 import { SelectedItemsGrid } from './StockIn/SelectedItemsGrid';
@@ -26,7 +25,6 @@ export function BatchStockInSystem({ onClose, initialProduct }: BatchStockInSyst
   const appSettings = useSettingsStore(s => s.settings);
 
   const { profile } = useAuth();
-  const { t } = useTranslation();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItems, setSelectedItems] = useState<any[]>(initialProduct ? [{
@@ -147,11 +145,14 @@ export function BatchStockInSystem({ onClose, initialProduct }: BatchStockInSyst
               created_at: new Date().toISOString(),
             };
             
-            const { localDb, queueOp } = await import('../../lib/localDb');
+            const { localDb } = await import('../../lib/localDb');
+            const { cloudWrite } = await import('../../lib/cloudWrite');
+            await cloudWrite('stock_history', 'create', histId, remoteEntry);
             await localDb.stockHistory.add(localEntry);
-            await queueOp('stock_history', 'create', histId, remoteEntry);
-            
-            await productsService.update(item.id, { stock: 0, trackInventory: true });
+
+            // stock:0 is already achieved by the stock_history insert above (DB trigger).
+            // Do NOT write products.stock directly (AGENTS.md hard limit / plan PART O).
+            await productsService.update(item.id, { trackInventory: true });
           }
         }
 
@@ -265,7 +266,6 @@ export function BatchStockInSystem({ onClose, initialProduct }: BatchStockInSyst
             setBatchData={setBatchData}
             recordAsSupplierBill={recordAsSupplierBill}
             setRecordAsSupplierBill={setRecordAsSupplierBill}
-            t={t}
           />
         </div>
 
@@ -273,7 +273,6 @@ export function BatchStockInSystem({ onClose, initialProduct }: BatchStockInSyst
           selectedItems={selectedItems}
           updateItem={updateItem}
           removeItem={removeItem}
-          t={t}
         />
       </div>
     </Modal>

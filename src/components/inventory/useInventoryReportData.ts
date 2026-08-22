@@ -100,8 +100,17 @@ export function useInventoryReportData({
       const revenue = item ? Math.abs(Number(item.subtotal) || 0) * scale : 0;
       const cogs = (productCostById.get(h.productId) || 0) * qty;
       let cur = kpiByProduct.get(h.productId) || { sold: 0, revenue: 0, cogs: 0 };
-      if (h.type === 'sale') { cur.sold += qty; cur.revenue += revenue; cur.cogs += cogs; }
-      else { cur.sold -= qty; cur.revenue -= revenue; cur.cogs -= cogs; }
+
+      // Retroactive fix for old data where deleted POS returns were saved as 'return' type instead of 'sale'.
+      let effectiveType = h.type;
+      const hNote = (h.note || '').toLowerCase();
+      if (hNote.includes('deleted')) {
+          const rawChange = Number(h.changeQty) || 0;
+          effectiveType = rawChange < 0 ? 'sale' : 'return';
+      }
+
+      if (effectiveType === 'sale') { cur.sold += qty; cur.revenue += revenue; cur.cogs += cogs; }
+      else if (effectiveType === 'return') { cur.sold -= qty; cur.revenue -= revenue; cur.cogs -= cogs; }
       kpiByProduct.set(h.productId, cur);
     }
 
@@ -184,7 +193,6 @@ export function useInventoryReportData({
         revenue,
         cogs,
         grossProfit,
-        batches: product.batches || [],
         isInfinite,
         recentSales
       } as InventoryReportRow;

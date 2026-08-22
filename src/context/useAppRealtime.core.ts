@@ -16,6 +16,7 @@ export function useAppRealtime(subscriptionsInitialized: React.MutableRefObject<
   const subscriptionRef = useRef<any>(null);
   const userRef = useRef(user);
   const profileRef = useRef(profile);
+  const retryAttempt = useRef(0);
   
   userRef.current = user;
   profileRef.current = profile;
@@ -73,9 +74,23 @@ export function useAppRealtime(subscriptionsInitialized: React.MutableRefObject<
     attachLedgerHandlers(channel, ctx);
     attachBundleHandlers(channel, ctx);
 
+    const MAX_RETRIES = 10;
+    let givenUp = false;
+
     channel.subscribe((status) => {
+      if (givenUp) return;
+
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        console.log(`[Realtime] Subscription status: ${status} — will retry in 5s.`);
+        const attempt = retryAttempt.current++;
+        if (attempt >= MAX_RETRIES) {
+          givenUp = true;
+          console.warn(`[Realtime] Gave up after ${MAX_RETRIES} retries. Refresh the page to reconnect.`);
+          supabase.removeChannel(channel).catch(() => { });
+          subscriptionRef.current = null;
+          return;
+        }
+        const delay = Math.min(30000, 2000 * 2 ** Math.min(attempt, 4)) + Math.floor(Math.random() * 1000);
+        console.log(`[Realtime] ${status} — retry in ${Math.round(delay / 1000)}s (${attempt + 1}/${MAX_RETRIES}).`);
         supabase.removeChannel(channel).catch(() => { });
         subscriptionsInitialized.current = false;
         subscriptionRef.current = null;
@@ -83,8 +98,9 @@ export function useAppRealtime(subscriptionsInitialized: React.MutableRefObject<
           if (userRef.current && profileRef.current && !subscriptionsInitialized.current && !subscriptionRef.current) {
             setReconnectTrigger(prev => prev + 1);
           }
-        }, 5000);
+        }, delay);
       } else if (status === 'SUBSCRIBED') {
+        retryAttempt.current = 0;
         console.log(`[Realtime] Subscription active (single-tenant).`);
       }
     });

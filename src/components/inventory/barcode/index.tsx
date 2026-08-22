@@ -8,7 +8,6 @@ import { sonner } from '../../../lib/sonner';
 import { settingsService } from '../../../lib/services';
 import { Product, AppSettings } from '../../../types';
 import { useApp } from '../../../context/SupabaseAppContext';
-import { useTranslation } from '../../../hooks/useTranslation';
 import { Button, Badge, EmptyState } from '../../../shared/ui';
 import { BarcodeCard, type PaperSize } from './BarcodeCard';
 import { BarcodeSidebar } from './BarcodeSidebar';

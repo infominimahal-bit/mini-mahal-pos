@@ -11,7 +11,6 @@ import {
   Category,
   Supplier,
   PurchaseRecord,
-  ProductBatch,
   SupplierTransaction,
   StockHistory,
   Payment,
@@ -21,11 +20,10 @@ import {
   CartItem,
   RefundRequest,
   Topping,
-  ExtraTopping,
   VariantStockHistory,
   ProductAddon,
 } from '../../types';
-import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
+import { localDb, generateId, SETTINGS_ID } from '../localDb';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { signAction, withActor } from '../actionToken';
 
@@ -47,6 +45,8 @@ export const activeReturns = new Set<string>();
 export async function commitSaleAuthoritative(
   remoteSale: any,
   movements: any[],
+  paymentMoves: any[] = [],
+  customerLedger: any = null,
   maxTries = 2
 ): Promise<any> {
   let lastErr: any = null;
@@ -62,6 +62,8 @@ export async function commitSaleAuthoritative(
         (supabase as any).rpc('commit_sale', {
           p_sale: salePayload,
           p_history: movements,
+          p_payment_moves: paymentMoves,
+          p_customer_ledger: customerLedger
         }),
         timeoutPromise
       ]);
@@ -136,11 +138,11 @@ export async function applyStockMovementsRemote(movements: any[]): Promise<boole
  * hard-delete the sale in ONE cloud transaction. Idempotent via RPC.
  * p_history may be [] for sales that need no stock reversal (e.g. drafts).
  */
-export async function deleteSaleAtomic(saleId: string, movements: any[]): Promise<boolean> {
+export async function deleteSaleAtomic(saleId: string, movements: any[], paymentMoves: any[] = [], customerLedger: any = null): Promise<boolean> {
   try {
     if (typeof navigator !== 'undefined' && !navigator.onLine) return false;
     const token = await signAction('delete_sale');
-    const base: any = { p_sale_id: saleId, p_history: movements };
+    const base: any = { p_sale_id: saleId, p_history: movements, p_payment_moves: paymentMoves, p_customer_ledger: customerLedger };
     if (token) { base.p_user_id = token.p_user_id; base.p_role = token.p_role; base.p_sig = token.p_sig; }
     const { error } = await (supabase as any).rpc('delete_sale_atomic', base);
     if (error) { console.error('[delete_sale_atomic] RPC error:', error.message); return false; }
@@ -155,7 +157,7 @@ export async function deleteSaleAtomic(saleId: string, movements: any[]): Promis
  * Atomic refund: reverse stock AND update sale status/refunded_amount in ONE
  * cloud transaction. p_refunded_amount is the ABSOLUTE new total (idempotent on retry).
  */
-export async function refundSaleAtomic(saleId: string, movements: any[], status: string, refundedAmount: number): Promise<boolean> {
+export async function refundSaleAtomic(saleId: string, movements: any[], status: string, refundedAmount: number, paymentMoves: any[] = [], customerLedger: any = null): Promise<boolean> {
   try {
     if (typeof navigator !== 'undefined' && !navigator.onLine) return false;
     const token = await signAction('refund_sale');
@@ -164,6 +166,8 @@ export async function refundSaleAtomic(saleId: string, movements: any[], status:
       p_history: movements,
       p_status: status,
       p_refunded_amount: refundedAmount,
+      p_payment_moves: paymentMoves,
+      p_customer_ledger: customerLedger
     };
     if (token) { base.p_user_id = token.p_user_id; base.p_role = token.p_role; base.p_sig = token.p_sig; }
     const { error } = await (supabase as any).rpc('refund_sale_atomic', base);

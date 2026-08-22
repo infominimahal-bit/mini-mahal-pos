@@ -3,7 +3,6 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/SupabaseAppContext';
 import { useProductsStore, useSettingsStore, useUiStore } from '../../stores';
-import { useTranslation } from '../../hooks/useTranslation';
 import { Package, ChevronLeft, History, ClipboardList, Gift, Layers, Camera } from 'lucide-react';
 import { Product } from '../../types';
 import { Button } from '../../shared/ui';
@@ -32,7 +31,6 @@ export function InventoryManager() {
   const appPendingReturnTab = useUiStore(s => s.pendingReturnTab);
   const appSettings = useSettingsStore(s => s.settings);
 
-  const { t } = useTranslation();
   const { profile } = useAuth();
 
   const products = appProducts ?? [];
@@ -189,7 +187,7 @@ export function InventoryManager() {
 
           {activeTab === 'inventory' ? (
             <ProductsList 
-              appProducts={products} categories={categories} suppliers={suppliers} t={t} isAdmin={isAdmin} canManageStock={canManageStock} profile={profile}
+              appProducts={products} categories={categories} suppliers={suppliers} isAdmin={isAdmin} canManageStock={canManageStock} profile={profile}
               setEditingProduct={setEditingProduct} setShowProductModal={setShowProductModal} handleEditProduct={(p) => setDetailProduct(p)}
               setShowBarcodeGenerator={setShowBarcodeGenerator} showBarcodeGenerator={showBarcodeGenerator}
             />
@@ -212,7 +210,7 @@ export function InventoryManager() {
       )}
       {showBarcodeGenerator && (
         <ProductsList 
-          appProducts={products} categories={categories} suppliers={suppliers} t={t} isAdmin={isAdmin} canManageStock={canManageStock} profile={profile}
+          appProducts={products} categories={categories} suppliers={suppliers} isAdmin={isAdmin} canManageStock={canManageStock} profile={profile}
           setEditingProduct={setEditingProduct} setShowProductModal={setShowProductModal} handleEditProduct={(p) => setDetailProduct(p)}
           setShowBarcodeGenerator={setShowBarcodeGenerator} showBarcodeGenerator={showBarcodeGenerator}
         />

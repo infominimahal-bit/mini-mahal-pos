@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react';
 import { useCartStore, useSettingsStore, useUsersStore, useProductsStore, useInventoryStore, useCustomersStore, useSalesStore, useExpensesStore, useAppStore } from '../stores';
-import { localDb } from '../lib/localDb';
-import { pullCloudChanges } from '../lib/cloudPull';
+import { localDb, SETTINGS_ID } from '../lib/localDb';
+import { supabase } from '../lib/supabase';
 import { sonner } from '../lib/sonner';
-import { isSyncEngineBusy } from '../lib/syncEngine';
+import { fetchAllPages } from '../lib/services/utils';
 import {
   productsService,
   customersService,
@@ -32,81 +32,21 @@ import {
   mapPurchaseRecord,
   mapPaymentMode
 } from '../lib/services';
-import type { PullEntity } from '../lib/cloudPull';
-import { SETTINGS_ID } from '../lib/localDb';
 import { useAuth } from './AuthContext';
+
+/** Fetch a table from Supabase cloud and map each row. */
+async function cloudFetch(table: string, mapper?: (r: any) => any, opts?: { order?: string; limit?: number }) {
+  let q: any = supabase.from(table).select('*');
+  if (opts?.order) q = q.order(opts.order, { ascending: false });
+  if (opts?.limit) q = q.limit(opts.limit);
+  const { data, error } = await q;
+  if (error) throw error;
+  const rows = (data as any[]) || [];
+  return mapper ? rows.map(mapper) : rows;
+}
 
 export function useAppLoadData(initialized: boolean, setInitialized: React.Dispatch<React.SetStateAction<boolean>>) {
   const { user, profile } = useAuth();
-  
-  const handleCloudPullChanged = useCallback(async (entities: PullEntity[]) => {
-    if (!entities || entities.length === 0) return;
-    console.log('[CloudPull] Refreshing state for entities:', entities.join(', '));
-
-    for (const entity of entities) {
-      try {
-        switch (entity) {
-          case 'products': {
-            const all = await localDb.products.toArray();
-            useProductsStore.getState().setProducts(all.map(mapProduct));
-            break;
-          }
-          case 'customers': {
-            const all = await localDb.customers.toArray();
-            useCustomersStore.getState().setCustomers(all.map(mapCustomer));
-            break;
-          }
-          case 'sales': {
-            const all = await localDb.sales.orderBy('timestamp').reverse().limit(500).toArray();
-            useSalesStore.getState().setSales(all.map(mapSale));
-            break;
-          }
-          case 'users': {
-            const all = await localDb.users.toArray();
-            useUsersStore.getState().setUsers(all.map(mapUser));
-            break;
-          }
-          case 'app_settings': {
-            const all = await localDb.appSettings.toArray();
-            if (all.length > 0) useSettingsStore.getState().setSettings(mapSettings(all[0]));
-            break;
-          }
-          case 'sales_tabs': {
-            const all = await localDb.salesTabs.toArray();
-            useCartStore.getState().setSalesTabs(all);
-            break;
-          }
-          case 'salesmen': {
-            const all = await localDb.salesmen.toArray();
-            useUsersStore.getState().setSalesmen(all.map(mapSalesman));
-            break;
-          }
-          case 'expenses': {
-            const all = await localDb.expenses.toArray();
-            useExpensesStore.getState().setExpenses(all.map(mapExpense));
-            break;
-          }
-          case 'discounts': {
-            const all = await localDb.discounts.toArray();
-            useAppStore.getState().setDiscounts(all.map(mapDiscount));
-            break;
-          }
-          case 'purchase_records': {
-            const all = await localDb.purchaseRecords.toArray();
-            useInventoryStore.getState().setPurchaseRecords(all.map(mapPurchaseRecord));
-            break;
-          }
-          case 'bundles': {
-            const all = await localDb.bundles.toArray();
-            useAppStore.getState().setBundles(all);
-            break;
-          }
-        }
-      } catch (err) {
-        console.error(`[CloudPull] Error refreshing state for ${entity}:`, err);
-      }
-    }
-  }, []);
 
   const searchSales = async (term: string) => {
     try {
@@ -144,10 +84,10 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
       if (sales.length > 0) {
         const currentSales = useSalesStore.getState().sales;
         const mapped = sales.map(mapSale);
-        
+
         const existingIds = new Set(currentSales.map(s => s.id));
         const newSales = mapped.filter(s => !existingIds.has(s.id));
-        
+
         if (newSales.length > 0) {
           useSalesStore.getState().setSales([...currentSales, ...newSales]);
           return true;
@@ -165,75 +105,107 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
     if (!silent) sonner.loading('Loading POS Data...', { id: 'load-data' });
 
     try {
-      if (forceCloudSync) {
-        if (!navigator.onLine) {
-          throw new Error('Cannot sync while offline');
-        }
-        if (isSyncEngineBusy()) {
-          throw new Error('Sync engine is already busy. Please wait.');
-        }
-        
-        sonner.loading('Syncing with cloud...', { id: 'load-data' });
-        
-        await pullCloudChanges(true);
+      if (!navigator.onLine) {
+        throw new Error('Cannot load while offline. Please connect to the internet.');
       }
 
-      // Load local data
-      console.log('[loadData] Starting local data fetch...');
+      console.log('[loadData] Fetching directly from cloud (Supabase)...');
       const [
-        localSettings,
-        localProducts,
-        localCustomers,
-        localUsers,
-        localSalesmen,
-        localDiscounts,
-        localSalesTabs,
-        localCategories,
-        localPaymentModes,
-        localBundles,
-        localSales,
-        localExpenses,
-        localPurchaseRecords,
-        localPurchaseOrders,
-        localSuppliers,
-        localSupplierTx
-      ] = await Promise.all([
-        localDb.appSettings.toArray(),
-        localDb.products.toArray(),
-        localDb.customers.toArray(),
-        localDb.users.toArray(),
-        localDb.salesmen.toArray(),
-        localDb.discounts.toArray(),
-        localDb.salesTabs.toArray(),
-        localDb.categories.toArray(),
-        localDb.paymentModes.toArray(),
-        localDb.bundles.toArray(),
-        localDb.sales.orderBy('timestamp').reverse().limit(500).toArray(),
-        localDb.expenses.toArray(),
-        localDb.purchaseRecords.toArray(),
-        localDb.purchaseOrders.toArray(),
-        localDb.suppliers.toArray(),
-        localDb.supplierTransactions.toArray()
+        cloudProducts,
+        cloudCustomers,
+        cloudUsers,
+        cloudSalesmen,
+        cloudDiscounts,
+        cloudPaymentModes,
+        cloudExpenses,
+        cloudPurchaseRecords,
+        cloudPurchaseOrders,
+        cloudSuppliers,
+        cloudSupplierTx,
+        cloudSalesTabs,
+        cloudCategories,
+        cloudBundles,
+        cloudSettings,
+        cloudSales
+      ] = await Promise.allSettled([
+        cloudFetch('products', mapProduct),
+        cloudFetch('customers', mapCustomer),
+        usersService.getAll().catch(() => []),
+        cloudFetch('salesmen', mapSalesman),
+        cloudFetch('discounts', mapDiscount),
+        cloudFetch('payment_modes', mapPaymentMode),
+        cloudFetch('expenses', mapExpense),
+        cloudFetch('purchase_records', mapPurchaseRecord),
+        cloudFetch('purchase_orders'),
+        cloudFetch('suppliers'),
+        cloudFetch('supplier_transactions'),
+        cloudFetch('sales_tabs'),
+        cloudFetch('categories'),
+        cloudFetch('bundles'),
+        (async () => {
+          const { data, error } = await supabase.from('app_settings').select('*').eq('id', SETTINGS_ID).single();
+          if (error) throw error;
+          return data;
+        })(),
+        cloudFetch('sales', mapSale, { order: 'created_at', limit: 500 }),
       ]);
-      
-      console.log('[loadData] Local data fetch complete. Setting stores...');
 
-      if (localSettings.length > 0) useSettingsStore.getState().setSettings(mapSettings(localSettings[0]));
-      useProductsStore.getState().setProducts(localProducts.map(mapProduct));
-      useCustomersStore.getState().setCustomers(localCustomers.map(mapCustomer));
-      useUsersStore.getState().setUsers(localUsers.map(mapUser));
-      useUsersStore.getState().setSalesmen(localSalesmen.map(mapSalesman));
-      useAppStore.getState().setDiscounts(localDiscounts.map(mapDiscount));
-      useCartStore.getState().setSalesTabs(localSalesTabs);
-      useInventoryStore.getState().setCategories(localCategories);
-      useSettingsStore.getState().setPaymentModes(localPaymentModes.map(mapPaymentMode));
-      useAppStore.getState().setBundles(localBundles);
-      useSalesStore.getState().setSales(localSales.map(mapSale));
-      useExpensesStore.getState().setExpenses(localExpenses.map(mapExpense));
-      useInventoryStore.getState().setPurchaseRecords(localPurchaseRecords.map(mapPurchaseRecord));
-      useInventoryStore.getState().setPurchaseOrders(localPurchaseOrders);
-      useInventoryStore.getState().setSuppliers(localSuppliers);
-      useInventoryStore.getState().setSupplierTransactions(localSupplierTx);
+      const ok = (r: PromiseSettledResult<any>) => (r.status === 'fulfilled' ? r.value : null);
+
+      const products = ok(cloudProducts) || [];
+      const customers = ok(cloudCustomers) || [];
+      const users = ok(cloudUsers) || [];
+      const salesmen = ok(cloudSalesmen) || [];
+      const discounts = ok(cloudDiscounts) || [];
+      const paymentModes = ok(cloudPaymentModes) || [];
+      const expenses = ok(cloudExpenses) || [];
+      const purchaseRecords = ok(cloudPurchaseRecords) || [];
+      const purchaseOrders = ok(cloudPurchaseOrders) || [];
+      const suppliers = ok(cloudSuppliers) || [];
+      const supplierTx = ok(cloudSupplierTx) || [];
+      const salesTabs = ok(cloudSalesTabs) || [];
+      const categories = ok(cloudCategories) || [];
+      const bundles = ok(cloudBundles) || [];
+      const settingsRow = ok(cloudSettings);
+      const sales = ok(cloudSales) || [];
+
+      // Persist into local display cache so search/loadMore keep working offline-of-cache.
+      await Promise.allSettled([
+        localDb.products.bulkPut(products.map(p => ({ ...p }))),
+        localDb.customers.bulkPut(customers),
+        localDb.salesmen.bulkPut(salesmen),
+        localDb.discounts.bulkPut(discounts),
+        localDb.paymentModes.bulkPut(paymentModes),
+        localDb.expenses.bulkPut(expenses),
+        localDb.purchaseRecords.bulkPut(purchaseRecords),
+        localDb.purchaseOrders.bulkPut(purchaseOrders),
+        localDb.suppliers.bulkPut(suppliers),
+        localDb.supplierTransactions.bulkPut(supplierTx),
+        localDb.salesTabs.bulkPut(salesTabs),
+        localDb.categories.bulkPut(categories),
+        localDb.bundles.bulkPut(bundles),
+        localDb.sales.bulkPut(sales),
+        ...(settingsRow ? [localDb.appSettings.put({ ...settingsRow })] : []),
+        ...(users.length ? [localDb.users.bulkPut(users)] : []),
+      ]).catch(() => {});
+
+      // Populate stores (cloud is source of truth)
+      if (settingsRow) useSettingsStore.getState().setSettings(mapSettings(settingsRow));
+      useProductsStore.getState().setProducts(products);
+      useCustomersStore.getState().setCustomers(customers);
+      useUsersStore.getState().setUsers(users);
+      useUsersStore.getState().setSalesmen(salesmen);
+      useAppStore.getState().setDiscounts(discounts);
+      useCartStore.getState().setSalesTabs(salesTabs);
+      useInventoryStore.getState().setCategories(categories);
+      useSettingsStore.getState().setPaymentModes(paymentModes);
+      useAppStore.getState().setBundles(bundles);
+      useSalesStore.getState().setSales(sales);
+      useExpensesStore.getState().setExpenses(expenses);
+      useInventoryStore.getState().setPurchaseRecords(purchaseRecords);
+      useInventoryStore.getState().setPurchaseOrders(purchaseOrders);
+      useInventoryStore.getState().setSuppliers(suppliers);
+      useInventoryStore.getState().setSupplierTransactions(supplierTx);
 
       if (!initialized) setInitialized(true);
       if (!silent) sonner.success('Data loaded successfully', { id: 'load-data' });
@@ -247,5 +219,5 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
     }
   };
 
-  return { loadData, loadMoreSales, searchSales, handleCloudPullChanged };
+  return { loadData, loadMoreSales, searchSales };
 }

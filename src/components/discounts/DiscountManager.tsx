@@ -77,8 +77,6 @@ const appSettings = useSettingsStore(s => s.settings);
       case 'percentage':
       case 'fixed':
         return <Percent className="h-4 w-4" />;
-      case 'free_gift':
-        return <Gift className="h-4 w-4" />;
       default:
         return <Percent className="h-4 w-4" />;
     }
@@ -90,8 +88,6 @@ const appSettings = useSettingsStore(s => s.settings);
         return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400';
       case 'fixed':
         return 'bg-green-100 text-green-800';
-      case 'free_gift':
-        return 'bg-purple-100 text-purple-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -102,8 +98,6 @@ const appSettings = useSettingsStore(s => s.settings);
       case 'percentage':
       case 'fixed':
         return 'success';
-      case 'free_gift':
-        return 'info';
       default:
         return 'neutral';
     }
@@ -162,10 +156,10 @@ const appSettings = useSettingsStore(s => s.settings);
 
         <div className="stat-card bg-gradient-to-br from-orange-500 to-rose-600">
           <div className="stat-card-inner">
-            <span className="stat-card-label">{"Free Gift Offers"}</span>
-            <span className="stat-card-value">{appDiscounts.filter(d => d.type === 'free_gift').length}</span>
+            <span className="stat-card-label">{"Fixed Offers"}</span>
+            <span className="stat-card-value">{appDiscounts.filter(d => d.type === 'fixed').length}</span>
           </div>
-          <Gift className="stat-card-icon h-10 w-10 text-white" />
+          <Percent className="stat-card-icon h-10 w-10 text-white" />
         </div>
       </div>
 
@@ -226,7 +220,6 @@ const appSettings = useSettingsStore(s => s.settings);
                   <td className="table-cell font-semibold" data-label="Value">
                     {discount.type === 'percentage' && `${discount.value}%`}
                     {discount.type === 'fixed' && `${appSettings.currency} ${discount.value}`}
-                    {discount.type === 'free_gift' && 'Free Gift'}
                   </td>
                   <td className="table-cell hidden md:table-cell" data-label="Conditions">
                     <div className="text-xs text-gray-600 dark:text-gray-400">

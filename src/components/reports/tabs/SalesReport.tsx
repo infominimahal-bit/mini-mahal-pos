@@ -3,7 +3,6 @@ import { ShoppingBag, ShoppingCart } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { formatCurrency } from '../../../lib/currencies';
 import { Sale } from '../../../types';
-import { useTranslation } from '../../../hooks/useTranslation';
 
 import { SalesHistoryTable } from './sales/SalesHistoryTable';
 import { SalesSummaryStats } from './sales/SalesSummaryStats';
@@ -47,8 +46,6 @@ interface SalesReportProps {
 export function SalesReport({
   filteredSales, salesData, categoryData, saleTypeData, topProducts, featureAnalytics, totalRevenue, totalTransactions, averageTransaction, totalCostOfGoods, grossProfit, totalExpenseAmount, netProfit, walletStats, currency, theme, country, users, retailEnabled = true, wholesaleEnabled
 }: SalesReportProps) {
-  const { t } = useTranslation();
-
   const netTotal = (s: any) =>
     s.status === 'refunded' || s.status === 'deleted' ? 0 :
     s.status === 'partially_refunded' ? (Number(s.total) || 0) - (Number(s.refundedAmount) || 0) :
@@ -138,7 +135,7 @@ export function SalesReport({
               <div className="absolute top-0 right-0 w-24 h-24 opacity-20 transition-opacity group-hover:opacity-40 bg-white"></div>
               <div className="space-y-3 relative z-10 text-white">
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-black text-white uppercase tracking-wider">{t(wallet.method, wallet.method).replace('_', ' ')}</span>
+                  <span className="text-[10px] font-black text-white uppercase tracking-wider">{wallet.method.replace('_', ' ')}</span>
                   <span className="text-[8px] font-black uppercase tracking-widest bg-white/20 px-1.5 py-0.5 rounded-md">Wallet</span>
                 </div>
                 
@@ -208,7 +205,7 @@ export function SalesReport({
                 <div key={type.name} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-transparent hover:border-gray-200 dark:hover:border-white/10 transition-all">
                   <div className="flex items-center gap-3">
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: ['#3b82f6', '#8b5cf6', '#ec4899'][index % 3] }} />
-                    <span className="text-sm font-bold text-gray-700 dark:text-gray-300 capitalize">{t(type.name, type.name)}</span>
+                    <span className="text-sm font-bold text-gray-700 dark:text-gray-300 capitalize">{type.name}</span>
                   </div>
                   <span className="font-black text-gray-900 dark:text-white">{formatCurrency(type.value, currency)}</span>
                 </div>

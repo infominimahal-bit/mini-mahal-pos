@@ -4,7 +4,6 @@ import { Supplier } from '../../../types';
 import { suppliersService, expensesService, generateId } from '../../../lib/services';
 import { sonner } from '../../../lib/sonner';
 import { usePagination } from '../../../shared/ui';
-import { useTranslation } from '../../../hooks/useTranslation';
 
 interface SupplierLedgerHookArgs {
   supplier: Supplier;
@@ -17,7 +16,6 @@ export function useSupplierLedger({ supplier, startDate, endDate, dateFilter }: 
   const appCurrentUser = useUsersStore(s => s.currentUser);
   const appSettings = useSettingsStore(s => s.settings);
 
-  const { t } = useTranslation();
   const [ledger, setLedger] = useState<any[]>([]);
   const [balance, setBalance] = useState<number>(0);
   const [loading, setLoading] = useState(false);
@@ -203,7 +201,6 @@ export function useSupplierLedger({ supplier, startDate, endDate, dateFilter }: 
 
   return {
     appSettings,
-    t,
     ledger,
     balance,
     loading,

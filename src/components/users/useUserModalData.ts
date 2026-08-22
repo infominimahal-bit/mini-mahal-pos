@@ -11,7 +11,6 @@ import { sonner } from '../../lib/sonner';
 import { hashPasswordString } from '../../context/AuthContext';
 import { Modal } from '../../shared/ui/Modal';
 import { cn } from '../../lib/utils';
-import { useTranslation } from '../../hooks/useTranslation';
 import { MediaLibrary } from '../../shared/MediaLibrary';
 import { Button, ToggleSwitch } from '../../shared/ui';
 
@@ -26,7 +25,6 @@ export function useUserModalData(user: UserType | null | undefined, onClose: () 
 const appUsers = useUsersStore(s => s.users);
 
   const { refreshProfile } = useAuth();
-  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
@@ -119,15 +117,9 @@ const appUsers = useUsersStore(s => s.users);
 
           try {
             const hash = await hashPasswordString(formData.password);
-            localStorage.setItem(`offline_hash_${formData.email}`, hash);
-            const localU = await localDb.users.get(user.id);
-            if (localU) {
-              const updatedLocalU = { ...localU, offlineHash: hash };
-              await localDb.users.put(updatedLocalU);
-            }
-            await supabase.from('users').update({ offline_hash: hash }).eq('id', user.id);
+            await supabase.from('users').update({ action_hash: hash }).eq('id', user.id);
           } catch (hashErr) {
-            console.warn('Failed to commit local password hash update:', hashErr);
+            console.warn('Failed to commit password hash update:', hashErr);
           }
         }
 
@@ -175,7 +167,7 @@ const appUsers = useUsersStore(s => s.users);
           : `${normalizedUsername}.${Date.now().toString(36)}@pos.local`;
 
         const hash = await hashPasswordString(formData.password);
-        const { data: authData, error: authError } = await adminUserAction('createUser', {
+        const authResp = await adminUserAction('createUser', {
           email: resolvedEmail,
           password: formData.password,
           email_confirm: true,
@@ -186,11 +178,21 @@ const appUsers = useUsersStore(s => s.users);
           },
         });
 
-        if (authError) throw new Error(authError);
+        // Deployed edge-fn versions differ in shape — the auth user may come back as
+        // { user }, { data: { user } }, { user: { user } }, or the user object itself.
+        const authUser =
+          authResp?.user?.id ? authResp.user
+          : authResp?.data?.user?.id ? authResp.data.user
+          : authResp?.user?.user?.id ? authResp.user.user
+          : authResp?.data?.id ? authResp.data
+          : authResp?.id ? authResp
+          : null;
+        if (!authUser?.id) {
+          console.error('[UserModal] Unexpected createUser response shape:', authResp);
+          throw new Error('User creation failed — unexpected response: ' + JSON.stringify(authResp)?.slice(0, 180));
+        }
 
-        const authUser = authData.user;
-
-        await supabase.from('users').upsert({
+        const { error: upsertError } = await supabase.from('users').upsert({
           id: authUser.id,
           name: formData.name,
           email: resolvedEmail,
@@ -207,8 +209,17 @@ const appUsers = useUsersStore(s => s.users);
           can_view_records: true,
           can_edit_sale: true,
           avatar: formData.avatar || null,
-          offline_hash: hash
+          action_hash: hash
         }, { onConflict: 'id' });
+
+        if (upsertError) {
+          try {
+            await adminUserAction('deleteUser', { id: authUser.id });
+          } catch (deleteErr) {
+            console.warn('[UserModal] Failed to clean up auth user after upsert error:', deleteErr);
+          }
+          throw new Error(`Failed to create user record: ${upsertError.message}`);
+        }
 
         const newUser: UserType = {
           id: authUser.id,
@@ -234,7 +245,11 @@ const appUsers = useUsersStore(s => s.users);
 
       onClose();
     } catch (error) {
-      sonner.error(`Error saving user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      let msg = error instanceof Error ? error.message : 'Unknown error';
+      if (msg.includes('users_username_key') || msg.includes('duplicate key')) {
+        msg = 'This username is already taken. Please choose another one.';
+      }
+      sonner.error(`Error saving user: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -257,7 +272,7 @@ const appUsers = useUsersStore(s => s.users);
     }));
   };
 
-
+  const t = (key: string, fallback: string = key) => fallback;
 
   return {
     appCurrentUser,

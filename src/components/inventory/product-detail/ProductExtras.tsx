@@ -3,15 +3,15 @@ import { Button, SearchableSelect, Select } from '../../../shared/ui';
 import type { ProductDetailController } from './useProductDetail';
 
 export function ProductExtras({ d }: { d: ProductDetailController }) {
-  const { t, modifiers, setModifiers, variants, productAddons, setProductAddons, appProducts, product } = d;
+  const { modifiers, setModifiers, variants, productAddons, setProductAddons, appProducts, product } = d;
 
   return (
     <>
       <div className="space-y-3 pt-6 border-t border-gray-200 dark:border-white/5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
-            <h4 className="text-xs font-black text-gray-900 dark:text-white uppercase">{t('extra_toppings', 'Extra Toppings')}</h4>
-            <p className="text-[9px] text-gray-600 uppercase font-bold tracking-widest">{t('extra_toppings_sub', 'Add custom toppings with price for this product')}</p>
+            <h4 className="text-xs font-black text-gray-900 dark:text-white uppercase">{"Extra Toppings"}</h4>
+            <p className="text-[9px] text-gray-600 uppercase font-bold tracking-widest">{"Add custom toppings with price for this product"}</p>
           </div>
           <Button
             type="button"
@@ -21,7 +21,7 @@ export function ProductExtras({ d }: { d: ProductDetailController }) {
             className="!min-h-0 !px-3 !py-1.5 !rounded-lg !text-[10px] !font-black !bg-white dark:!bg-black !border-gray-200 dark:!border-white/10 !text-primary hover:!border-primary"
             icon={<Plus className="w-3.5 h-3.5" />}
           >
-            {t('add_extra_topping', 'Add Topping')}
+            {"Add Topping"}
           </Button>
         </div>
 

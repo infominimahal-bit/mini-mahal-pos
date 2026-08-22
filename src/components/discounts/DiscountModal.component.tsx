@@ -1,7 +1,6 @@
 import { Tag } from 'lucide-react';
 import { Discount } from '../../types';
 import { Modal } from '../../shared/ui/Modal';
-import { MixAndMatchBuilder } from './MixAndMatchBuilder';
 import { Button, ToggleSwitch, Select } from '../../shared/ui';
 import { useDiscountModalData } from './useDiscountModalData';
 import { DiscountConditionsSection } from './DiscountConditionsSection';
@@ -14,10 +13,10 @@ interface DiscountModalProps {
 
 export function DiscountModal({ isOpen, onClose, discount }: DiscountModalProps) {
   const {
-    appSettings, formData, setFormData, conditions, setConditions,
+    appSettings, formData, setFormData, conditions,
     validDays, productSearch, setProductSearch, pickerProducts, toggleConditionProduct,
     handleSubmit, handleChange, addCondition, updateCondition, removeCondition,
-    toggleDay, cardConditionWarning, t
+    toggleDay, cardConditionWarning
   } = useDiscountModalData(discount, onClose);
 
   if (!isOpen) return null;
@@ -26,7 +25,7 @@ export function DiscountModal({ isOpen, onClose, discount }: DiscountModalProps)
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={discount ? t('edit_privilege', 'Edit Discount') : t('register_new_privilege', 'New Discount')}
+      title={discount ? 'Edit Discount' : 'New Discount'}
       maxWidth="lg"
       footer={
         <div className="flex items-center justify-end gap-2 sm:gap-3 w-full">
@@ -44,7 +43,7 @@ export function DiscountModal({ isOpen, onClose, discount }: DiscountModalProps)
             onClick={handleSubmit}
             className="flex-1 sm:flex-none sm:min-w-[240px]"
           >
-            {discount ? t('edit_privilege', 'Edit Discount') : t('register_privilege', 'New Discount')}
+            {discount ? 'Edit Discount' : 'New Discount'}
           </Button>
         </div>
       }
@@ -66,7 +65,7 @@ export function DiscountModal({ isOpen, onClose, discount }: DiscountModalProps)
                 onChange={handleChange}
                 required
                 className="w-full bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all font-medium placeholder:text-gray-600"
-                placeholder={t('promotion_name_placeholder', 'e.g. Eid Mega Sale')}
+                placeholder={'e.g. Eid Mega Sale'}
               />
             </div>
 
@@ -80,36 +79,28 @@ export function DiscountModal({ isOpen, onClose, discount }: DiscountModalProps)
               >
                 <option value="percentage" className="dark:bg-surface">{"Percentage Off"}</option>
                 <option value="fixed" className="dark:bg-surface">{"Fixed Amount Off"}</option>
-                <option value="bogo" className="dark:bg-surface">{"BOGO (Buy 1 Get 1)"}</option>
-                <option value="free_gift" className="dark:bg-surface">{"Gift Incentive"}</option>
-                <option value="mix_and_match" className="dark:bg-surface">Mix & Match Deal</option>
               </Select>
             </div>
 
-            {formData.type !== 'free_gift' && formData.type !== 'mix_and_match' && (
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                  {formData.type === 'percentage' ? "Factor (%)" : "Amount ({currency})".replace('{currency}', appSettings.currency)} *
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    name="value"
-                    value={formData.value}
-                    onChange={handleChange}
-                    required
-                    className="w-full bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all font-medium placeholder:text-gray-600"
-                    placeholder="0"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 font-bold text-[10px] uppercase tracking-widest">{formData.type === 'percentage' ? '%' : appSettings.currency}</span>
-                </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                {formData.type === 'percentage' ? "Factor (%)" : "Amount ({currency})".replace('{currency}', appSettings.currency)} *
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  name="value"
+                  value={formData.value}
+                  onChange={handleChange}
+                  required
+                  className="w-full bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all font-medium placeholder:text-gray-600"
+                  placeholder="0"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 font-bold text-[10px] uppercase tracking-widest">{formData.type === 'percentage' ? '%' : appSettings.currency}</span>
               </div>
-            )}
-            {formData.type === 'free_gift' && (
-              <div></div>
-            )}
+            </div>
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-wider">{"Min Basket"}</label>
@@ -181,29 +172,24 @@ export function DiscountModal({ isOpen, onClose, discount }: DiscountModalProps)
                     : 'bg-[#f8f9fa] dark:bg-black/75 border-transparent text-gray-600 hover:bg-gray-100'
                     }`}
                 >
-                  {t(day.toLowerCase())}
+                  {day.toLowerCase()}
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        {formData.type === 'mix_and_match' ? (
-          <MixAndMatchBuilder conditions={conditions} onChange={setConditions} currency={appSettings.currency} />
-        ) : (
-          <DiscountConditionsSection
-            conditions={conditions}
-            addCondition={addCondition}
-            updateCondition={updateCondition}
-            removeCondition={removeCondition}
-            productSearch={productSearch}
-            setProductSearch={setProductSearch}
-            pickerProducts={pickerProducts}
-            toggleConditionProduct={toggleConditionProduct}
-            cardConditionWarning={cardConditionWarning}
-            t={t}
-          />
-        )}
+        <DiscountConditionsSection
+          conditions={conditions}
+          addCondition={addCondition}
+          updateCondition={updateCondition}
+          removeCondition={removeCondition}
+          productSearch={productSearch}
+          setProductSearch={setProductSearch}
+          pickerProducts={pickerProducts}
+          toggleConditionProduct={toggleConditionProduct}
+          cardConditionWarning={cardConditionWarning}
+        />
 
         <div className="space-y-6 pt-2">
           <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">

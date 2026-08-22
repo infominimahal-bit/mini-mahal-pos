@@ -22,8 +22,6 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
     appProducts,
     formData,
     setFormData,
-    batches,
-    setBatches,
     variants,
     setVariants,
     variantData,
@@ -32,7 +30,6 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
     setModifiers,
     productAddons,
     setProductAddons,
-    batchTotalStock,
     categories,
     suppliers,
     handleChange,
@@ -45,11 +42,11 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
   const [showMediaLibrary, setShowMediaLibrary] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = useProductSubmit({
     product,
     formData,
-    batches,
-    batchTotalStock,
     variants,
     variantData,
     modifiers,
@@ -57,17 +54,26 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
     appCurrentUser,
     appSuppliers,
     setFormData,
-    setBatches,
     setVariants,
     setVariantData,
     setModifiers,
     onClose,
   });
 
+  const onSubmit = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await handleSubmit();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   const footer = (
-    <ProductModalFooter product={product} onClose={onClose} onSubmit={handleSubmit} />
+    <ProductModalFooter product={product} onClose={onClose} onSubmit={onSubmit} isSubmitting={isSubmitting} />
   );
 
   return (

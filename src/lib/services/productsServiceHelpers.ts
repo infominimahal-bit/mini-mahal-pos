@@ -29,7 +29,6 @@ export function buildChildProduct(
     variantData: [],
     modifiers: [],
     productAddons: [],
-    batches: [],
     trackInventory: true
   };
 }

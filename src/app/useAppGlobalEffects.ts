@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSettingsStore } from '../stores';
 import { playPageSound } from '../lib/sounds';
-import { startSyncEngine } from '../lib/syncEngine';
 import { updateDynamicManifest } from '../lib/dynamicManifest';
 
 export function useAppGlobalEffects() {
@@ -28,7 +27,6 @@ export function useAppGlobalEffects() {
   useEffect(() => {
     if (!appSettings) return;
     const bizName = appSettings.storeName?.trim() || 'POS';
-    const storeLogo = appSettings.storeLogo || '';
 
     let name = bizName.startsWith('POS') ? bizName : `POS - ${bizName}`;
     let shortName = bizName.length > 12 ? bizName.substring(0, 10) + '\u2026' : bizName;
@@ -59,10 +57,7 @@ export function useAppGlobalEffects() {
 
     updateDynamicManifest({
       storeName: bizName,
-      storeLogo: storeLogo || undefined,
-      isStore: false,
       themeColor: '#10b981',
-      updatedAt: appSettings.updatedAt,
     });
   }, [appSettings, location.pathname]);
 
@@ -78,27 +73,9 @@ export function useAppGlobalEffects() {
   }, [navigate]);
 
   useEffect(() => {
-    import('../lib/localDb').then(({ localDb }) => {
-      localDb.pendingOps
-        .filter(q => q.entity === 'products' && q.operation === 'create')
-        .modify(q => {
-          if (!q.payload.sku) q.payload.sku = q.payload.id || q.payload.barcode_value || `SKU-${Date.now()}`;
-          if (q.payload.variantData) {
-            q.payload.variant_data = q.payload.variantData;
-            delete q.payload.variantData;
-          }
-        })
-        .then(() => {
-          return localDb.pendingOps.toCollection().modify({ retries: 0, status: 'pending' });
-        })
-        .then(() => {
-          startSyncEngine();
-          if (navigator.onLine) {
-            import('../lib/services').then(m => m.seedMissingBarcodes().catch(() => {})).catch(() => {});
-          }
-        })
-        .catch(() => startSyncEngine());
-    });
+    if (navigator.onLine) {
+      import('../lib/services').then(m => m.seedMissingBarcodes().catch(() => {})).catch(() => {});
+    }
   }, []);
 
   useEffect(() => {

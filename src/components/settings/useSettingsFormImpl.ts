@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSettingsStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
-import { useTranslation } from '../../hooks/useTranslation';
-import { useSync } from '../../hooks/useSync';
 import { useSoundFeedback } from '../../hooks/useSoundFeedback';
 import { sonner } from '../../lib/sonner';
 import { supabase } from '../../lib/supabase';
@@ -12,16 +10,26 @@ import { buildInitialFormData, syncFormDataFromSettings } from './settingsFormDa
 export function useSettingsForm() {
   const appSettings = useSettingsStore(s => s.settings);
   const { profile } = useAuth();
-  const { t } = useTranslation();
-  const { isOnline, syncNow } = useSync();
   const { play } = useSoundFeedback();
 
   const [isSaving, setIsSaving] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [completedSale, setCompletedSale] = useState<any>(null);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'syncing' | 'success' | 'local'>('idle');
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'success'>('idle');
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
   const [formData, setFormData] = useState<any>(buildInitialFormData(appSettings));
+
+  useEffect(() => {
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  }, []);
 
   useEffect(() => {
     if ((window as any).electronAPI) {
@@ -76,17 +84,12 @@ export function useSettingsForm() {
 
       await settingsService.update(updatedSettings as any);
       useSettingsStore.getState().setSettings(updatedSettings as any);
-
-      if (navigator.onLine) {
-        syncNow().catch(e => console.warn('Instant sync issue:', e));
-        setSyncStatus('local');
-      } else {
-        setSyncStatus('local');
-      }
+      setSyncStatus('success');
 
       sonner.toast(`Applied ${name.charAt(0).toUpperCase() + name.slice(1)}: ${value} 🌐`, 'success');
     } catch (error) {
       console.error('Instant update error:', error);
+      setSyncStatus('idle');
       sonner.toast('Failed to apply change instantly', 'error');
     } finally {
       setTimeout(() => setSyncStatus('idle'), 2000);
@@ -140,15 +143,8 @@ export function useSettingsForm() {
 
       await settingsService.update(updatedSettings as any);
       useSettingsStore.getState().setSettings(updatedSettings as any);
-
-      if (navigator.onLine) {
-        syncNow().catch(e => console.warn('Background settings sync issue:', e));
-        setSyncStatus('local');
-        sonner.success('Saved to device! Syncing to cloud in background... 📶');
-      } else {
-        setSyncStatus('local');
-        sonner.success('Saved to device! Will sync when online. 📶');
-      }
+      setSyncStatus('success');
+      sonner.success('Settings saved to cloud! 🌐');
     } catch (error) {
       console.error('Error saving settings:', error);
       setSyncStatus('idle');
@@ -162,7 +158,7 @@ export function useSettingsForm() {
 
   const handleRepairCounter = async () => {
     if (!canEditSettings) return;
-    if (!isOnline) {
+    if (!navigator.onLine) {
       sonner.error('You must be online to repair the counter from cloud data.');
       return;
     }
@@ -220,7 +216,6 @@ export function useSettingsForm() {
     handleRepairCounter,
     handleResetCalibration,
     appSettings,
-    t,
     profile,
     canEditSettings,
     isOnline,

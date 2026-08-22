@@ -15,8 +15,8 @@ export function useInventoryStats(appProducts: any[], filteredSales: any[], repo
           }
         });
       });
-      const stockValue = isInfinite ? 0 : Math.max(0, product.stock) * (product.cost || 0);
-      const potentialRevenue = isInfinite ? 0 : Math.max(0, product.stock) * (product.isWeightBased ? (product.pricePerUnit || 0) : product.price);
+      const stockValue = isInfinite ? 0 : (product.stock || 0) * (product.cost || 0);
+      const potentialRevenue = isInfinite ? 0 : (product.stock || 0) * (product.isWeightBased ? (product.pricePerUnit || 0) : product.price);
       const turnoverRatio = isInfinite ? 0 : (product.stock > 0 ? (soldQuantity / product.stock) : (soldQuantity > 0 ? 100 : 0));
       return {
         id: product.id,

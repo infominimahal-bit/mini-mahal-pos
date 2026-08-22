@@ -1,7 +1,6 @@
 import { useProductsStore, useSettingsStore } from '../../stores';
 import { useState, useEffect, useMemo } from 'react';
 import { Discount, DiscountCondition } from '../../types';
-import { useTranslation } from '../../hooks/useTranslation';
 import { SharedItem } from '../../shared/modules/search-and-list';
 import { createDiscountSubmit, getCardConditionWarning } from './discountSubmit';
 
@@ -9,11 +8,10 @@ export function useDiscountModalData(discount: Discount | null, onClose: () => v
   const appProducts = useProductsStore(s => s.products);
   const appSettings = useSettingsStore(s => s.settings);
 
-  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    type: 'percentage' as 'percentage' | 'fixed' | 'free_gift' | 'bogo' | 'mix_and_match',
+    type: 'percentage' as 'percentage' | 'fixed',
     value: '',
     minAmount: '',
     maxDiscount: '',
@@ -23,7 +21,6 @@ export function useDiscountModalData(discount: Discount | null, onClose: () => v
     isAutoApply: true,
   });
   const [conditions, setConditions] = useState<DiscountCondition[]>([]);
-  const [freeGiftProducts, setFreeGiftProducts] = useState<string[]>([]);
   const [validDays, setValidDays] = useState<number[]>([]);
   const [productSearch, setProductSearch] = useState('');
 
@@ -75,7 +72,6 @@ export function useDiscountModalData(discount: Discount | null, onClose: () => v
           ? { ...condition, minQuantity: 1 }
           : condition
       ));
-      setFreeGiftProducts(discount.freeGiftProducts || []);
       setValidDays(discount.validDays || []);
     } else {
       setFormData({
@@ -91,12 +87,11 @@ export function useDiscountModalData(discount: Discount | null, onClose: () => v
         isAutoApply: true,
       });
       setConditions([]);
-      setFreeGiftProducts([]);
       setValidDays([]);
     }
   }, [discount]);
 
-  const handleSubmit = createDiscountSubmit({ discount, onClose, formData, conditions, freeGiftProducts, validDays });
+  const handleSubmit = createDiscountSubmit({ discount, onClose, formData, conditions, validDays });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -141,14 +136,6 @@ export function useDiscountModalData(discount: Discount | null, onClose: () => v
     );
   };
 
-  const toggleProduct = (productId: string) => {
-    setFreeGiftProducts(prev =>
-      prev.includes(productId)
-        ? prev.filter(id => id !== productId)
-        : [...prev, productId]
-    );
-  };
-
   const cardConditionWarning = getCardConditionWarning(conditions);
 
   return {
@@ -157,8 +144,6 @@ export function useDiscountModalData(discount: Discount | null, onClose: () => v
     setFormData,
     conditions,
     setConditions,
-    freeGiftProducts,
-    setFreeGiftProducts,
     validDays,
     setValidDays,
     productSearch,
@@ -171,8 +156,6 @@ export function useDiscountModalData(discount: Discount | null, onClose: () => v
     updateCondition,
     removeCondition,
     toggleDay,
-    toggleProduct,
     cardConditionWarning,
-    t,
   };
 }

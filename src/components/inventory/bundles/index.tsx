@@ -1,5 +1,5 @@
 import { useAppStore, useProductsStore, useSettingsStore } from '../../../stores';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Plus, Gift } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { Bundle, Product } from '../../../types';
@@ -24,29 +24,8 @@ export function BundleManager() {
   const [expandedBundle, setExpandedBundle] = useState<string | null>(null);
   const [actionMenuBundleId, setActionMenuBundleId] = useState<string | null>(null);
   const [menuUpward, setMenuUpward] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<string>('all');
 
   const bundles = appBundles || [];
-
-  // Auto-detect deal categories from bundles
-  const dealCategories = ['all', ...Array.from(new Set(bundles.map(b => (b as any).dealCategory).filter(Boolean)))] as string[];
-
-  const formatCatLabel = (cat: string) => {
-    if (cat === 'all') return 'All';
-    return cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  };
-
-  const formatSectionLabel = (cat: string) => {
-    return `${formatCatLabel(cat)} Deals`;
-  };
-
-  // Reset activeCategory if its count drops to zero (e.g. after delete)
-  useEffect(() => {
-    if (activeCategory !== 'all') {
-      const count = bundles.filter(b => (b as any).dealCategory === activeCategory).length;
-      if (count === 0) setActiveCategory('all');
-    }
-  }, [bundles, activeCategory]);
 
   const openCreate = () => {
     setEditingBundle(null);
@@ -143,72 +122,32 @@ export function BundleManager() {
               )}
             />
           ) : (
-            <div className="space-y-6">
-              {/* Category filter tabs — auto-detected from bundle dealCategory values */}
-              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-nowrap md:flex-wrap pb-1">
-                {dealCategories.map(cat => {
-                  const count = cat === 'all' ? bundles.length : bundles.filter(b => (b as any).dealCategory === cat).length;
-                  if (cat !== 'all' && count === 0) return null;
-                  return (
-                    <button
-                      key={cat}
-                      onClick={() => setActiveCategory(cat)}
-                      className={`shrink-0 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
-                        activeCategory === cat
-                          ? 'bg-primary text-white shadow-md'
-                          : 'bg-gray-100 dark:bg-white/5 text-gray-500 hover:text-gray-900 dark:hover:text-white'
-                      }`}
-                    >
-                      {formatCatLabel(cat)} ({count})
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Grouped bundles */}
-              {dealCategories.filter(c => c !== 'all').map(cat => {
-                const catBundles = bundles.filter(b => (b as any).dealCategory === cat);
-                if (catBundles.length === 0) return null;
-                if (activeCategory !== 'all' && activeCategory !== cat) return null;
-                return (
-                  <div key={cat}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="h-5 w-1 rounded-full bg-primary" />
-                      <h3 className="text-[11px] font-black uppercase tracking-widest text-gray-500">
-                        {formatSectionLabel(cat)}
-                      </h3>
-                      <span className="text-[9px] text-gray-400 font-medium">({catBundles.length})</span>
-                    </div>
-                    <div className="space-y-3">
-                      {catBundles.map(bundle => (
-                        <BundleCard
-                          key={bundle.id}
-                          bundle={bundle}
-                          products={appProducts}
-                          appSettings={appSettings}
-                          isExpanded={expandedBundle === bundle.id}
-                          onToggleExpand={() => setExpandedBundle(expandedBundle === bundle.id ? null : bundle.id)}
-                          canManage={canManage}
-                          onEdit={() => openEdit(bundle)}
-                          onToggleActive={() => handleToggleActive(bundle)}
-                          onDelete={() => handleDelete(bundle)}
-                          actionMenuOpen={actionMenuBundleId === bundle.id}
-                          menuUpward={menuUpward}
-                          onToggleMenu={(bundleId, e) => {
-                            const isOpen = actionMenuBundleId === bundleId;
-                            if (!isOpen) {
-                              const btn = e.currentTarget.getBoundingClientRect();
-                              setMenuUpward(window.innerHeight - btn.bottom < 220);
-                            }
-                            setActionMenuBundleId(isOpen ? null : bundleId);
-                          }}
-                          onCloseMenu={() => { setActionMenuBundleId(null); setMenuUpward(false); }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="space-y-3">
+              {bundles.map(bundle => (
+                <BundleCard
+                  key={bundle.id}
+                  bundle={bundle}
+                  products={appProducts}
+                  appSettings={appSettings}
+                  isExpanded={expandedBundle === bundle.id}
+                  onToggleExpand={() => setExpandedBundle(expandedBundle === bundle.id ? null : bundle.id)}
+                  canManage={canManage}
+                  onEdit={() => openEdit(bundle)}
+                  onToggleActive={() => handleToggleActive(bundle)}
+                  onDelete={() => handleDelete(bundle)}
+                  actionMenuOpen={actionMenuBundleId === bundle.id}
+                  menuUpward={menuUpward}
+                  onToggleMenu={(bundleId, e) => {
+                    const isOpen = actionMenuBundleId === bundleId;
+                    if (!isOpen) {
+                      const btn = e.currentTarget.getBoundingClientRect();
+                      setMenuUpward(window.innerHeight - btn.bottom < 220);
+                    }
+                    setActionMenuBundleId(isOpen ? null : bundleId);
+                  }}
+                  onCloseMenu={() => { setActionMenuBundleId(null); setMenuUpward(false); }}
+                />
+              ))}
             </div>
           )}
         </div>

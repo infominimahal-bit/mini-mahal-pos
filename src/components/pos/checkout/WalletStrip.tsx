@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Dexie from 'dexie';
 import { formatCurrency } from '../../../lib/currencies';
 import { HelpTooltip } from '../../../shared/ui/HelpTooltip';
 import { localDb } from '../../../lib/localDb';
@@ -10,7 +11,8 @@ export function WalletStrip({ currency, timezone }: { currency: string, timezone
   useEffect(() => {
     let alive = true;
     const load = async () => {
-      // 1. Get mode structures
+      Dexie.ignoreTransaction(async () => {
+        // 1. Get mode structures
       const m = await localDb.paymentModes.toArray();
       const order = ['cash', 'card', 'online'];
       m.sort((a: any, b: any) => order.indexOf(a.id) - order.indexOf(b.id));
@@ -62,6 +64,7 @@ export function WalletStrip({ currency, timezone }: { currency: string, timezone
       }));
 
       if (alive) setModes(finalModes);
+      });
     };
     load();
     const subs: any[] = [];

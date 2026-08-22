@@ -17,7 +17,7 @@
 --   3.  customers              CRM / Loyalty
 --   4.  suppliers              Vendor management (no FK deps)
 --   5.  products               Inventory master
---   6.  product_batches        FIFO batch tracking → FK: products
+--   6.  product_batches        REMOVED (Stage 1 decommission — never populated)
 --   7.  discounts              Campaigns / BOGO
 --   8.  users                  Extends auth.users → FK: auth.users
 --   9.  sales                  POS Invoices → FK: customers
@@ -31,7 +31,6 @@
 --   17. stock_history          Inventory audit trail → FK: products
 --   18. toppings               Pizza topping add-ons (Cheese/Chicken/Veggie)
 --   19. product_toppings        Per-product topping availability
---   20. bundle_slot_toppings    Per-slot topping availability
 -- FUNCTIONS (8): update_updated_at_column, generate_invoice_number,
 --                 auto_generate_invoice_number, update_customer_stats,
 --                 handle_new_user, get_my_workspace_id,
@@ -42,6 +41,41 @@
 -- 📜 SCHEMA CHANGE LOG (AUDIT TRAIL)
 -- ════════════════════════════════════════════════════════════════
 -- Every structural DB change MUST be logged here AND in a migration file.
+--
+-- [2026-08-22] Stage 2 Hardening - refund_sale_atomic double-reversal guard
+--   Files: SUPER_MASTER_SCHEMA.sql, migration 20260822040000_refund_double_reversal_guard.sql
+--   refund_sale_atomic now no-ops when the sale is deleted / already fully
+--   refunded / the passed cumulative refunded_amount does not exceed the stored
+--   one (duplicate / stale / multi-device replay). Prevents double stock-restore
+--   + double wallet credit. Legitimate INCREASING partial refunds still proceed.
+--   Mirrors the existing delete_sale_atomic idempotency (deleted_at check).
+--
+-- [2026-08-22] Stage 1 Decommission - E-store Config Columns Removed
+--   Files: SUPER_MASTER_SCHEMA.sql, migration 20260822030000_drop_estore_config_columns.sql
+--   DROPPED app_settings cols: all estore_* (22 storefront/theme/COD/timer/custom-payment)
+--     + store_type, store_latitude, store_longitude, shop_open_time, shop_close_time,
+--     delivery_start_time, delivery_end_time, pickup_start_time, pickup_end_time.
+--   DROPPED products cols: show_in_estore, estore_sort_order, estore_category_sort_order.
+--   DROPPED categories.estore_sort_order, bundles.estore_sort_order.
+--   Pure orphans: no RPC/view/index referenced them. DEFERRED to Stage 2 (RPC rewrite):
+--     store_orders + place_estore_order/release_estore_stock, sales.source_order_id,
+--     sales.estore_status, sale_type/store_type CHECK 'estore', daily_summary.estore_sales.
+--
+-- [2026-08-22] Stage 1 Decommission — Discount Types Narrowed
+--   Files: SUPER_MASTER_SCHEMA.sql, migration 20260822020000_narrow_discount_types.sql
+--   discounts.type CHECK narrowed to ('percentage','fixed') — dropped
+--     'bogo','free_gift','mix_and_match'. Dropped orphaned free_gift_products col.
+--   KEPT: sales.free_gifts (realized line items — sale COGS/stock/return integrity).
+--
+-- [2026-08-22] Stage 1 Decommission — Combo System Removed
+--   Files: SUPER_MASTER_SCHEMA.sql, migration 20260822010000_drop_combo_system.sql
+--   DROPPED tables: bundle_slots, bundle_slot_options, bundle_slot_toppings
+--   DROPPED bundles cols: is_combo, deal_category, schedule_type, start_date,
+--     end_date, repeat_days, start_time, end_time, badge_enabled, badge_text,
+--     badge_icon, badge_bg_color, badge_text_color, extra_toppings, highlight_tag
+--   KEPT: bundles, bundle_items, bundles.override_price, bundles.hide_item_prices,
+--     toppings, product_toppings,
+--     products.highlight_tag / products.is_featured (product scope).
 --
 -- [2026-08-17] Verification & Repair Protocol Fixes
 --   Files: SUPER_MASTER_SCHEMA.sql, migrations 20260818010000 - 20260818040000
@@ -198,7 +232,6 @@
 --   6. CODE: InventoryManager.tsx added Reconcile Stock button (purple, Shield icon)
 -- ════════════════════════════════════════════════════════════════
 
-
 -- ════════════════════════════════════════════════════════════════
 -- 0. EXTENSIONS
 -- ════════════════════════════════════════════════════════════════
@@ -231,7 +264,7 @@ CREATE TABLE IF NOT EXISTS users (
     active              BOOLEAN DEFAULT true,
     last_login          TIMESTAMPTZ,
     avatar              TEXT,
-    offline_hash        TEXT,
+    action_hash        TEXT,
 
     created_at          TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at          TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
@@ -244,8 +277,6 @@ CREATE OR REPLACE FUNCTION current_user_role()
 RETURNS TEXT LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions AS $$
     SELECT role FROM public.users WHERE id = auth.uid();
 $$;
-
-
 
 -- ════════════════════════════════════════════════════════════════
 -- 1. APP SETTINGS  (Singleton — 1 row only)
@@ -333,9 +364,6 @@ CREATE TABLE IF NOT EXISTS app_settings (
     barcode_gap_y               INTEGER DEFAULT 0,
     barcode_bar_width           NUMERIC DEFAULT 1.2,
 
-    -- Sync / Offline
-    offline_mode                BOOLEAN DEFAULT true,
-    auto_sync                   BOOLEAN DEFAULT true,
     last_backup_date            TIMESTAMPTZ,
 
     -- Localization & Business
@@ -355,37 +383,6 @@ CREATE TABLE IF NOT EXISTS app_settings (
     -- System Module Toggles
     retail_enabled              BOOLEAN DEFAULT true,
     wholesale_enabled           BOOLEAN DEFAULT false,
-    estore_enabled              BOOLEAN DEFAULT false,
-    estore_theme_color          TEXT DEFAULT '#10b981',
-    estore_delivery_fee         NUMERIC DEFAULT 0,
-    estore_min_order            NUMERIC DEFAULT 0,
-    estore_cod_enabled          BOOLEAN DEFAULT true,
-    estore_location_lat         NUMERIC,
-    estore_location_lng         NUMERIC,
-    estore_delivery_radius      NUMERIC DEFAULT 5,
-    estore_whatsapp_enabled     BOOLEAN DEFAULT false,
-    estore_whatsapp_number      TEXT,
-    estore_primary_color_hover  TEXT DEFAULT '#059669',
-    estore_bg_color             TEXT DEFAULT '#f9fafb',
-    estore_text_color           TEXT DEFAULT '#111827',
-    estore_card_bg_color        TEXT DEFAULT '#ffffff',
-    estore_order_timer_enabled  BOOLEAN DEFAULT false,
-    estore_order_timer_minutes  INTEGER DEFAULT 30,
-    estore_custom_payment_enabled BOOLEAN DEFAULT false,
-    estore_custom_payment_name  TEXT,
-    estore_custom_payment_detail TEXT,
-    estore_custom_payment_note  TEXT,
-  estore_pickup_enabled BOOLEAN DEFAULT true,
-  estore_delivery_enabled BOOLEAN DEFAULT true,
-  store_type TEXT DEFAULT 'both',
-  store_latitude NUMERIC,
-  store_longitude NUMERIC,
-  shop_open_time TIME,
-  shop_close_time TIME,
-  delivery_start_time TIME,
-  delivery_end_time TIME,
-  pickup_start_time TIME,
-  pickup_end_time TIME,
     sound_enabled               BOOLEAN DEFAULT true,
     touch_keyboard_enabled      BOOLEAN DEFAULT false,
     enable_kot_printer          BOOLEAN DEFAULT false,
@@ -430,7 +427,6 @@ CREATE POLICY "settings_write" ON app_settings FOR UPDATE
 CREATE POLICY "settings_delete" ON app_settings FOR DELETE
   USING (current_user_role() IN ('admin', 'manager'));
 
-
 -- ════════════════════════════════════════════════════════════════
 -- 2. CATEGORIES  (Product taxonomy — no FK deps)
 -- ════════════════════════════════════════════════════════════════
@@ -445,7 +441,6 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 
 ALTER TABLE categories REPLICA IDENTITY FULL;
-
 
 -- ════════════════════════════════════════════════════════════════
 -- 3. CUSTOMERS  (CRM + Credit — no FK deps)
@@ -501,7 +496,6 @@ DROP POLICY IF EXISTS customer_ledger_write ON customer_ledger;
 CREATE POLICY customer_ledger_select ON customer_ledger FOR SELECT USING (true);
 CREATE POLICY customer_ledger_write ON customer_ledger FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
-
 -- ════════════════════════════════════════════════════════════════
 -- 4. SUPPLIERS  (Vendor + Opening Balance — no FK deps)
 -- ════════════════════════════════════════════════════════════════
@@ -521,7 +515,6 @@ CREATE TABLE IF NOT EXISTS suppliers (
 );
 
 ALTER TABLE suppliers REPLICA IDENTITY FULL;
-
 
 -- ════════════════════════════════════════════════════════════════
 -- 5. PRODUCTS  (Inventory Master — no FK deps)
@@ -556,9 +549,6 @@ CREATE TABLE IF NOT EXISTS products (
     parent_id           UUID REFERENCES products(id) ON DELETE CASCADE,
     is_service          BOOLEAN DEFAULT false,
     require_serial      BOOLEAN DEFAULT false,
-    show_in_estore      BOOLEAN DEFAULT true,
-    estore_sort_order   INTEGER DEFAULT 0,
-    estore_category_sort_order INTEGER DEFAULT 0,
     menu_number         INTEGER,
     highlight_tag       TEXT CHECK (highlight_tag IN ('sunday', 'crown')),
     created_at          TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
@@ -571,38 +561,12 @@ CREATE TABLE IF NOT EXISTS products (
 
 ALTER TABLE products REPLICA IDENTITY FULL;
 
-
 -- ════════════════════════════════════════════════════════════════
--- 6. PRODUCT BATCHES  (FIFO / Expiry tracking)
+-- 6. PRODUCT BATCHES — REMOVED (Stage 1 decommission)
 -- ════════════════════════════════════════════════════════════════
-CREATE TABLE IF NOT EXISTS product_batches (
-    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    product_id          UUID REFERENCES products(id) ON DELETE CASCADE,
-    batch_number        TEXT NOT NULL,
-    batch_type          TEXT DEFAULT 'purchase' CHECK (batch_type IN ('opening', 'purchase')),
-    manufacturing_date  DATE,
-    expiry_date         DATE,
-    received_date       TIMESTAMPTZ DEFAULT NOW(),
-    qty_received        INTEGER NOT NULL,
-    qty_remaining       INTEGER NOT NULL,
-    purchase_cost       DECIMAL(10,2) NOT NULL,
-    retail_price        DECIMAL(10,2),
-    wholesale_price     DECIMAL(10,2),
-    estore_price        DECIMAL(10,2),
-    supplier_id         UUID REFERENCES suppliers(id) ON DELETE SET NULL,
-    purchase_record_id  UUID,
-    created_at          TIMESTAMPTZ DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ DEFAULT NOW()
-);
-
-ALTER TABLE product_batches ENABLE ROW LEVEL SECURITY;
-ALTER TABLE product_batches REPLICA IDENTITY FULL;
-
-DROP POLICY IF EXISTS "Allow all for authenticated" ON product_batches;
-CREATE POLICY "Allow all for authenticated" ON product_batches
-    FOR ALL USING (true) WITH CHECK (true);
-
-
+-- The FIFO / expiry lot layer was never populated (product.batches was
+-- always []). Dropped via migration 20260822000000_drop_product_batches.sql.
+-- Stock integrity is audited from the stock_history ledger, not lot rows.
 
 -- ════════════════════════════════════════════════════════════════
 -- 7. DISCOUNTS  (Campaigns / BOGO / Free Gift)
@@ -612,10 +576,9 @@ CREATE TABLE IF NOT EXISTS discounts (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name                TEXT NOT NULL,
     description         TEXT,
-    type                TEXT NOT NULL CHECK (type IN ('percentage', 'fixed', 'bogo', 'free_gift', 'mix_and_match')),
+    type                TEXT NOT NULL CHECK (type IN ('percentage', 'fixed')),
     value               DECIMAL(10,2) DEFAULT 0,
     conditions          JSONB DEFAULT '[]'::jsonb,
-    free_gift_products  TEXT[],
     min_amount          DECIMAL(10,2),
     max_discount        DECIMAL(10,2),
     valid_from          TIMESTAMPTZ NOT NULL,
@@ -632,12 +595,6 @@ CREATE TABLE IF NOT EXISTS discounts (
 );
 
 ALTER TABLE discounts REPLICA IDENTITY FULL;
-
-
-
-
-
-
 
 -- ════════════════════════════════════════════════════════════════
 -- 11. SALES  (POS Invoices)
@@ -693,7 +650,6 @@ CREATE TABLE IF NOT EXISTS sales (
 
 ALTER TABLE sales REPLICA IDENTITY FULL;
 
-
 -- ════════════════════════════════════════════════════════════════
 -- 11b. SALESMEN  (Sales staff tracking)
 -- ════════════════════════════════════════════════════════════════
@@ -713,7 +669,6 @@ ALTER TABLE salesmen REPLICA IDENTITY FULL;
 DROP POLICY IF EXISTS "Allow all for authenticated" ON salesmen;
 CREATE POLICY "Allow all for authenticated" ON salesmen
     FOR ALL USING (true) WITH CHECK (true);
-
 
 -- ════════════════════════════════════════════════════════════════
 -- 12. EXPENSES  (Operating costs)
@@ -735,7 +690,6 @@ CREATE TABLE IF NOT EXISTS expenses (
     CONSTRAINT expenses_amount_positive CHECK (amount >= 0)
 );
 
-
 -- ════════════════════════════════════════════════════════════════
 -- 13. SALES TABS  (Multi-tab cashier)
 -- ════════════════════════════════════════════════════════════════
@@ -754,43 +708,7 @@ CREATE TABLE IF NOT EXISTS sales_tabs (
     updated_at              TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-
--- ════════════════════════════════════════════════════════════════
--- 14. STORE ORDERS  (Online e-store orders, separate from POS sales)
--- ════════════════════════════════════════════════════════════════
-
-CREATE TABLE IF NOT EXISTS store_orders (
-    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    invoice_number      TEXT NOT NULL,
-    customer_id         UUID REFERENCES customers(id) ON DELETE SET NULL,
-    customer_name       TEXT,
-    customer_phone      TEXT,
-    items               JSONB NOT NULL DEFAULT '[]'::jsonb,
-    subtotal            DECIMAL(12,2) NOT NULL DEFAULT 0,
-    discount_amount     DECIMAL(12,2) DEFAULT 0,
-    tax_amount          DECIMAL(12,2) DEFAULT 0,
-    total               DECIMAL(12,2) NOT NULL,
-    delivery_fee        DECIMAL(12,2) DEFAULT 0,
-    payment_method      TEXT DEFAULT 'cash',
-    status              TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled', 'converted')),
-    delivery_address    TEXT,
-    delivery_location_lat NUMERIC,
-    delivery_location_lng NUMERIC,
-    customer_notes      TEXT,
-    cashier             TEXT DEFAULT 'ONLINE_STORE',
-    fulfilled_sale_id   UUID REFERENCES sales(id) ON DELETE SET NULL,
-    created_at          TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
-    updated_at          TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE store_orders REPLICA IDENTITY FULL;
-
-CREATE INDEX IF NOT EXISTS idx_store_orders_invoice_number ON store_orders(invoice_number);
-CREATE INDEX IF NOT EXISTS idx_store_orders_status ON store_orders(status);
-CREATE INDEX IF NOT EXISTS idx_store_orders_fulfilled_sale_id ON store_orders(fulfilled_sale_id);
-CREATE INDEX IF NOT EXISTS idx_store_orders_customer_id ON store_orders(customer_id);
-CREATE INDEX IF NOT EXISTS idx_store_orders_created_at ON store_orders(created_at DESC);
-
+-- 14. STORE ORDERS — REMOVED: e-store feature deleted (see migration 20260823010000_drop_estore.sql)
 
 -- ════════════════════════════════════════════════════════════════
 -- 15. PURCHASE RECORDS  (Unified inventory ledger)
@@ -818,7 +736,6 @@ CREATE TABLE IF NOT EXISTS purchase_records (
     updated_at      TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-
 -- ════════════════════════════════════════════════════════════════
 -- 16. PURCHASE ORDERS  (PO Headers)
 -- ════════════════════════════════════════════════════════════════
@@ -835,7 +752,6 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
     updated_at      TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-
 -- ════════════════════════════════════════════════════════════════
 -- 17. PURCHASE ORDER ITEMS  (PO line items)
 -- ════════════════════════════════════════════════════════════════
@@ -849,7 +765,6 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
     cost_price      DECIMAL(12,2) NOT NULL CHECK (cost_price >= 0),
     created_at      TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
-
 
 -- ════════════════════════════════════════════════════════════════
 -- 17. SUPPLIER TRANSACTIONS  (Khata / Master ledger)
@@ -873,7 +788,6 @@ CREATE TABLE IF NOT EXISTS supplier_transactions (
     updated_at      TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-
 -- ════════════════════════════════════════════════════════════════
 -- 18. PAYMENTS  (Supplier payments)
 -- ════════════════════════════════════════════════════════════════
@@ -891,7 +805,6 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at      TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at      TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
-
 
 -- ════════════════════════════════════════════════════════════════
 -- 19. STOCK HISTORY  (Inventory audit trail)
@@ -919,7 +832,6 @@ CREATE TABLE IF NOT EXISTS stock_history (
     updated_at      TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-
 -- ════════════════════════════════════════════════════════════════
 -- 20. BUNDLES (Product Bundles/Deals)
 -- ════════════════════════════════════════════════════════════════
@@ -928,28 +840,14 @@ CREATE TABLE IF NOT EXISTS bundles (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name                TEXT NOT NULL,
     description         TEXT DEFAULT '',
-    is_combo            BOOLEAN NOT NULL DEFAULT FALSE,
     discount_value      NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (discount_value >= 0),
     discount_type       TEXT NOT NULL DEFAULT 'percentage' CHECK (discount_type IN ('percentage', 'fixed')),
     hide_item_prices    BOOLEAN NOT NULL DEFAULT FALSE,
     active              BOOLEAN NOT NULL DEFAULT TRUE,
     image               TEXT,
     override_price       NUMERIC(10,2),
-    deal_category       TEXT NOT NULL DEFAULT 'pizza' CHECK (deal_category IN ('pizza','burger','beverage','single_item')),
-    schedule_type       TEXT DEFAULT 'always' CHECK (schedule_type IN ('always', 'scheduled')),
-    start_date          DATE,
-    end_date            DATE,
-    repeat_days         TEXT[],
-    start_time          TIME,
-    end_time            TIME,
     created_at          TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
-    updated_at          TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
-    badge_enabled       BOOLEAN DEFAULT false,
-    badge_text          TEXT,
-    badge_icon          TEXT DEFAULT 'crown',
-    badge_bg_color      TEXT DEFAULT '#1A1A1A',
-    badge_text_color    TEXT DEFAULT '#D4AF37',
-    extra_toppings       JSONB DEFAULT '[]'::jsonb
+    updated_at          TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 -- Prevent duplicate bundle names
@@ -970,42 +868,9 @@ CREATE TABLE IF NOT EXISTS bundle_items (
 CREATE INDEX IF NOT EXISTS idx_bundle_items_bundle_id ON bundle_items(bundle_id);
 CREATE INDEX IF NOT EXISTS idx_bundle_items_product_id ON bundle_items(product_id);
 
-
--- ════════════════════════════════════════════════════════════════
--- 22. BUNDLE SLOTS (Combo choices)
--- ════════════════════════════════════════════════════════════════
-
-CREATE TABLE IF NOT EXISTS bundle_slots (
-    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    bundle_id           UUID NOT NULL REFERENCES bundles(id) ON DELETE CASCADE,
-    name                TEXT NOT NULL,
-    required_quantity   INTEGER NOT NULL DEFAULT 1 CHECK (required_quantity > 0),
-    order_index         INTEGER NOT NULL DEFAULT 0,
-    created_at          TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_bundle_slots_bundle_id ON bundle_slots(bundle_id);
-
--- ════════════════════════════════════════════════════════════════
--- 23. BUNDLE SLOT OPTIONS (Products inside a slot)
--- ════════════════════════════════════════════════════════════════
-
-CREATE TABLE IF NOT EXISTS bundle_slot_options (
-    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    slot_id             UUID NOT NULL REFERENCES bundle_slots(id) ON DELETE CASCADE,
-    product_id          UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    sort_order          INTEGER NOT NULL DEFAULT 0,
-    created_at          TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_bundle_slot_options_slot_id ON bundle_slot_options(slot_id);
-CREATE INDEX IF NOT EXISTS idx_bundle_slot_options_product_id ON bundle_slot_options(product_id);
-
 -- API Grants: Allow anon, authenticated, and service_role to read bundle data
 GRANT SELECT ON TABLE bundles TO anon, authenticated, service_role;
 GRANT SELECT ON TABLE bundle_items TO anon, authenticated, service_role;
-GRANT SELECT ON TABLE bundle_slots TO anon, authenticated, service_role;
-GRANT SELECT ON TABLE bundle_slot_options TO anon, authenticated, service_role;
 
 -- ════════════════════════════════════════════════════════════════
 -- 27. VARIANT STOCK HISTORY (Per-variant inventory audit trail)
@@ -1121,7 +986,6 @@ CREATE INDEX IF NOT EXISTS idx_sales_cashier            ON sales(cashier);
 CREATE INDEX IF NOT EXISTS idx_sales_created_at_status  ON sales(created_at, status);
 CREATE INDEX IF NOT EXISTS idx_sales_sale_date          ON sales(sale_date);
 
-
 -- Discounts
 CREATE INDEX IF NOT EXISTS idx_discounts_active          ON discounts(active);
 CREATE INDEX IF NOT EXISTS idx_discounts_validity        ON discounts(valid_from, valid_to) WHERE active = true;
@@ -1169,9 +1033,6 @@ CREATE INDEX IF NOT EXISTS idx_payments_created_at         ON payments(created_a
 CREATE INDEX IF NOT EXISTS idx_stock_history_product_id    ON stock_history(product_id);
 CREATE INDEX IF NOT EXISTS idx_stock_history_created_at    ON stock_history(created_at);
 CREATE INDEX IF NOT EXISTS idx_stock_history_type          ON stock_history(type);
-
-
-
 
 -- ════════════════════════════════════════════════════════════════
 -- FUNCTIONS & TRIGGERS
@@ -1231,7 +1092,7 @@ DO $$ BEGIN CREATE TRIGGER update_discounts_updated_at          BEFORE UPDATE ON
 DO $$ BEGIN CREATE TRIGGER update_users_updated_at             BEFORE UPDATE ON users              FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TRIGGER update_sales_updated_at              BEFORE UPDATE ON sales              FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TRIGGER update_sales_tabs_updated_at         BEFORE UPDATE ON sales_tabs         FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TRIGGER update_store_orders_updated_at       BEFORE UPDATE ON store_orders       FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 DO $$ BEGIN CREATE TRIGGER update_expenses_updated_at           BEFORE UPDATE ON expenses           FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TRIGGER update_purchase_orders_updated_at    BEFORE UPDATE ON purchase_orders    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TRIGGER update_purchase_order_items_updated_at BEFORE UPDATE ON purchase_order_items FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
@@ -1279,7 +1140,7 @@ DO $$ BEGIN CREATE TRIGGER guard_stale_write_variant_history  BEFORE INSERT OR U
 DO $$ BEGIN CREATE TRIGGER guard_stale_write_purchase_records BEFORE INSERT OR UPDATE ON purchase_records      FOR EACH ROW EXECUTE FUNCTION guard_stale_write(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TRIGGER guard_stale_write_expenses         BEFORE INSERT OR UPDATE ON expenses              FOR EACH ROW EXECUTE FUNCTION guard_stale_write(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TRIGGER guard_stale_write_payments         BEFORE INSERT OR UPDATE ON payments              FOR EACH ROW EXECUTE FUNCTION guard_stale_write(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TRIGGER guard_stale_write_store_orders     BEFORE INSERT OR UPDATE ON store_orders          FOR EACH ROW EXECUTE FUNCTION guard_stale_write(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 DO $$ BEGIN CREATE TRIGGER guard_stale_write_sales_tabs       BEFORE INSERT OR UPDATE ON sales_tabs            FOR EACH ROW EXECUTE FUNCTION guard_stale_write(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN CREATE TRIGGER record_tombstone_sales             AFTER DELETE ON sales                FOR EACH ROW EXECUTE FUNCTION record_row_tombstone(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
@@ -1288,9 +1149,8 @@ DO $$ BEGIN CREATE TRIGGER record_tombstone_variant_history   AFTER DELETE ON va
 DO $$ BEGIN CREATE TRIGGER record_tombstone_purchase_records  AFTER DELETE ON purchase_records      FOR EACH ROW EXECUTE FUNCTION record_row_tombstone(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TRIGGER record_tombstone_expenses          AFTER DELETE ON expenses              FOR EACH ROW EXECUTE FUNCTION record_row_tombstone(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TRIGGER record_tombstone_payments          AFTER DELETE ON payments              FOR EACH ROW EXECUTE FUNCTION record_row_tombstone(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TRIGGER record_tombstone_store_orders      AFTER DELETE ON store_orders          FOR EACH ROW EXECUTE FUNCTION record_row_tombstone(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TRIGGER record_tombstone_sales_tabs        AFTER DELETE ON sales_tabs            FOR EACH ROW EXECUTE FUNCTION record_row_tombstone(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DO $$ BEGIN CREATE TRIGGER record_tombstone_sales_tabs        AFTER DELETE ON sales_tabs            FOR EACH ROW EXECUTE FUNCTION record_row_tombstone(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ── Invoice Number Generator ──
 CREATE OR REPLACE FUNCTION generate_invoice_number()
@@ -1360,7 +1220,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
 -- ── Customer Stats Auto-Update ──
 CREATE OR REPLACE FUNCTION update_customer_stats()
 RETURNS TRIGGER AS $$
@@ -1385,7 +1244,6 @@ $$ LANGUAGE plpgsql;
 --       FOR EACH ROW
 --       EXECUTE FUNCTION update_customer_stats();
 -- EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
 
 -- ── Auto-Create User Profile from Supabase Auth ──
 -- First user becomes admin, subsequent users are cashier
@@ -1438,7 +1296,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-
 -- ── Users RLS + role-escalation guard (MASTER §2, applied live 2026-08-18) ──
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
@@ -1478,7 +1335,6 @@ DO $$ BEGIN
       FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-
 -- ── Workspace-check helper (single-tenant: returns current user id) ──
 CREATE OR REPLACE FUNCTION get_my_workspace_id()
 RETURNS UUID AS $$
@@ -1486,7 +1342,6 @@ BEGIN
   RETURN auth.uid();
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
 
 -- ── PO Number Generator ──
 CREATE OR REPLACE FUNCTION generate_po_number()
@@ -1529,7 +1384,6 @@ DO $$ BEGIN
       FOR EACH ROW
       EXECUTE FUNCTION auto_generate_po_number();
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
 
 -- ── ATOMIC SALES PROCESSOR (RPC) ──
 CREATE OR REPLACE FUNCTION process_sale(sale_data JSONB)
@@ -1611,14 +1465,9 @@ GRANT EXECUTE ON FUNCTION process_sale(JSONB) TO anon;
 GRANT EXECUTE ON FUNCTION process_return(UUID, JSONB) TO authenticated;
 GRANT EXECUTE ON FUNCTION process_return(UUID, JSONB) TO anon;
 
-
 -- ════════════════════════════════════════════════════════════════
 -- AUDIT FUNCTIONS (Stock & Financial Integrity Checks)
 -- ════════════════════════════════════════════════════════════════
-
-
-
-
 
 -- ── Purchase Cost Audit ──
 -- Returns completed sales that have items with zero or null purchaseCost.
@@ -1650,10 +1499,6 @@ LANGUAGE sql SECURITY DEFINER AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION audit_missing_purchase_cost() TO authenticated;
-
-
-
-
 
 -- ── Login Helper RPC ──
 CREATE OR REPLACE FUNCTION public.resolve_login_email(p_username TEXT)
@@ -1691,7 +1536,6 @@ FROM public.sales s,
 jsonb_array_elements(s.items) AS item
 WHERE s.status = 'completed';
 
-
 -- ── Daily Summary View ──
 CREATE OR REPLACE VIEW daily_summary AS
 SELECT
@@ -1707,7 +1551,6 @@ FROM public.sales sa
 WHERE sa.sale_date IS NOT NULL
 GROUP BY sa.sale_date;
 
-
 -- ════════════════════════════════════════════════════════════════
 -- GRANTS
 -- ════════════════════════════════════════════════════════════════
@@ -1720,8 +1563,7 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated;
 -- estore customer self-registration inserts customers/orders without JWT
-GRANT INSERT ON customers, store_orders TO anon;
-
+GRANT INSERT ON customers TO anon;
 
 -- ════════════════════════════════════════════════════════════════
 -- SEED DATA
@@ -1735,7 +1577,7 @@ INSERT INTO app_settings (
     receipt_paper_size, receipt_template, receipt_show_logo,
     receipt_show_store_name, receipt_show_store_address,
     receipt_show_store_phone, receipt_show_customer_name,
-    receipt_show_notes, offline_mode, auto_sync,
+    receipt_show_notes,
     enable_purchase_orders, po_prefix, po_counter,
     retail_enabled, sound_enabled
 ) VALUES (
@@ -1745,7 +1587,7 @@ INSERT INTO app_settings (
     '80mm', 'modern', true,
     true, true,
     true, true,
-    true, true, true,
+    true,
     true, 'PO-', 1000,
     true, true
 ) ON CONFLICT DO NOTHING;
@@ -1762,7 +1604,6 @@ INSERT INTO categories (name, description) VALUES
     ('Automotive',       'Car parts and automotive supplies'),
     ('General',          'General merchandise')
 ON CONFLICT (name) DO NOTHING;
-
 
 -- ════════════════════════════════════════════════════════════════
 -- VERIFICATION
@@ -1800,19 +1641,6 @@ END $$;
 -- END OF SUPER MASTER SCHEMA
 -- ════════════════════════════════════════════════════════════════
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 -- ──────────────────────────────────────────────────────────────
 -- FIX MISSING COLUMNS IN app_settings
 -- ──────────────────────────────────────────────────────────────
@@ -1843,8 +1671,6 @@ END $$;
 --   "AUTO-BLACKLISTED COLUMN: 'barcode_padding' on entity 'app_settings'"
 --   "AUTO-BLACKLISTED COLUMN: 'barcode_border' on entity 'app_settings'"
 --   "AUTO-BLACKLISTED COLUMN: 'interface_mode' on entity 'app_settings'"
---   "AUTO-BLACKLISTED COLUMN: 'offline_mode' on entity 'app_settings'"
---   "AUTO-BLACKLISTED COLUMN: 'auto_sync' on entity 'app_settings'"
 --   "AUTO-BLACKLISTED COLUMN: 'country' on entity 'app_settings'"
 --   "AUTO-BLACKLISTED COLUMN: 'business_type' on entity 'app_settings'"
 --   "AUTO-BLACKLISTED COLUMN: 'allow_credit_over_limit' on entity 'app_settings'"
@@ -1868,8 +1694,6 @@ ALTER TABLE app_settings
   ADD COLUMN IF NOT EXISTS receipt_font_weight          TEXT DEFAULT 'normal',
   ADD COLUMN IF NOT EXISTS receipt_density              NUMERIC DEFAULT 1.0,
   ADD COLUMN IF NOT EXISTS interface_mode               TEXT DEFAULT 'touch',
-  ADD COLUMN IF NOT EXISTS offline_mode                 BOOLEAN DEFAULT true,
-  ADD COLUMN IF NOT EXISTS auto_sync                   BOOLEAN DEFAULT true,
   ADD COLUMN IF NOT EXISTS country                     TEXT DEFAULT 'PK',
   ADD COLUMN IF NOT EXISTS business_type               TEXT DEFAULT 'general',
   ADD COLUMN IF NOT EXISTS receipt_padding_top       INTEGER DEFAULT 0,
@@ -1903,11 +1727,6 @@ ALTER TABLE app_settings
   ADD COLUMN IF NOT EXISTS auto_save_receipt_png          BOOLEAN DEFAULT false,
   ADD COLUMN IF NOT EXISTS allow_credit_over_limit        BOOLEAN DEFAULT true,
   ADD COLUMN IF NOT EXISTS pos_grid_columns               INTEGER DEFAULT 4,
-  ADD COLUMN IF NOT EXISTS estore_location_lat            NUMERIC,
-  ADD COLUMN IF NOT EXISTS estore_location_lng            NUMERIC,
-  ADD COLUMN IF NOT EXISTS estore_delivery_radius         NUMERIC DEFAULT 5,
-  ADD COLUMN IF NOT EXISTS estore_whatsapp_enabled        BOOLEAN DEFAULT false,
-  ADD COLUMN IF NOT EXISTS estore_whatsapp_number         TEXT,
   ADD COLUMN IF NOT EXISTS allow_negative_stock            BOOLEAN DEFAULT true;
 
 DO $$
@@ -1919,8 +1738,6 @@ END $$;
 ALTER TABLE products
   ADD COLUMN IF NOT EXISTS variant_data  JSONB DEFAULT '[]'::jsonb,
   ADD COLUMN IF NOT EXISTS modifiers     JSONB DEFAULT '[]'::jsonb,
-  ADD COLUMN IF NOT EXISTS estore_sort_order INTEGER DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS estore_category_sort_order INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS product_type  TEXT DEFAULT 'simple',
   ADD COLUMN IF NOT EXISTS is_service    BOOLEAN DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS require_serial BOOLEAN DEFAULT FALSE,
@@ -2059,8 +1876,6 @@ LANGUAGE sql SECURITY DEFINER SET search_path = public, extensions AS $$
   ORDER BY ABS(p.stock - COALESCE(SUM(sh.change_qty), 0)) DESC;
 $$;
 
-
-
 -- ── 5. Missing Cost Audit ──
 CREATE OR REPLACE FUNCTION audit_missing_purchase_cost()
 RETURNS TABLE(sale_id uuid, invoice_number text, created_at timestamptz, item_count bigint)
@@ -2124,8 +1939,6 @@ GRANT EXECUTE ON FUNCTION get_email_by_username(TEXT) TO anon, authenticated;
 
 NOTIFY pgrst, 'reload schema';
 
-
-
 -- ════════════════════════════════════════════════════════════════
 -- SEED: App Settings
 -- ════════════════════════════════════════════════════════════════
@@ -2133,10 +1946,6 @@ NOTIFY pgrst, 'reload schema';
 INSERT INTO app_settings (id, store_name)
 VALUES ('00000000-0000-4000-8000-000000000001', 'ZaynahsPOS')
 ON CONFLICT (id) DO NOTHING;
-
-
-
-
 
 -- ════════════════════════════════════════════════════════════════
 -- REALTIME CONFIGURATION
@@ -2149,8 +1958,6 @@ BEGIN
       app_settings,
       bundles,
       bundle_items,
-      bundle_slots,
-      bundle_slot_options,
       categories,
       customers,
       customer_ledger,
@@ -2164,7 +1971,7 @@ BEGIN
       purchase_records,
       sales,
       sales_tabs,
-      store_orders,
+
       stock_history,
       supplier_transactions,
       suppliers,
@@ -2175,19 +1982,15 @@ BEGIN
   END IF;
 END $$;
 
-
 -- ════════════════════════════════════════════════════════════════
 -- SYSTEM AUDIT — Commented out after initial validation.
 -- Re-enable individual checks when debugging.
 -- ════════════════════════════════════════════════════════════════
 
-
 -- ════════════════════════════════════════════════════════════════
 -- DATA INTEGRITY — Backfill missing batches and stock_history
 -- ════════════════════════════════════════════════════════════════
 -- Safe to re-run: uses LEFT JOIN + HAVING COUNT(pb.id) = 0
-
-
 
 -- Backfill missing 'initial' stock_history entries
 INSERT INTO stock_history (id, product_id, change_qty, balance_after, type, note, cashier_name, created_at)
@@ -2213,79 +2016,18 @@ WHERE p.track_inventory = true
 -- IDEMPOTENT COLUMN ADDITIONS (Post-Launch schema updates)
 -- ════════════════════════════════════════════════════════════════
 
-ALTER TABLE products
-  ADD COLUMN IF NOT EXISTS show_in_estore BOOLEAN DEFAULT true;
-
 ALTER TABLE sales
   ADD COLUMN IF NOT EXISTS estore_status TEXT DEFAULT 'pending' CHECK (estore_status IN ('pending', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled')),
   ADD COLUMN IF NOT EXISTS delivery_address TEXT,
   ADD COLUMN IF NOT EXISTS delivery_fee DECIMAL(12,2) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS customer_notes TEXT;
 
-ALTER TABLE app_settings
-  ADD COLUMN IF NOT EXISTS estore_theme_color TEXT DEFAULT '#10b981',
-  ADD COLUMN IF NOT EXISTS estore_delivery_fee NUMERIC DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS estore_min_order NUMERIC DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS estore_cod_enabled BOOLEAN DEFAULT true,
-  ADD COLUMN IF NOT EXISTS estore_primary_color_hover TEXT DEFAULT '#059669',
-  ADD COLUMN IF NOT EXISTS estore_bg_color TEXT DEFAULT '#f9fafb',
-  ADD COLUMN IF NOT EXISTS estore_text_color TEXT DEFAULT '#111827',
-  ADD COLUMN IF NOT EXISTS estore_card_bg_color TEXT DEFAULT '#ffffff',
-  ADD COLUMN IF NOT EXISTS estore_order_timer_enabled BOOLEAN DEFAULT false,
-  ADD COLUMN IF NOT EXISTS estore_order_timer_minutes INTEGER DEFAULT 30,
-  ADD COLUMN IF NOT EXISTS estore_custom_payment_enabled BOOLEAN DEFAULT false,
-  ADD COLUMN IF NOT EXISTS estore_custom_payment_name TEXT,
-  ADD COLUMN IF NOT EXISTS estore_custom_payment_detail TEXT,
-  ADD COLUMN IF NOT EXISTS estore_custom_payment_note TEXT,
-  ADD COLUMN IF NOT EXISTS estore_pickup_enabled BOOLEAN DEFAULT true,
-  ADD COLUMN IF NOT EXISTS estore_delivery_enabled BOOLEAN DEFAULT true,
-  ADD COLUMN IF NOT EXISTS store_type TEXT DEFAULT 'both',
-  ADD COLUMN IF NOT EXISTS store_latitude NUMERIC,
-  ADD COLUMN IF NOT EXISTS store_longitude NUMERIC,
-  ADD COLUMN IF NOT EXISTS shop_open_time TIME,
-  ADD COLUMN IF NOT EXISTS shop_close_time TIME,
-  ADD COLUMN IF NOT EXISTS delivery_start_time TIME,
-  ADD COLUMN IF NOT EXISTS delivery_end_time TIME,
-  ADD COLUMN IF NOT EXISTS pickup_start_time TIME,
-  ADD COLUMN IF NOT EXISTS pickup_end_time TIME;
-
-ALTER TABLE bundles
-  ADD COLUMN IF NOT EXISTS schedule_type TEXT DEFAULT 'always' CHECK (schedule_type IN ('always', 'scheduled')),
-  ADD COLUMN IF NOT EXISTS start_date DATE,
-  ADD COLUMN IF NOT EXISTS end_date DATE,
-  ADD COLUMN IF NOT EXISTS repeat_days TEXT[],
-  ADD COLUMN IF NOT EXISTS start_time TIME,
-  ADD COLUMN IF NOT EXISTS end_time TIME,
-  ADD COLUMN IF NOT EXISTS estore_sort_order INTEGER DEFAULT 0;
-
-ALTER TABLE categories
-  ADD COLUMN IF NOT EXISTS estore_sort_order INTEGER DEFAULT 0;
-
-ALTER TABLE bundle_slot_options
-  ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
-
 ALTER TABLE products
   ADD COLUMN IF NOT EXISTS menu_number INTEGER,
   ADD COLUMN IF NOT EXISTS highlight_tag TEXT CHECK (highlight_tag IN ('sunday', 'crown'));
 
 ALTER TABLE bundles
-  ADD COLUMN IF NOT EXISTS highlight_tag TEXT CHECK (highlight_tag IN ('sunday', 'crown'));
-
-ALTER TABLE bundles
-  ADD COLUMN IF NOT EXISTS deal_category TEXT NOT NULL DEFAULT 'pizza' CHECK (deal_category IN ('pizza','burger','beverage','single_item'));
-
-ALTER TABLE bundles
   ADD COLUMN IF NOT EXISTS override_price NUMERIC(10,2);
-
-ALTER TABLE bundles
-  ADD COLUMN IF NOT EXISTS badge_enabled BOOLEAN DEFAULT false,
-  ADD COLUMN IF NOT EXISTS badge_text TEXT,
-  ADD COLUMN IF NOT EXISTS badge_icon TEXT DEFAULT 'crown',
-  ADD COLUMN IF NOT EXISTS badge_bg_color TEXT DEFAULT '#1A1A1A',
-  ADD COLUMN IF NOT EXISTS badge_text_color TEXT DEFAULT '#D4AF37';
-
-ALTER TABLE bundles
-  ADD COLUMN IF NOT EXISTS extra_toppings JSONB DEFAULT '[]'::jsonb;
 
 -- 24. TOPPINGS (Pizza topping add-ons)
 -- ════════════════════════════════════════════════════════════════
@@ -2324,23 +2066,6 @@ CREATE INDEX IF NOT EXISTS idx_product_toppings_product ON product_toppings(prod
 
 GRANT SELECT, INSERT, DELETE ON TABLE product_toppings TO anon, authenticated, service_role;
 GRANT ALL ON TABLE product_toppings TO service_role;
-
--- ════════════════════════════════════════════════════════════════
--- 26. BUNDLE SLOT TOPPINGS (which toppings are available per slot)
--- ════════════════════════════════════════════════════════════════
-
-CREATE TABLE IF NOT EXISTS bundle_slot_toppings (
-    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    slot_id     UUID NOT NULL REFERENCES bundle_slots(id) ON DELETE CASCADE,
-    topping_id  UUID NOT NULL REFERENCES toppings(id) ON DELETE CASCADE,
-    created_at  TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
-    UNIQUE(slot_id, topping_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_bundle_slot_toppings_slot ON bundle_slot_toppings(slot_id);
-
-GRANT SELECT, INSERT, DELETE ON TABLE bundle_slot_toppings TO anon, authenticated, service_role;
-GRANT ALL ON TABLE bundle_slot_toppings TO service_role;
 
 -- ════════════════════════════════════════════════════════════════
 -- POST-LAUNCH ALTER TABLE: supplier_transactions — Ledger Separation + Manual Override
@@ -2389,7 +2114,6 @@ DO $$ BEGIN CREATE TRIGGER update_product_addons_updated_at        BEFORE UPDATE
 DO $$ BEGIN CREATE TRIGGER on_stock_history_insert AFTER INSERT ON stock_history FOR EACH ROW EXECUTE FUNCTION trigger_update_product_stock(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TRIGGER on_variant_stock_history_insert AFTER INSERT ON variant_stock_history FOR EACH ROW EXECUTE FUNCTION trigger_update_variant_stock(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-
 -- POST-LAUNCH ALTER TABLE: expenses — Manual Override
 ALTER TABLE expenses
   ADD COLUMN IF NOT EXISTS is_manual_override   BOOLEAN DEFAULT FALSE,
@@ -2398,12 +2122,11 @@ ALTER TABLE expenses
 -- POST-LAUNCH ALTER TABLE: sales — Soft Delete Support & Online Orders Tracing
 ALTER TABLE sales
   ADD COLUMN IF NOT EXISTS deleted_at           TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS source_order_id      UUID REFERENCES store_orders(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS source_order_id      UUID;
 
 -- (UNIQUE, partial) index on source_order_id — created here (post-launch) so the
 -- column exists first. CREATE INDEX IF NOT EXISTS keeps it idempotent on existing projects.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_source_order_id ON sales(source_order_id) WHERE source_order_id IS NOT NULL;
-
 -- POST-LAUNCH ALTER TABLE: sales — Idempotency Key (commit_sale references it)
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS idempotency_key UUID;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_idempotency_key ON sales(idempotency_key) WHERE idempotency_key IS NOT NULL;
@@ -2501,11 +2224,7 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS on_store_order_cancelled ON store_orders;
-CREATE TRIGGER on_store_order_cancelled
-AFTER UPDATE ON store_orders
-FOR EACH ROW
-EXECUTE FUNCTION trigger_release_estore_stock();
+
 
 -- Enable RLS on stock_history and variant_stock_history
 ALTER TABLE stock_history ENABLE ROW LEVEL SECURITY;
@@ -2601,7 +2320,7 @@ DO $$ BEGIN CREATE TRIGGER guard_stale_write_variant_history  BEFORE INSERT OR U
 DO $$ BEGIN CREATE TRIGGER guard_stale_write_purchase_records BEFORE INSERT OR UPDATE ON purchase_records      FOR EACH ROW EXECUTE FUNCTION guard_stale_write(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TRIGGER guard_stale_write_expenses         BEFORE INSERT OR UPDATE ON expenses              FOR EACH ROW EXECUTE FUNCTION guard_stale_write(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TRIGGER guard_stale_write_payments         BEFORE INSERT OR UPDATE ON payments              FOR EACH ROW EXECUTE FUNCTION guard_stale_write(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TRIGGER guard_stale_write_store_orders     BEFORE INSERT OR UPDATE ON store_orders          FOR EACH ROW EXECUTE FUNCTION guard_stale_write(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 DO $$ BEGIN CREATE TRIGGER guard_stale_write_sales_tabs       BEFORE INSERT OR UPDATE ON sales_tabs            FOR EACH ROW EXECUTE FUNCTION guard_stale_write(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN CREATE TRIGGER record_tombstone_sales             AFTER DELETE ON sales                FOR EACH ROW EXECUTE FUNCTION record_row_tombstone(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
@@ -2610,7 +2329,7 @@ DO $$ BEGIN CREATE TRIGGER record_tombstone_variant_history   AFTER DELETE ON va
 DO $$ BEGIN CREATE TRIGGER record_tombstone_purchase_records  AFTER DELETE ON purchase_records      FOR EACH ROW EXECUTE FUNCTION record_row_tombstone(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TRIGGER record_tombstone_expenses          AFTER DELETE ON expenses              FOR EACH ROW EXECUTE FUNCTION record_row_tombstone(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TRIGGER record_tombstone_payments          AFTER DELETE ON payments              FOR EACH ROW EXECUTE FUNCTION record_row_tombstone(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TRIGGER record_tombstone_store_orders      AFTER DELETE ON store_orders          FOR EACH ROW EXECUTE FUNCTION record_row_tombstone(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 DO $$ BEGIN CREATE TRIGGER record_tombstone_sales_tabs        AFTER DELETE ON sales_tabs            FOR EACH ROW EXECUTE FUNCTION record_row_tombstone(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 -- ════════════════════════════════════════════════════════════════
 -- MIGRATION: Inventory Sync Trigger
@@ -2735,11 +2454,7 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS on_store_order_cancelled ON store_orders;
-CREATE TRIGGER on_store_order_cancelled
-AFTER UPDATE ON store_orders
-FOR EACH ROW
-EXECUTE FUNCTION public.trigger_release_estore_stock();-- 20260812235500_fix_estore_place_order_bugs.sql
+
 -- 🐛 FIX (found by TESTS_GUIDE full-system-flow battery, 2026-08-12):
 --   1. place_estore_order referenced columns (address, table_number, fulfillment_mode)
 --      that DON'T EXIST in store_orders → EVERY online order placement failed.
@@ -2749,8 +2464,6 @@ EXECUTE FUNCTION public.trigger_release_estore_stock();-- 20260812235500_fix_est
 --   3. F22 note: estore reservation deducts via stock_history (product-level) —
 --      variant items would silently not reserve; app routes variant orders
 --      through variant_stock_history on the POS side; RPC reserves products only.
-
-
 
 CREATE OR REPLACE FUNCTION trigger_release_estore_stock()
 RETURNS TRIGGER
@@ -2971,63 +2684,9 @@ END;
 $$;
 
 -- Re-attach trigger (idempotent)
-DROP TRIGGER IF EXISTS on_store_order_cancelled ON store_orders;
-CREATE TRIGGER on_store_order_cancelled
-AFTER UPDATE ON store_orders
-FOR EACH ROW
-EXECUTE FUNCTION trigger_release_estore_stock();
 
--- ── 3. LEGACY RESERVATION RELEASE (one-time compensation) ──────────────────
--- Reverse every legacy 'Estore Reservation' row with an equal +qty 'return'
--- entry. Net ledger effect = zero; products.stock (already reduced by the
--- reservation trigger) returns to pre-reservation levels. Runs only when
--- reservations exist (idempotent — reference note is unique per function run
--- and successive runs find zero rows to release).
-DO $$
-DECLARE
-    r record;
-    n_released integer := 0;
-BEGIN
-    -- Simple-product reservations
-    FOR r IN
-        SELECT sh.product_id, sh.change_qty, sh.reference_id, o.invoice_number
-        FROM stock_history sh
-        LEFT JOIN store_orders o ON o.id = sh.reference_id
-        WHERE sh.note LIKE 'Estore Reservation%'
-          AND sh.change_qty < 0
-    LOOP
-        INSERT INTO stock_history (
-            id, product_id, change_qty, type, reference_id, note, cashier_name, created_at
-        ) VALUES (
-            gen_random_uuid(), r.product_id, -r.change_qty, 'return', r.reference_id,
-            'Estore Reservation Release (2026-08-12 migration): ' || COALESCE(r.invoice_number, 'order'),
-            'System', now()
-        );
-        n_released := n_released + 1;
-    END LOOP;
 
-    -- Variant reservations
-    FOR r IN
-        SELECT vh.product_id, vh.variant_id, vh.variant_label, vh.change_qty, vh.reference_id, o.invoice_number
-        FROM variant_stock_history vh
-        LEFT JOIN store_orders o ON o.id = vh.reference_id
-        WHERE vh.note LIKE 'Estore Reservation%'
-          AND vh.change_qty < 0
-    LOOP
-        INSERT INTO variant_stock_history (
-            id, product_id, variant_id, variant_label, change_qty, type,
-            reference_id, note, cashier_name, created_at
-        ) VALUES (
-            gen_random_uuid(), r.product_id, r.variant_id, r.variant_label, -r.change_qty,
-            'return', r.reference_id,
-            'Estore Reservation Release (2026-08-12 migration): ' || COALESCE(r.invoice_number, 'order'),
-            'System', now()
-        );
-        n_released := n_released + 1;
-    END LOOP;
 
-    RAISE NOTICE 'Legacy estore reservations released: %', n_released;
-END $$;
 
 -- ============================================================================
 -- ATOMIC SALE & STOCK COMMIT RPCs (2026-08-16 — Phase 1, online-authoritative)
@@ -3060,60 +2719,48 @@ REVOKE ALL ON FUNCTION public.lock_product_stock FROM anon;
 REVOKE ALL ON FUNCTION public.lock_product_stock FROM public;
 GRANT EXECUTE ON FUNCTION public.lock_product_stock TO authenticated;
 
-CREATE OR REPLACE FUNCTION commit_sale(p_sale jsonb, p_history jsonb)
-RETURNS jsonb LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION commit_sale(
+  p_sale jsonb, 
+  p_history jsonb,
+  p_payment_moves jsonb DEFAULT '[]'::jsonb,
+  p_customer_ledger jsonb DEFAULT NULL
+)
+RETURNS jsonb LANGUAGE plpgsql AS $
 DECLARE
   v_id uuid;
   h jsonb;
   cur numeric;
+  v_allow_neg boolean := false;
+  v_oversell int;
 BEGIN
-  -- NOTE: NO auth.uid() check. This POS is single-tenant and ships the PUBLIC
-  -- anon key; the browser frequently runs WITHOUT a Supabase-auth session
-  -- (offline-login fallback), so auth.uid() is effectively always NULL.
-  -- Enforcing auth.uid() here broke every clone in Aug-2026 (sales stopped
-  -- committing, stock stopped decreasing). Role enforcement lives in the signed
-  -- action-token RPCs (delete_sale_atomic / refund_sale_atomic) + the over-refund
-  -- cap below — NOT in auth.uid().
-
-  -- Idempotent fulfilment: never bill the same online order twice.
   IF p_sale->>'source_order_id' IS NOT NULL AND p_sale->>'source_order_id' <> '' THEN
     IF EXISTS (SELECT 1 FROM sales WHERE source_order_id = (p_sale->>'source_order_id')::uuid) THEN
       RETURN jsonb_build_object('success', true, 'id', (SELECT id FROM sales WHERE source_order_id = (p_sale->>'source_order_id')::uuid), 'already_fulfilled', true);
     END IF;
   END IF;
 
-  -- MASTER §5.2: client-generated idempotency key -> retry/replay is a no-op.
   IF p_sale->>'idempotency_key' IS NOT NULL AND p_sale->>'idempotency_key' <> '' THEN
     IF EXISTS (SELECT 1 FROM sales WHERE idempotency_key = (p_sale->>'idempotency_key')::uuid) THEN
       RETURN jsonb_build_object('success', true, 'id', (SELECT id FROM sales WHERE idempotency_key = (p_sale->>'idempotency_key')::uuid), 'already_committed', true);
     END IF;
   END IF;
 
-  -- OVERSELL GUARD (P3/P35): never drive product.stock negative unless
-  -- app_settings.allow_negative_stock is ON. Variant movements are excluded
-  -- (their stock lives in variant_data; variant oversell is guarded client-side).
-  DECLARE
-    v_allow_neg boolean := false;
-    v_oversell int;
-  BEGIN
-    SELECT COALESCE(allow_negative_stock, false) INTO v_allow_neg FROM app_settings LIMIT 1;
-    IF NOT v_allow_neg THEN
-      WITH agg AS (
-        SELECT (hist_item->>'product_id')::uuid AS pid, SUM((hist_item->>'change_qty')::int) AS delta
-        FROM jsonb_array_elements(p_history) hist_item
-        WHERE hist_item->>'variant_id' IS NULL OR hist_item->>'variant_id' = ''
-        GROUP BY pid
-      )
-      SELECT 1 INTO v_oversell FROM agg
-      JOIN products p ON p.id = agg.pid
-      WHERE (p.stock + agg.delta) < 0
-      LIMIT 1;
-      
-      IF FOUND THEN
-        RAISE EXCEPTION 'OVERSELL: stock would go negative for a product (allow_negative_stock=false)';
-      END IF;
+  SELECT COALESCE(allow_negative_stock, false) INTO v_allow_neg FROM app_settings LIMIT 1;
+  IF NOT v_allow_neg THEN
+    WITH agg AS (
+      SELECT (hist_item->>'product_id')::uuid AS pid, SUM((hist_item->>'change_qty')::int) AS delta
+      FROM jsonb_array_elements(p_history) hist_item
+      WHERE hist_item->>'variant_id' IS NULL OR hist_item->>'variant_id' = ''
+      GROUP BY pid
+    )
+    SELECT 1 INTO v_oversell FROM agg
+    JOIN products p ON p.id = agg.pid
+    WHERE (p.stock + agg.delta) < 0
+    LIMIT 1;
+    IF FOUND THEN
+      RAISE EXCEPTION 'OVERSELL: stock would go negative for a product (allow_negative_stock=false)';
     END IF;
-  END;
+  END IF;
 
   INSERT INTO sales (
     id, invoice_number, customer_id, customer_name, customer_phone,
@@ -3125,57 +2772,25 @@ BEGIN
     delivery_address, delivery_fee, delivery_location_lat, delivery_location_lng,
     customer_notes, source_order_id, salesman_id, salesman_name, idempotency_key, created_at, updated_at
   ) VALUES (
-    (p_sale->>'id')::uuid,
-    p_sale->>'invoice_number',
-    NULLIF(p_sale->>'customer_id','')::uuid,
-    p_sale->>'customer_name',
-    p_sale->>'customer_phone',
-    COALESCE(p_sale->'items','[]'::jsonb),
-    (p_sale->>'subtotal')::numeric,
-    (p_sale->>'discount_amount')::numeric,
-    (p_sale->>'bill_discount_value')::numeric,
-    p_sale->>'bill_discount_type',
-    (p_sale->>'tax_amount')::numeric,
-    (p_sale->>'total')::numeric,
-    (p_sale->>'received_amount')::numeric,
-    (p_sale->>'change_amount')::numeric,
-    p_sale->>'payment_method',
-    p_sale->'card_details',
-    p_sale->>'status',
-    p_sale->>'cashier',
-    p_sale->>'cashier_role',
-    p_sale->>'receipt_number',
-    p_sale->>'notes',
-    p_sale->'applied_discounts',
-    p_sale->'free_gifts',
-    (p_sale->>'timestamp')::timestamptz,
-    (p_sale->>'sale_date')::date,
-    p_sale->>'sale_type',
-    p_sale->'extra_charges',
-    p_sale->'split_payments',
-    (p_sale->>'refunded_amount')::numeric,
-    p_sale->>'estore_status',
-    p_sale->>'delivery_address',
-    (p_sale->>'delivery_fee')::numeric,
-    (p_sale->>'delivery_location_lat')::numeric,
-    (p_sale->>'delivery_location_lng')::numeric,
-    p_sale->>'customer_notes',
-    NULLIF(p_sale->>'source_order_id','')::uuid,
-    NULLIF(p_sale->>'salesman_id','')::uuid,
-    p_sale->>'salesman_name',
-    NULLIF(p_sale->>'idempotency_key','')::uuid,
-    COALESCE((p_sale->>'created_at')::timestamptz, now()),
-    now()
+    (p_sale->>'id')::uuid, p_sale->>'invoice_number', NULLIF(p_sale->>'customer_id','')::uuid,
+    p_sale->>'customer_name', p_sale->>'customer_phone', COALESCE(p_sale->'items','[]'::jsonb),
+    (p_sale->>'subtotal')::numeric, (p_sale->>'discount_amount')::numeric, (p_sale->>'bill_discount_value')::numeric,
+    p_sale->>'bill_discount_type', (p_sale->>'tax_amount')::numeric, (p_sale->>'total')::numeric,
+    (p_sale->>'received_amount')::numeric, (p_sale->>'change_amount')::numeric, p_sale->>'payment_method',
+    p_sale->'card_details', p_sale->>'status', p_sale->>'cashier', p_sale->>'cashier_role',
+    p_sale->>'receipt_number', p_sale->>'notes', p_sale->'applied_discounts', p_sale->'free_gifts',
+    (p_sale->>'timestamp')::timestamptz, (p_sale->>'sale_date')::date, p_sale->>'sale_type',
+    p_sale->'extra_charges', p_sale->'split_payments', (p_sale->>'refunded_amount')::numeric,
+    p_sale->>'estore_status', p_sale->>'delivery_address', (p_sale->>'delivery_fee')::numeric,
+    (p_sale->>'delivery_location_lat')::numeric, (p_sale->>'delivery_location_lng')::numeric,
+    p_sale->>'customer_notes', NULLIF(p_sale->>'source_order_id','')::uuid, NULLIF(p_sale->>'salesman_id','')::uuid,
+    p_sale->>'salesman_name', NULLIF(p_sale->>'idempotency_key','')::uuid,
+    COALESCE((p_sale->>'created_at')::timestamptz, now()), now()
   ) ON CONFLICT (id) DO NOTHING RETURNING id INTO v_id;
 
-  -- Fix latent bug: if the sale id already existed (ON CONFLICT no-op), reuse it
-  -- so the stock_history rows below get a valid (non-null) reference_id.
-  IF v_id IS NULL THEN
-    v_id := (p_sale->>'id')::uuid;
-  END IF;
+  IF v_id IS NULL THEN v_id := (p_sale->>'id')::uuid; END IF;
 
-  FOR h IN SELECT * FROM jsonb_array_elements(p_history)
-  LOOP
+  FOR h IN SELECT * FROM jsonb_array_elements(p_history) LOOP
     IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
       INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
       VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', v_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
@@ -3185,9 +2800,26 @@ BEGIN
     END IF;
   END LOOP;
 
+  -- Payment Moves
+  FOR h IN SELECT * FROM jsonb_array_elements(p_payment_moves) LOOP
+    INSERT INTO payment_movements (id, mode_id, delta, reference_id, note, created_at)
+    VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), h->>'mode_id', (h->>'delta')::numeric, v_id, h->>'note', now()) ON CONFLICT (id) DO NOTHING;
+  END LOOP;
+
+  -- Customer Ledger
+  IF p_customer_ledger IS NOT NULL AND jsonb_typeof(p_customer_ledger) = 'object' THEN
+    INSERT INTO customer_ledger (id, customer_id, sale_id, type, debit, credit, balance_after, reference, note, created_by, created_at)
+    VALUES (
+      COALESCE((p_customer_ledger->>'id')::uuid, gen_random_uuid()), (p_customer_ledger->>'customer_id')::uuid, v_id,
+      p_customer_ledger->>'type', (p_customer_ledger->>'debit')::numeric, (p_customer_ledger->>'credit')::numeric,
+      (p_customer_ledger->>'balance_after')::numeric, p_customer_ledger->>'reference', p_customer_ledger->>'note',
+      NULLIF(p_customer_ledger->>'created_by','')::uuid, COALESCE((p_customer_ledger->>'created_at')::timestamptz, now())
+    ) ON CONFLICT (id) DO NOTHING;
+  END IF;
+
   RETURN jsonb_build_object('success', true, 'id', v_id);
 END;
-$$;
+$;
 
 CREATE OR REPLACE FUNCTION apply_stock_movements(p_history jsonb)
 RETURNS jsonb LANGUAGE plpgsql AS $$
@@ -3502,10 +3134,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_guard_store_order_update ON store_orders;
-CREATE TRIGGER trg_guard_store_order_update
-BEFORE UPDATE ON store_orders
-FOR EACH ROW EXECUTE FUNCTION guard_store_order_update();
+
 
 -- Per-phone rate limit (anti flood). Tunable constant below (20 orders / 10 min).
 CREATE OR REPLACE FUNCTION guard_store_order_insert()
@@ -3525,10 +3154,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_guard_store_order_insert ON store_orders;
-CREATE TRIGGER trg_guard_store_order_insert
-BEFORE INSERT ON store_orders
-FOR EACH ROW EXECUTE FUNCTION guard_store_order_insert();
+
 
 -- ============================================================================
 -- RLS hardening (2026-08-18, MASTER §2.1.4) — server-side write guards.
@@ -3631,7 +3257,7 @@ CREATE POLICY supplier_transactions_delete ON public.supplier_transactions FOR D
 -- anon grants (MASTER §2.1.4): SELECT-only + public-facing estore INSERTs.
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
-GRANT INSERT ON public.customers, public.store_orders TO anon;
+GRANT INSERT ON public.customers TO anon;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated;
@@ -3666,11 +3292,11 @@ DECLARE v_hash text; v_stored_role text; v_expected text;
 BEGIN
   IF p_user_id IS NULL THEN RETURN false; END IF;
   IF p_sig IS NULL OR p_sig = '' THEN
-    SELECT offline_hash, role INTO v_hash, v_stored_role FROM users WHERE id = p_user_id;
+    SELECT action_hash, role INTO v_hash, v_stored_role FROM users WHERE id = p_user_id;
     IF v_hash IS NULL THEN RETURN true; END IF;
     RETURN false;
   END IF;
-  SELECT offline_hash, role INTO v_hash, v_stored_role FROM users WHERE id = p_user_id;
+  SELECT action_hash, role INTO v_hash, v_stored_role FROM users WHERE id = p_user_id;
   IF v_hash IS NULL OR v_stored_role IS NULL THEN RETURN false; END IF;
   IF v_stored_role <> p_role THEN RETURN false; END IF;
   v_expected := encode(digest(v_hash || '|' || p_user_id::text || '|' || p_role || '|' || p_action, 'sha256'), 'hex');
@@ -3699,11 +3325,11 @@ DECLARE v_hash text; v_stored_role text; v_expected text;
 BEGIN
   IF p_user_id IS NULL THEN RETURN false; END IF;
   IF p_sig IS NULL OR p_sig = '' THEN
-    SELECT offline_hash, role INTO v_hash, v_stored_role FROM users WHERE id = p_user_id;
+    SELECT action_hash, role INTO v_hash, v_stored_role FROM users WHERE id = p_user_id;
     IF v_hash IS NULL THEN RETURN true; END IF;
     RETURN false;
   END IF;
-  SELECT offline_hash, role INTO v_hash, v_stored_role FROM users WHERE id = p_user_id;
+  SELECT action_hash, role INTO v_hash, v_stored_role FROM users WHERE id = p_user_id;
   IF v_hash IS NULL OR v_stored_role IS NULL THEN RETURN false; END IF;
   IF v_stored_role <> p_role THEN RETURN false; END IF;
   v_expected := encode(digest(v_hash || '|' || p_user_id::text || '|' || p_role || '|' || p_action, 'sha256'), 'hex');
@@ -3720,13 +3346,11 @@ CREATE OR REPLACE FUNCTION public.delete_sale_atomic(
   p_history jsonb,
   p_user_id uuid DEFAULT NULL,
   p_role text DEFAULT NULL,
-  p_sig text DEFAULT NULL
+  p_sig text DEFAULT NULL,
+  p_payment_moves jsonb DEFAULT '[]'::jsonb,
+  p_customer_ledger jsonb DEFAULT NULL
 )
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
 DECLARE
   h jsonb;
 BEGIN
@@ -3736,23 +3360,33 @@ BEGIN
     RETURN jsonb_build_object('success', true, 'id', p_sale_id, 'note', 'already_deleted');
   END IF;
 
-  FOR h IN SELECT * FROM jsonb_array_elements(p_history)
-  LOOP
+  FOR h IN SELECT * FROM jsonb_array_elements(p_history) LOOP
     IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
       INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
-      ON CONFLICT (id) DO NOTHING;
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
     ELSE
       INSERT INTO stock_history (id, product_id, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
-      ON CONFLICT (id) DO NOTHING;
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
     END IF;
   END LOOP;
 
+  FOR h IN SELECT * FROM jsonb_array_elements(p_payment_moves) LOOP
+    INSERT INTO payment_movements (id, mode_id, delta, reference_id, note, created_at)
+    VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), h->>'mode_id', (h->>'delta')::numeric, p_sale_id, h->>'note', now()) ON CONFLICT (id) DO NOTHING;
+  END LOOP;
+
+  IF p_customer_ledger IS NOT NULL AND jsonb_typeof(p_customer_ledger) = 'object' THEN
+    INSERT INTO customer_ledger (id, customer_id, sale_id, type, debit, credit, balance_after, reference, note, created_by, created_at)
+    VALUES (
+      COALESCE((p_customer_ledger->>'id')::uuid, gen_random_uuid()), (p_customer_ledger->>'customer_id')::uuid, p_sale_id,
+      p_customer_ledger->>'type', (p_customer_ledger->>'debit')::numeric, (p_customer_ledger->>'credit')::numeric,
+      (p_customer_ledger->>'balance_after')::numeric, p_customer_ledger->>'reference', p_customer_ledger->>'note',
+      NULLIF(p_customer_ledger->>'created_by','')::uuid, COALESCE((p_customer_ledger->>'created_at')::timestamptz, now())
+    ) ON CONFLICT (id) DO NOTHING;
+  END IF;
+
   UPDATE sales SET status = 'deleted', deleted_at = now(), updated_at = now() WHERE id = p_sale_id;
-  INSERT INTO row_tombstones (table_name, ref_id, deleted_at)
-  VALUES ('sales', p_sale_id, now())
-  ON CONFLICT (table_name, ref_id) DO UPDATE SET deleted_at = EXCLUDED.deleted_at;
+  INSERT INTO row_tombstones (table_name, ref_id, deleted_at) VALUES ('sales', p_sale_id, now()) ON CONFLICT (table_name, ref_id) DO UPDATE SET deleted_at = EXCLUDED.deleted_at;
 
   RETURN jsonb_build_object('success', true, 'id', p_sale_id);
 END;
@@ -3766,38 +3400,67 @@ CREATE OR REPLACE FUNCTION public.refund_sale_atomic(
   p_refunded_amount numeric,
   p_user_id uuid DEFAULT NULL,
   p_role text DEFAULT NULL,
-  p_sig text DEFAULT NULL
+  p_sig text DEFAULT NULL,
+  p_payment_moves jsonb DEFAULT '[]'::jsonb,
+  p_customer_ledger jsonb DEFAULT NULL
 )
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
 DECLARE
   h jsonb;
   _total numeric;
+  _status text;
+  _prior numeric;
 BEGIN
   PERFORM public.require_action(p_user_id, p_role, 'refund_sale', p_sig, VARIADIC array['admin', 'manager', 'cashier']);
 
   IF NOT EXISTS (SELECT 1 FROM sales WHERE id = p_sale_id) THEN
     RETURN jsonb_build_object('success', true, 'id', p_sale_id, 'note', 'sale_missing');
   END IF;
-  SELECT total INTO _total FROM sales WHERE id = p_sale_id;
+
+  SELECT total, status, COALESCE(refunded_amount, 0)
+    INTO _total, _status, _prior
+    FROM sales WHERE id = p_sale_id;
+
+  -- double-reversal guard (see migration 20260822040000):
+  --   deleted / fully-refunded / no-forward-progress => no-op (skip all reversals)
+  IF _status = 'deleted' THEN
+    RETURN jsonb_build_object('success', true, 'id', p_sale_id, 'note', 'sale_deleted_noop');
+  END IF;
+  IF _status = 'refunded' THEN
+    RETURN jsonb_build_object('success', true, 'id', p_sale_id, 'note', 'already_fully_refunded', 'refunded_amount', _prior);
+  END IF;
+  IF p_refunded_amount <= _prior + 0.001 THEN
+    RETURN jsonb_build_object('success', true, 'id', p_sale_id, 'note', 'noop_no_increase', 'refunded_amount', _prior);
+  END IF;
   IF _total IS NOT NULL AND p_refunded_amount > _total + 0.001 THEN
     RAISE EXCEPTION 'FORBIDDEN: refund amount exceeds sale total' USING ERRCODE = '42501';
   END IF;
-  FOR h IN SELECT * FROM jsonb_array_elements(p_history)
-  LOOP
+
+  FOR h IN SELECT * FROM jsonb_array_elements(p_history) LOOP
     IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
       INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
-      ON CONFLICT (id) DO NOTHING;
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
     ELSE
       INSERT INTO stock_history (id, product_id, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now())
-      ON CONFLICT (id) DO NOTHING;
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', p_sale_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
     END IF;
   END LOOP;
+
+  FOR h IN SELECT * FROM jsonb_array_elements(p_payment_moves) LOOP
+    INSERT INTO payment_movements (id, mode_id, delta, reference_id, note, created_at)
+    VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), h->>'mode_id', (h->>'delta')::numeric, p_sale_id, h->>'note', now()) ON CONFLICT (id) DO NOTHING;
+  END LOOP;
+
+  IF p_customer_ledger IS NOT NULL AND jsonb_typeof(p_customer_ledger) = 'object' THEN
+    INSERT INTO customer_ledger (id, customer_id, sale_id, type, debit, credit, balance_after, reference, note, created_by, created_at)
+    VALUES (
+      COALESCE((p_customer_ledger->>'id')::uuid, gen_random_uuid()), (p_customer_ledger->>'customer_id')::uuid, p_sale_id,
+      p_customer_ledger->>'type', (p_customer_ledger->>'debit')::numeric, (p_customer_ledger->>'credit')::numeric,
+      (p_customer_ledger->>'balance_after')::numeric, p_customer_ledger->>'reference', p_customer_ledger->>'note',
+      NULLIF(p_customer_ledger->>'created_by','')::uuid, COALESCE((p_customer_ledger->>'created_at')::timestamptz, now())
+    ) ON CONFLICT (id) DO NOTHING;
+  END IF;
+
   UPDATE sales SET status = p_status, refunded_amount = p_refunded_amount, updated_at = now() WHERE id = p_sale_id;
   RETURN jsonb_build_object('success', true, 'id', p_sale_id);
 END;
@@ -3893,10 +3556,6 @@ CREATE POLICY payment_movements_all ON public.payment_movements FOR ALL TO anon,
 ALTER TABLE public.payment_modes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS payment_modes_all ON public.payment_modes;
 CREATE POLICY payment_modes_all ON public.payment_modes FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-ALTER TABLE public.product_batches ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS product_batches_all ON public.product_batches;
-CREATE POLICY product_batches_all ON public.product_batches FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 ALTER TABLE public.salesmen ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS salesmen_all ON public.salesmen;
@@ -4013,17 +3672,22 @@ CREATE OR REPLACE FUNCTION stock_adjustment(
   p_note text,
   p_cashier text,
   p_variant_id text DEFAULT NULL,
-  p_variant_label text DEFAULT NULL
+  p_variant_label text DEFAULT NULL,
+  p_adjustment_id uuid DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public, extensions AS $$
+DECLARE
+  v_id uuid := COALESCE(p_adjustment_id, gen_random_uuid());
 BEGIN
   IF p_variant_id IS NOT NULL AND p_variant_id <> '' THEN
     INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, note, cashier_name, created_at, updated_at)
-    VALUES (gen_random_uuid(), p_product_id, p_variant_id, COALESCE(p_variant_label, ''), p_change_qty, p_type, p_note, p_cashier, now(), now());
+    VALUES (v_id, p_product_id, p_variant_id, COALESCE(p_variant_label, ''), p_change_qty, p_type, p_note, p_cashier, now(), now())
+    ON CONFLICT (id) DO NOTHING;
   ELSE
     INSERT INTO stock_history (id, product_id, change_qty, type, note, cashier_name, created_at, updated_at)
-    VALUES (gen_random_uuid(), p_product_id, p_change_qty, p_type, p_note, p_cashier, now(), now());
+    VALUES (v_id, p_product_id, p_change_qty, p_type, p_note, p_cashier, now(), now())
+    ON CONFLICT (id) DO NOTHING;
   END IF;
-  RETURN jsonb_build_object('success', true);
+  RETURN jsonb_build_object('success', true, 'id', v_id);
 END;
 $$;
 
@@ -4300,4 +3964,85 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'new_id', v_id);
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.edit_sale_atomic(jsonb, jsonb, uuid, jsonb, uuid, text, text) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.edit_sale_atomic(jsonb, jsonb, uuid, jsonb, uuid, text, text) TO anon, authenticated, service_role;CREATE OR REPLACE FUNCTION commit_restock(
+  p_purchase_record jsonb, 
+  p_stock_history jsonb DEFAULT '[]'::jsonb, 
+  p_supplier_transaction jsonb DEFAULT NULL
+) RETURNS jsonb LANGUAGE plpgsql AS $$
+DECLARE
+  v_id uuid;
+  h jsonb;
+BEGIN
+  INSERT INTO purchase_records (
+    id, type, product_id, product_name, sku, variant_id, variant_label,
+    quantity, cost_price, retail_price, total_amount, supplier, supplier_id,
+    qty_remaining, date, added_by, notes, created_at, updated_at
+  ) VALUES (
+    (p_purchase_record->>'id')::uuid, p_purchase_record->>'type', NULLIF(p_purchase_record->>'product_id','')::uuid,
+    p_purchase_record->>'product_name', p_purchase_record->>'sku', p_purchase_record->>'variant_id',
+    p_purchase_record->>'variant_label', (p_purchase_record->>'quantity')::int, (p_purchase_record->>'cost_price')::numeric,
+    (p_purchase_record->>'retail_price')::numeric, (p_purchase_record->>'total_amount')::numeric,
+    p_purchase_record->>'supplier', NULLIF(p_purchase_record->>'supplier_id','')::uuid,
+    (p_purchase_record->>'qty_remaining')::int, COALESCE((p_purchase_record->>'date')::timestamptz, now()),
+    p_purchase_record->>'added_by', p_purchase_record->>'notes', COALESCE((p_purchase_record->>'created_at')::timestamptz, now()), now()
+  ) ON CONFLICT (id) DO NOTHING RETURNING id INTO v_id;
+
+  IF v_id IS NULL THEN v_id := (p_purchase_record->>'id')::uuid; END IF;
+
+  FOR h IN SELECT * FROM jsonb_array_elements(p_stock_history) LOOP
+    IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
+      INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', v_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+    ELSE
+      INSERT INTO stock_history (id, product_id, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
+      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', v_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
+    END IF;
+  END LOOP;
+
+  IF p_supplier_transaction IS NOT NULL AND jsonb_typeof(p_supplier_transaction) = 'object' THEN
+    INSERT INTO supplier_transactions (
+      id, supplier_id, type, source_type, amount, reference_id, reference_type,
+      note, payment_type, split_payments, created_at, updated_at
+    ) VALUES (
+      (p_supplier_transaction->>'id')::uuid, (p_supplier_transaction->>'supplier_id')::uuid, p_supplier_transaction->>'type',
+      p_supplier_transaction->>'source_type', (p_supplier_transaction->>'amount')::numeric, v_id, p_supplier_transaction->>'reference_type',
+      p_supplier_transaction->>'note', p_supplier_transaction->>'payment_type', p_supplier_transaction->'split_payments',
+      COALESCE((p_supplier_transaction->>'created_at')::timestamptz, now()), now()
+    ) ON CONFLICT (id) DO NOTHING;
+  END IF;
+
+  RETURN jsonb_build_object('success', true, 'id', v_id);
+END;
+$$;
+GRANT EXECUTE ON FUNCTION commit_restock(jsonb, jsonb, jsonb) TO anon, authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION commit_expense(
+  p_expense jsonb,
+  p_payment_move jsonb DEFAULT NULL
+) RETURNS jsonb LANGUAGE plpgsql AS $$
+DECLARE
+  v_id uuid;
+BEGIN
+  INSERT INTO expenses (
+    id, category_id, amount, date, description, added_by, payment_mode, created_at, updated_at
+  ) VALUES (
+    (p_expense->>'id')::uuid, (p_expense->>'category_id')::uuid, (p_expense->>'amount')::numeric,
+    COALESCE((p_expense->>'date')::timestamptz, now()), p_expense->>'description', p_expense->>'added_by',
+    p_expense->>'payment_mode', COALESCE((p_expense->>'created_at')::timestamptz, now()), now()
+  ) ON CONFLICT (id) DO NOTHING RETURNING id INTO v_id;
+
+  IF v_id IS NULL THEN v_id := (p_expense->>'id')::uuid; END IF;
+
+  IF p_payment_move IS NOT NULL AND jsonb_typeof(p_payment_move) = 'object' THEN
+    INSERT INTO payment_movements (id, mode_id, delta, reference_id, note, created_at)
+    VALUES (
+      COALESCE((p_payment_move->>'id')::uuid, gen_random_uuid()), p_payment_move->>'mode_id',
+      (p_payment_move->>'delta')::numeric, v_id, p_payment_move->>'note', now()
+    ) ON CONFLICT (id) DO NOTHING;
+  END IF;
+
+  RETURN jsonb_build_object('success', true, 'id', v_id);
+END;
+$$;
+GRANT EXECUTE ON FUNCTION commit_expense(jsonb, jsonb) TO anon, authenticated, service_role;
+

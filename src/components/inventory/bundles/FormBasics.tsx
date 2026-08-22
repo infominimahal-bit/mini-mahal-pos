@@ -13,24 +13,6 @@ interface FormBasicsProps {
 export function FormBasics({ form, setForm, currencySymbol, bundleTotal, onOpenMediaLibrary }: FormBasicsProps) {
   return (
     <>
-      {/* Mode Toggle */}
-      <div className="flex bg-gray-100 dark:bg-white/5 p-1 rounded-xl w-full">
-        <button
-          type="button"
-          onClick={() => setForm(p => ({ ...p, isCombo: false }))}
-          className={`flex-1 py-2 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all ${!form.isCombo ? 'bg-white dark:bg-surface shadow-md text-primary' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
-        >
-          Fixed Bundle
-        </button>
-        <button
-          type="button"
-          onClick={() => setForm(p => ({ ...p, isCombo: true }))}
-          className={`flex-1 py-2 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all ${form.isCombo ? 'bg-white dark:bg-surface shadow-md text-primary' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
-        >
-          Slot-Based Deal (Combo)
-        </button>
-      </div>
-
       {/* Name + Image + Description */}
       <div className="space-y-3">
         <div>

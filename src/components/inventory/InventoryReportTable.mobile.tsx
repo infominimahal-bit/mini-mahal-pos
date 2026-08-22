@@ -76,23 +76,8 @@ export function InventoryReportMobileTable({
             </div>
           </div>
 
-          {expandedRows.has(item.id) && (item.batches.length > 0 || (item.recentSales && item.recentSales.length > 0)) && (
+          {expandedRows.has(item.id) && item.recentSales && item.recentSales.length > 0 && (
             <div className="mt-4 pt-4 border-t border-dashed border-gray-200 dark:border-white/10 space-y-4">
-              {item.batches.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-3 h-3 text-primary" />
-                    <p className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"Batch History"}</p>
-                  </div>
-                  {item.batches.map((batch: any, idx: number) => (
-                    <div key={idx} className="flex justify-between items-center bg-gray-50 dark:bg-black/20 p-2 rounded-xl text-[10px]">
-                      <span className="font-bold text-gray-600">Batch #{idx + 1}</span>
-                      <span className="font-black text-gray-900 dark:text-white">{batch.qtyRemaining} {"left"} @ {formatCurrency(batch.costPrice, appSettings.currency)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
               {item.recentSales && item.recentSales.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">

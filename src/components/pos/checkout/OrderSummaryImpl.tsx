@@ -1,7 +1,6 @@
 import { ShoppingBag, Gift, Wallet } from 'lucide-react';
 import { CartItem } from '../../../types';
 import { formatCurrency } from '../../../lib/currencies';
-import { useTranslation } from '../../../hooks/useTranslation';
 import { OrderSummaryItems } from './OrderSummaryItems';
 
 interface OrderSummaryProps {
@@ -33,8 +32,6 @@ export function OrderSummary({
   saleType,
   setSaleType,
 }: OrderSummaryProps) {
-  const { t } = useTranslation();
-
   return (
     <div className="p-4 flex flex-col order-2 md:order-1 border-t md:border-t-0 border-gray-200 dark:border-white/5 bg-white dark:bg-[#0C0C0C]">
       <div className="flex items-center gap-2 mb-2 shrink-0">
@@ -93,7 +90,7 @@ export function OrderSummary({
                 <button key={st.id} onClick={() => setSaleType(st.id as any)}
                   className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-[9px] font-black uppercase tracking-wide transition-all active:scale-95 touch-manipulation ${saleType === st.id ? 'bg-primary text-white border-primary shadow-sm shadow-emerald-500/20' : 'bg-gray-50 dark:bg-white/[0.03] text-gray-600 border-gray-200 dark:border-white/5 hover:text-gray-600 dark:hover:text-gray-200'}`}>
                   <Icon className="w-3.5 h-3.5" />
-                  {t(st.id, st.label)}
+                  {st.label}
                 </button>
               );
             })}

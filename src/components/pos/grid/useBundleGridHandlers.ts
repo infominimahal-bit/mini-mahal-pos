@@ -9,11 +9,10 @@ interface BundleHandlerDeps {
   appProducts: any[];
   isReturnMode: boolean;
   currency: string;
-  setActiveCombo: (v: any) => void;
   setActiveGroup: (v: any) => void;
 }
 
-export function useBundleGridHandlers({ appCart, appProducts, isReturnMode, currency, setActiveCombo, setActiveGroup }: BundleHandlerDeps) {
+export function useBundleGridHandlers({ appCart, appProducts, isReturnMode, currency, setActiveGroup }: BundleHandlerDeps) {
   const handleBundleQuantity = useCallback((item: any, d: number) => {
     if (item.isGroup) {
       if (d > 0) handleAddBundle(item);
@@ -163,7 +162,6 @@ export function useBundleGridHandlers({ appCart, appProducts, isReturnMode, curr
         ? `${bundle.discountValue}%`
         : `${currency}${bundle.discountValue}`;
       sonner.success(`🎁 ${bundle.name} added — ${discountText} discount applied!`);
-      setActiveCombo(null);
     } catch (err) {
       console.error('[Bundle] Add bundle error:', err);
       sonner.error('Could not add bundle — please try again');
@@ -173,8 +171,6 @@ export function useBundleGridHandlers({ appCart, appProducts, isReturnMode, curr
   const handleAddBundle = (bundleOrGroup: any) => {
     if (bundleOrGroup.isGroup) {
       setActiveGroup(bundleOrGroup);
-    } else if (bundleOrGroup.isCombo) {
-      setActiveCombo(bundleOrGroup);
     } else {
       processBundleAdd(bundleOrGroup);
     }

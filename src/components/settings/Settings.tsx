@@ -33,67 +33,14 @@ export function Settings() {
   const form = useSettingsForm();
   const {
     formData, setFormData, handleChange, handleInstantUpdate, handleSubmit, 
-    handleRepairCounter, handleResetCalibration, appSettings, t, profile, 
+    handleRepairCounter, handleResetCalibration, appSettings, profile,
     canEditSettings, isOnline, play, isSaving, showReceipt, setShowReceipt, 
     completedSale, setCompletedSale, syncStatus
   } = form;
 
-  const tabKeys: Record<string, string> = {
-    general: 'general_settings',
-    receipt: 'receipt_design',
-    security: 'security_account',
-    database: 'db_tools'
-  };
-
   const activeTab = (subTab as TabType) || 'general';
   
-  const [offlineDataSize, setOfflineDataSize] = useState<string | null>(null);
-  const [dataBreakdown, setDataBreakdown] = useState<Record<string, number>>({});
-  const [lastDownloadTime, setLastDownloadTime] = useState<string | null>(null);
 
-  const calculateOfflineSize = useCallback(async () => {
-    try {
-      let lsSize = 0;
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i) || '';
-        const val = localStorage.getItem(key) || '';
-        lsSize += (key.length + val.length) * 2;
-      }
-      const [
-        pArr, cArr, sArr, prArr, eArr, dArr, pbArr, catArr, supArr
-      ] = await Promise.all([
-        localDb.products.toArray().catch(() => []),
-        localDb.customers.toArray().catch(() => []),
-        localDb.sales.toArray().catch(() => []),
-        localDb.purchaseRecords.toArray().catch(() => []),
-        localDb.expenses.toArray().catch(() => []),
-        localDb.discounts.toArray().catch(() => []),
-        localDb.productBatches.toArray().catch(() => []),
-        localDb.categories.toArray().catch(() => []),
-        localDb.suppliers.toArray().catch(() => []),
-      ]);
-      const counts = {
-        products: pArr.length, customers: cArr.length, sales: sArr.length,
-        purchases: prArr.length, expenses: eArr.length, discounts: dArr.length,
-        batches: pbArr.length, categories: catArr.length, suppliers: supArr.length
-      };
-      setDataBreakdown(counts);
-      const totalCount = Object.values(counts).reduce((a, b) => a + b, 0);
-      const totalBytes = lsSize + (totalCount * 500);
-
-      if (totalBytes === 0) setOfflineDataSize(null);
-      else if (totalBytes < 1024) setOfflineDataSize(`${totalBytes} B`);
-      else if (totalBytes < 1024 * 1024) setOfflineDataSize(`${(totalBytes / 1024).toFixed(1)} KB`);
-      else setOfflineDataSize(`${(totalBytes / (1024 * 1024)).toFixed(1)} MB`);
-
-      setLastDownloadTime(localStorage.getItem('pos_last_download'));
-    } catch (err) {
-      console.warn('Offline audit error:', err);
-      setOfflineDataSize(null);
-    }
-  }, []);
-
-  useEffect(() => { calculateOfflineSize(); }, [calculateOfflineSize]);
 
   const tabs: { id: TabType; label: string; icon: any }[] = [
     { id: 'general', label: 'General Settings', icon: Sliders },
@@ -104,7 +51,7 @@ export function Settings() {
 
   const tabProps: SettingsTabProps = {
     formData, setFormData, handleChange, handleInstantUpdate, handleRepairCounter,
-    handleResetCalibration, appSettings, t, profile, canEditSettings, isOnline, play,
+    handleResetCalibration, appSettings, profile, canEditSettings, isOnline, play,
     setCompletedSale, setShowReceipt,
   };
 
@@ -113,7 +60,7 @@ export function Settings() {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6 pb-2">
         <div className="flex items-center gap-4 shrink-0">
           <Button variant="ghost" type="button" onClick={() => window.dispatchEvent(new CustomEvent('navigate', { detail: 'pos' }))} icon={<ChevronLeft className="h-5 w-5" />} className="!min-h-0 !p-2 !rounded-xl !gap-1 !text-gray-600 dark:!text-gray-400 mr-1 !hover:bg-gray-100 dark:!hover:bg-white/5">
-            <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">{t("back", "Back")}</span>
+            <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">{"Back"}</span>
           </Button>
           <div className="h-10 w-px bg-gray-200 dark:bg-white/10 mx-1 hidden sm:block" />
           <div className="h-14 w-14 bg-primary/10 rounded-2xl flex items-center justify-center shadow-inner border border-primary/10">
@@ -121,7 +68,7 @@ export function Settings() {
           </div>
           <div className="shrink-0 flex flex-col">
             <h1 className="text-2xl xl:text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">{"Settings"}</h1>
-            <p className="text-gray-600 dark:text-gray-400 text-[9px] font-black uppercase tracking-[0.2em] mt-2 opacity-60">{t("control_center", "Control Center")} • {formData.storeName?.trim() || 'POS'}</p>
+            <p className="text-gray-600 dark:text-gray-400 text-[9px] font-black uppercase tracking-[0.2em] mt-2 opacity-60">{"Control Center"} • {formData.storeName?.trim() || 'POS'}</p>
           </div>
         </div>
 
@@ -147,7 +94,7 @@ export function Settings() {
               return (
                 <Button key={tab.id} variant="ghost" onClick={() => navigate('/settings/' + tab.id)} className={`!min-h-0 !flex !justify-start !gap-3 !px-6 !py-4 !rounded-[1.5rem] !text-[10px] !tracking-widest !duration-300 !whitespace-nowrap !shadow-none ${isActive ? `${activeColor} !text-white !shadow-lg !shadow-emerald-500/20 translate-x-1` : `!text-gray-600 hover:!text-gray-900 dark:hover:!text-white hover:!bg-gray-50 dark:hover:!bg-white/5`}`}>
                   <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-gray-600'}`} />
-                  {t(tabKeys[tab.id], tab.label)}
+                  {tab.label}
                 </Button>
               );
             })}
@@ -164,7 +111,7 @@ export function Settings() {
                 return (
                   <Button key={tab.id} variant="ghost" onClick={() => navigate('/settings/' + tab.id)} className={`chip-nav-item !min-h-0 !shadow-none ${isActive ? `${activeColor} !text-white !shadow-lg` : '!text-gray-600'}`}>
                     <Icon className="w-3.5 h-3.5" />
-                    {t(tabKeys[tab.id], tab.label)}
+                    {tab.label}
                   </Button>
                 );
               })}
@@ -185,7 +132,7 @@ export function Settings() {
       <StickyFormFooter
         isSaving={isSaving}
         onDiscard={() => window.history.back()}
-        saveLabel={t("update_system", "Update System")}
+        saveLabel={"Update System"}
         formId="settings-form"
         disabled={!canEditSettings}
         statusBadge={

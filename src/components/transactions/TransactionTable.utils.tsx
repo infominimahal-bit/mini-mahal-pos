@@ -87,7 +87,7 @@ export const computeWalletTotals = (
   return totals;
 };
 
-export const buildExportColumns = (t: (k: string, f: string) => string, isAdmin: boolean) => {
+export const buildExportColumns = (isAdmin: boolean) => {
   const cols: any[] = [
     { key: 'date', label: "Date" },
     { key: 'time', label: "Time" },
@@ -123,7 +123,6 @@ export const buildExportRows = (
   isAdmin: boolean,
   country: string,
   timezone: string,
-  t: (k: string, f: string) => string,
 ) => {
   return filteredTransactions.map(sale => {
     const customer = sale.customerId ? appCustomers.find(c => c.id === sale.customerId) : null;

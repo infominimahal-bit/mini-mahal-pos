@@ -4,15 +4,15 @@ import type { ProductDetailController } from './useProductDetail';
 import { ProductExtras } from './ProductExtras';
 
 export function ProductVariants({ d }: { d: ProductDetailController }) {
-  const { t, formData, variants, setVariants, variantData, setVariantData, modifiers, setModifiers, productAddons, setProductAddons, appProducts, product } = d;
+  const { formData, variants, setVariants, variantData, setVariantData, modifiers, setModifiers, productAddons, setProductAddons, appProducts, product } = d;
 
   return (
     <div className="pt-6 mt-8 border-t border-gray-200 dark:border-white/5">
       <div className="flex items-center gap-3 mb-8">
         <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-[1.5rem]"><PackageSearch className="w-6 h-6" /></div>
         <div>
-          <h3 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tight">{t('customization_details', 'Customizations & Options')}</h3>
-          <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{t('variants_modifiers_subtitle', 'Manage product variants and add-on modifiers')}</p>
+          <h3 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tight">{"Customizations & Options"}</h3>
+          <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"Manage product variants and add-on modifiers"}</p>
         </div>
       </div>
       <div className="space-y-6">
@@ -21,8 +21,8 @@ export function ProductVariants({ d }: { d: ProductDetailController }) {
           <div className="space-y-3 animate-in fade-in zoom-in-95">
             <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h4 className="text-xs font-black text-gray-900 dark:text-white uppercase">{t('product_variants', 'Product Variants')}</h4>
-              <p className="text-[9px] text-gray-600 uppercase font-bold tracking-widest">{t('variants_sub', 'Size, Color, Material (e.g. Garments, Shoes)')}</p>
+              <h4 className="text-xs font-black text-gray-900 dark:text-white uppercase">{"Product Variants"}</h4>
+              <p className="text-[9px] text-gray-600 uppercase font-bold tracking-widest">{"Size, Color, Material (e.g. Garments, Shoes)"}</p>
             </div>
             <Button
               type="button"
@@ -31,7 +31,7 @@ export function ProductVariants({ d }: { d: ProductDetailController }) {
               onClick={() => setVariants([...variants, { name: '', options: [], optionsRaw: '' }])}
               className="!min-h-0 !px-3 !py-1.5 !rounded-lg !text-[10px] !font-black !bg-white dark:!bg-black !border-gray-200 dark:!border-white/10 !text-primary hover:!border-primary"
             >
-              {t('add_variant_option', 'Add Variant Option')}
+              {"Add Variant Option"}
             </Button>
           </div>
 
@@ -62,7 +62,7 @@ export function ProductVariants({ d }: { d: ProductDetailController }) {
               <div key={index} className="flex gap-2 items-start p-3 bg-white dark:bg-black/40 rounded-xl border border-gray-200 dark:border-white/5">
                 <input
                   type="text"
-                  placeholder={t('variant_name_placeholder', 'Variant Name (e.g. Size)')}
+                  placeholder={"Variant Name (e.g. Size)"}
                   value={variant.name}
                   onChange={(e) => {
                     const newVariants = [...variants];
@@ -100,7 +100,7 @@ export function ProductVariants({ d }: { d: ProductDetailController }) {
                   ))}
                   <input
                     type="text"
-                    placeholder={variant.options.length === 0 ? t('variant_options_placeholder', 'Options (Comma/Enter)') : ""}
+                    placeholder={variant.options.length === 0 ? 'Options (Comma/Enter)' : ""}
                     value={variant.optionsRaw || ''}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -171,7 +171,7 @@ export function ProductVariants({ d }: { d: ProductDetailController }) {
               className="!min-h-0 !px-4 !py-2 !rounded-lg !text-[10px] !font-black !bg-emerald-50 dark:!bg-primary/10 !text-emerald-600 dark:!text-primary !border-emerald-200 dark:!border-primary/20 hover:!border-primary !shadow-sm"
               icon={<Wand2 className="w-3.5 h-3.5" />}
             >
-              {t('generate_matrix', 'Generate Price/Stock Matrix')}
+              {"Generate Price/Stock Matrix"}
             </Button>
           </div>
         )}

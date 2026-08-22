@@ -11,7 +11,6 @@ import {
   Category,
   Supplier,
   PurchaseRecord,
-  ProductBatch,
   SupplierTransaction,
   StockHistory,
   Payment,
@@ -21,11 +20,11 @@ import {
   CartItem,
   RefundRequest,
   Topping,
-  ExtraTopping,
   VariantStockHistory,
   ProductAddon,
 } from '../../types';
-import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
+import { localDb, generateId, SETTINGS_ID } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { signAction, withActor } from '../actionToken';
 import { mapStockHistory, toRemoteVariantStockHistory, mapPurchaseRecord, toRemoteProduct, toRemotePurchaseRecord, toRemoteStockHistory } from './mappers';
@@ -53,8 +52,8 @@ export const variantStockHistoryService = {
     const id = generateId();
     const now = new Date();
     const newEntry = { ...entry, id, createdAt: now } as VariantStockHistory;
+    await cloudWrite('variant_stock_history', 'create', id, toRemoteVariantStockHistory(newEntry));
     await localDb.variantStockHistory.add(newEntry);
-    await queueOp('variant_stock_history', 'create', id, toRemoteVariantStockHistory(newEntry));
     return newEntry;
   },
 

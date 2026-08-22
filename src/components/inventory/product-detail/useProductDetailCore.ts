@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useProductsStore, useInventoryStore, useSalesStore, useSettingsStore } from '../../../stores';
 import { useAuth } from '../../../context/AuthContext';
-import { useTranslation } from '../../../hooks/useTranslation';
 import { Product } from '../../../types';
 import { createDetailHandlers } from './detailActions';
 import { useProductDetailData } from './useProductDetailData';
@@ -22,7 +21,6 @@ export function useProductDetail({ product, onBack, onEdit }: ProductDetailHubPr
   const appPurchaseRecords = useInventoryStore(s => s.purchaseRecords);
 
   const { profile } = useAuth();
-  const { t } = useTranslation();
 
   const saleById = useMemo(() => {
     const m = new Map<string, any>();
@@ -55,7 +53,7 @@ export function useProductDetail({ product, onBack, onEdit }: ProductDetailHubPr
   const base: any = {
     product, onBack, onEdit,
     appProducts, appSuppliers, appSettings, appSales, appPurchaseRecords,
-    profile, t,
+    profile,
     ...data,
     saleById,
     ...ledger,

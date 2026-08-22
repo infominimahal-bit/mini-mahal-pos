@@ -12,7 +12,6 @@ interface DiscountConditionsSectionProps {
   pickerProducts: any[];
   toggleConditionProduct: (index: number, productId: string) => void;
   cardConditionWarning: { type: string; message: string } | null;
-  t: (key: string, fallback?: string) => string;
 }
 
 export function DiscountConditionsSection({
@@ -25,7 +24,6 @@ export function DiscountConditionsSection({
   pickerProducts,
   toggleConditionProduct,
   cardConditionWarning,
-  t,
 }: DiscountConditionsSectionProps) {
   return (
     <div className="space-y-6 pt-2">
@@ -80,16 +78,16 @@ export function DiscountConditionsSection({
                     <SharedSearchBar
                       value={productSearch}
                       onChange={setProductSearch}
-                      placeholder={t('search_products_to_add', 'Search products to add...')}
+                      placeholder={'Search products to add...'}
                     />
                     <SharedProductList
                       items={pickerProducts}
                       selectedIds={Array.isArray(condition.value) ? condition.value : []}
                       onItemSelect={(item) => toggleConditionProduct(index, item.id)}
                       onClearSearch={() => setProductSearch('')}
-                      headerTitle={t('matching_products', 'Matching Products')}
+                      headerTitle={'Matching Products'}
                       maxHeight="220px"
-                      emptyStateText={t('no_products_found', 'NO PRODUCTS FOUND')}
+                      emptyStateText={'NO PRODUCTS FOUND'}
                       className="rounded-2xl shadow-none"
                     />
                     <div className="flex items-center gap-3 p-3 bg-white dark:bg-surface rounded-xl border border-gray-50 dark:border-white/5">
@@ -119,18 +117,18 @@ export function DiscountConditionsSection({
                     )}
                     {condition.type === 'customer_tier' && (
                       <>
-                        <option value="Standard" className="dark:bg-surface">{t('tier_standard', 'Standard Tier')}</option>
-                        <option value="Premium" className="dark:bg-surface">{t('tier_premium', 'Premium Tier')}</option>
-                        <option value="VIP" className="dark:bg-surface">{t('tier_vip', 'VIP Elite')}</option>
-                        <option value="Wholesale" className="dark:bg-surface">{t('tier_wholesale', 'Trade Partner')}</option>
+                        <option value="Standard" className="dark:bg-surface">{'Standard Tier'}</option>
+                        <option value="Premium" className="dark:bg-surface">{'Premium Tier'}</option>
+                        <option value="VIP" className="dark:bg-surface">{'VIP Elite'}</option>
+                        <option value="Wholesale" className="dark:bg-surface">{'Trade Partner'}</option>
                       </>
                     )}
                     {condition.type === 'card_type' && (
                       <>
-                        <option value="visa" className="dark:bg-surface">{t('visa_network', 'Visa Network')}</option>
-                        <option value="mastercard" className="dark:bg-surface">{t('mastercard_network', 'Mastercard Network')}</option>
-                        <option value="amex" className="dark:bg-surface">{t('amex_network', 'Amex Enterprise')}</option>
-                        <option value="discover" className="dark:bg-surface">{t('discover_network', 'Discover Net')}</option>
+                        <option value="visa" className="dark:bg-surface">{'Visa Network'}</option>
+                        <option value="mastercard" className="dark:bg-surface">{'Mastercard Network'}</option>
+                        <option value="amex" className="dark:bg-surface">{'Amex Enterprise'}</option>
+                        <option value="discover" className="dark:bg-surface">{'Discover Net'}</option>
                       </>
                     )}
                     {condition.type === 'bank_name' && (

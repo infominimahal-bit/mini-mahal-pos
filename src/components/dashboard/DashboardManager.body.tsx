@@ -16,14 +16,12 @@ import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
 import { MagicalClock } from './MagicalClock';
 import { formatCurrency } from '../../lib/currencies';
 import { formatInTimeZone } from '../../lib/dateUtils';
-import { useTranslation } from '../../hooks/useTranslation';
 import { Button } from '../../shared/ui';
 import { DashboardCards } from './DashboardCards';
 import { useDashboardData } from './DashboardManager.data';
 
 export function DashboardManager() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
   const {
     currency,
     country,

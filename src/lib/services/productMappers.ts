@@ -65,9 +65,6 @@ export const toRemoteProduct = (p: Partial<Product>) => {
   if ('productType' in p) { remote.product_type = p.productType; delete remote.productType; }
   if ('parentId' in p) { remote.parent_id = p.parentId; delete remote.parentId; }
   if ('highlightTag' in p) { remote.highlight_tag = p.highlightTag; delete remote.highlightTag; }
-  delete remote.batches;
-  delete remote.product_batches;
-  delete remote.productBatches;
 
   // Enforce NOT NULL constraint for sku
   if (!remote.sku) {

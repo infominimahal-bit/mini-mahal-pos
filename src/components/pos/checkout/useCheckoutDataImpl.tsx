@@ -8,7 +8,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { KOTPrint } from '../KOTPrint';
 import { ReceiptPrint } from '../ReceiptPrint';
 import { salesService, generateId, adjustPaymentBalances, buildSalePaymentMoves } from '../../../lib/services';
-import { localDb, queueOp } from '../../../lib/localDb';
+import { localDb } from '../../../lib/localDb';
 import { sonner } from '../../../lib/sonner';
 import { formatCurrency } from '../../../lib/currencies';
 import { Modal } from '../../../shared/ui/Modal';
@@ -90,9 +90,9 @@ export function useCheckoutData(onClose: () => void, onComplete: (sale: Sale) =>
     extraCharges.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0)
     , [extraCharges]);
 
-  // C1 FIX: delivery/service extra charges must be taxed consistently with the e-store
-  // (StoreCheckout taxes the delivery fee). Previously extraCharges were added to the total
-  // but excluded from the tax base, so a direct-POS delivery was under-taxed vs an e-store order.
+  // Delivery/service extra charges are included in the tax base (not merely added
+  // to the total post-tax), so a delivered order is taxed consistently. Do not move
+  // these out of the tax base.
   const taxRate = appSettings.taxRate || 0;
   const extraChargesTax = Math.round(extraChargesTotal * (taxRate / 100) * 100) / 100;
   const finalTax = Math.round((taxAmount + extraChargesTax) * 100) / 100;

@@ -1,7 +1,5 @@
 import { supabase } from '../supabase';
-import {
-  queueOp,
-} from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 
 export const productToppingsService = {
   async getByProduct(productId: string): Promise<string[]> {
@@ -14,12 +12,11 @@ export const productToppingsService = {
   },
 
   async setByProduct(productId: string, toppingIds: string[]): Promise<void> {
-    // OFFLINE-FIRST: queue the delete (by product_id) + re-insert join rows (never direct supabase write).
-    await queueOp('product_toppings', 'delete', productId, {});
+    // Cloud-direct: replace the join rows for this product atomically enough for
+    // our needs — delete the old set, then upsert the new set. Throws on failure.
+    await cloudWrite('product_toppings', 'delete', productId, {});
     if (toppingIds.length === 0) return;
-    for (const toppingId of toppingIds) {
-      const row = { product_id: productId, topping_id: toppingId };
-      await queueOp('product_toppings', 'create', `${productId}:${toppingId}`, row);
-    }
+    const rows = toppingIds.map(toppingId => ({ product_id: productId, topping_id: toppingId }));
+    await cloudWrite('product_toppings', 'create', productId, rows);
   },
 };

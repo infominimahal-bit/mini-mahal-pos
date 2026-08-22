@@ -11,7 +11,6 @@ import {
   Category,
   Supplier,
   PurchaseRecord,
-  ProductBatch,
   SupplierTransaction,
   StockHistory,
   Payment,
@@ -21,11 +20,11 @@ import {
   CartItem,
   RefundRequest,
   Topping,
-  ExtraTopping,
   VariantStockHistory,
   ProductAddon,
 } from '../../types';
-import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
+import { localDb, generateId, SETTINGS_ID } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { signAction, withActor } from '../actionToken';
 import { toRemoteSupplier, toRemoteSupplierTransaction, mapSupplier } from './mappers';
@@ -44,8 +43,8 @@ export const suppliersService = {
   async create(data: Omit<Supplier, 'id' | 'createdAt'>): Promise<Supplier> {
     const id = generateId();
     const sup = { ...data, id, createdAt: new Date() } as Supplier;
+    await cloudWrite('suppliers', 'create', id, toRemoteSupplier(sup));
     await localDb.suppliers.add(sup);
-    await queueOp('suppliers', 'create', id, toRemoteSupplier(sup));
 
     // Create opening balance transaction if needed
     if (data.openingBalance && data.openingBalance > 0) {
@@ -63,14 +62,14 @@ export const suppliersService = {
     const existing = await this.getById(id);
     if (!existing) throw new Error('Supplier not found');
     const updated = { ...existing, ...updates, updatedAt: new Date() };
+    await cloudWrite('suppliers', 'update', id, { ...toRemoteSupplier({ ...updates, updatedAt: updated.updatedAt }), id });
     await localDb.suppliers.put(updated);
-    await queueOp('suppliers', 'update', id, toRemoteSupplier({ ...updates, updatedAt: updated.updatedAt }));
     return updated;
   },
 
   async delete(id: string): Promise<void> {
+    await cloudWrite('suppliers', 'delete', id, {});
     await localDb.suppliers.delete(id);
-    queueOp('suppliers', 'delete', id, {});
     // Cleanup transactions?
     await localDb.supplierTransactions.where('supplierId').equals(id).delete();
   },
@@ -126,8 +125,8 @@ export const suppliersService = {
       expenseId: data.expenseId,
       createdAt: new Date()
     };
+    await cloudWrite('supplier_transactions', 'create', id, toRemoteSupplierTransaction(tx));
     await localDb.supplierTransactions.add(tx);
-    await queueOp('supplier_transactions', 'create', id, toRemoteSupplierTransaction(tx));
     // Wallet deduction: paying supplier = money OUT of our register (split-aware)
     if (split) {
       await adjustPaymentBalances(split.map(sp => ({
@@ -174,8 +173,8 @@ export const suppliersService = {
       overrideBy: data.overrideBy || undefined,
       createdAt: new Date()
     };
+    await cloudWrite('supplier_transactions', 'create', id, toRemoteSupplierTransaction(tx));
     await localDb.supplierTransactions.add(tx);
-    await queueOp('supplier_transactions', 'create', id, toRemoteSupplierTransaction(tx));
     return tx;
   },
 
@@ -208,14 +207,14 @@ export const suppliersService = {
     try {
       const tx: any = await localDb.supplierTransactions.get(id);
       if (tx?.expenseId) {
+        await cloudWrite('expenses', 'delete', tx.expenseId, {});
         await localDb.expenses.delete(tx.expenseId);
-        queueOp('expenses', 'delete', tx.expenseId, {});
       }
     } catch (e) {
       console.warn('deleteTransaction: failed to cascade expense cleanup', e);
     }
+    await cloudWrite('supplier_transactions', 'delete', id, {});
     await localDb.supplierTransactions.delete(id);
-    queueOp('supplier_transactions', 'delete', id, {});
   },
 
   // Update a previously-recorded supplier bill (used when a linked Supplies
@@ -224,8 +223,8 @@ export const suppliersService = {
     const tx: any = await localDb.supplierTransactions.get(id);
     if (!tx) return null;
     const updated = { ...tx, ...updates, updatedAt: new Date() };
+    await cloudWrite('supplier_transactions', 'update', id, toRemoteSupplierTransaction(updated));
     await localDb.supplierTransactions.put(updated);
-    await queueOp('supplier_transactions', 'update', id, toRemoteSupplierTransaction(updated));
     return updated;
   },
 
@@ -257,8 +256,7 @@ export const purchaseOrdersService = {
     const id = generateId();
     const now = new Date();
     const newPO = { ...po, id, createdAt: now, updatedAt: now } as PurchaseOrder;
-    await localDb.purchaseOrders.add(newPO);
-    queueOp('purchase_orders', 'create', id, {
+    await cloudWrite('purchase_orders', 'create', id, {
       id,
       po_number: po.poNumber,
       supplier_id: po.supplierId,
@@ -269,6 +267,7 @@ export const purchaseOrdersService = {
       created_at: now.toISOString(),
       updated_at: now.toISOString()
     });
+    await localDb.purchaseOrders.add(newPO);
     return newPO;
   }
 };

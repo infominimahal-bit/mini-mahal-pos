@@ -7,7 +7,6 @@ import { productsService } from '../../lib/services';
 import { useProductsStore } from '../../stores';
 import { formatCurrency } from '../../lib/currencies';
 import { sonner } from '../../lib/sonner';
-import type { UseTranslationResponse } from '../../hooks/useTranslation';
 
 interface InventoryTableProps {
   paginatedProducts: Product[];
@@ -25,7 +24,6 @@ interface InventoryTableProps {
   isAdmin: boolean;
   profile: any;
   canManageStock: boolean;
-  t: UseTranslationResponse['t'];
 }
 
 export function InventoryTable({
@@ -44,7 +42,6 @@ export function InventoryTable({
   isAdmin,
   profile,
   canManageStock,
-  t,
 }: InventoryTableProps) {
   const appSettings = useSettingsStore(s => s.settings);
 
@@ -62,12 +59,12 @@ export function InventoryTable({
                     ? <MinusSquare className="h-5 w-5 text-emerald-400" />
                     : <Square className="h-5 w-5 text-gray-600" />}
               </th>
-              <th className="p-4 text-[10px] font-black uppercase text-gray-700 dark:text-gray-400 tracking-widest text-left w-[32%]">{t("item", "ITEM")}</th>
-              <th className="p-4 text-[10px] font-black uppercase text-gray-700 dark:text-gray-400 tracking-widest text-left hidden lg:table-cell w-[20%]">{t("sku", "IDENTIFIER")}</th>
-              <th className="p-4 text-[10px] font-black uppercase text-gray-700 dark:text-gray-400 tracking-widest text-center hidden lg:table-cell w-[14%]">{t("barcode", "BARCODE")}</th>
-              <th className="p-4 text-[10px] font-black uppercase text-gray-700 dark:text-gray-400 tracking-widest text-left w-[13%]">{t("price", "PRICING")}</th>
-              <th className="p-4 text-[10px] font-black uppercase text-gray-700 dark:text-gray-400 tracking-widest text-center w-[11%]">{t("stock", "STOCK STATUS")}</th>
-              <th className="p-4 text-[10px] font-black uppercase text-gray-700 dark:text-gray-400 tracking-widest text-right w-[10%]">{t("actions", "Actions")}</th>
+              <th className="p-4 text-[10px] font-black uppercase text-gray-700 dark:text-gray-400 tracking-widest text-left w-[32%]">{"ITEM"}</th>
+              <th className="p-4 text-[10px] font-black uppercase text-gray-700 dark:text-gray-400 tracking-widest text-left hidden lg:table-cell w-[20%]">{"IDENTIFIER"}</th>
+              <th className="p-4 text-[10px] font-black uppercase text-gray-700 dark:text-gray-400 tracking-widest text-center hidden lg:table-cell w-[14%]">{"BARCODE"}</th>
+              <th className="p-4 text-[10px] font-black uppercase text-gray-700 dark:text-gray-400 tracking-widest text-left w-[13%]">{"PRICING"}</th>
+              <th className="p-4 text-[10px] font-black uppercase text-gray-700 dark:text-gray-400 tracking-widest text-center w-[11%]">{"STOCK STATUS"}</th>
+              <th className="p-4 text-[10px] font-black uppercase text-gray-700 dark:text-gray-400 tracking-widest text-right w-[10%]">{"Actions"}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 dark:divide-white/5">
@@ -127,7 +124,9 @@ export function InventoryTable({
                         onClick={async (e) => {
                           e.stopPropagation();
                           try {
-                            const updated = { ...product, active: !product.active, updatedAt: new Date() };
+                            // Send only the toggled field — never spread product (avoids
+                            // writing products.stock directly to cloud; AGENTS.md hard limit).
+                            const updated = { id: product.id, active: !product.active, updatedAt: new Date() };
                             await productsService.update(product.id, updated);
                             useProductsStore.getState().updateProduct(updated);
                             sonner.success(updated.active ? 'Product enabled' : 'Product disabled');
@@ -147,7 +146,7 @@ export function InventoryTable({
                         e.stopPropagation();
                         const newStatus = !product.isFeatured;
                         try {
-                          const updated = { ...product, isFeatured: newStatus, updatedAt: new Date() };
+                          const updated = { id: product.id, isFeatured: newStatus, updatedAt: new Date() };
                           await productsService.update(product.id, updated);
                           useProductsStore.getState().updateProduct(updated);
                         } catch (error) {
@@ -195,11 +194,11 @@ export function InventoryTable({
                   : <Square className="h-4 w-4 text-gray-600" />}
               Select All
             </Button>
-            <span className="text-[9px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{selectedProductIds.length} {t("selected", "Selected")}</span>
+            <span className="text-[9px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{selectedProductIds.length} {"Selected"}</span>
           </div>
         )}
         {paginatedProducts.length === 0 ? (
-          <div className="text-center py-10 text-gray-600 font-bold uppercase tracking-widest text-xs">{t("no_products_found", "No products found")}</div>
+          <div className="text-center py-10 text-gray-600 font-bold uppercase tracking-widest text-xs">{"No products found"}</div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4">
             {paginatedProducts.map(product => (
@@ -265,7 +264,7 @@ export function InventoryTable({
                       </div>
                       {(true) && (
                         <div className="flex items-center justify-between opacity-50">
-                          <span className="text-[7px] font-black text-gray-600 dark:text-gray-500 uppercase">{t("cost", "Cost")}</span>
+                          <span className="text-[7px] font-black text-gray-600 dark:text-gray-500 uppercase">{"Cost"}</span>
                           <span className="text-[7px] font-black text-gray-600 dark:text-gray-400">{formatCurrency(product.cost || 0, appSettings.currency)}</span>
                         </div>
                       )}

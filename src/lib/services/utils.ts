@@ -11,7 +11,6 @@ import {
   Category,
   Supplier,
   PurchaseRecord,
-  ProductBatch,
   SupplierTransaction,
   StockHistory,
   Payment,
@@ -21,11 +20,10 @@ import {
   CartItem,
   RefundRequest,
   Topping,
-  ExtraTopping,
   VariantStockHistory,
   ProductAddon,
 } from '../../types';
-import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
+import { localDb, generateId, SETTINGS_ID } from '../localDb';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { signAction, withActor } from '../actionToken';
 
@@ -118,9 +116,8 @@ export function derivePaymentStatus(sale: any): string {
   return 'paid';
 }
 
-// P6/P24: append an immutable customer_ledger entry (OFFLINE-FIRST compliant).
-// Writes go to local Dexie first, then queueOp so the SyncEngine replicates them —
-// never a direct supabase-js write. Returns the new running balance_after.
+// P6/P24: append an immutable customer_ledger entry (cloud-direct).
+// Returns the new running balance_after.
 export const normalizePaymentMethod = (method: string): string => {
   if (!method) return 'cash';
   const m = method.toLowerCase().trim();

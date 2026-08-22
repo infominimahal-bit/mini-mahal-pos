@@ -4,7 +4,6 @@ import { Button } from '../../../shared/ui';
 import { SearchableSelect } from '../../../shared/ui/SearchableSelect';
 import { Product } from '../../../types';
 import type { PaperSize } from './BarcodeCard';
-import { useTranslation } from '../../../hooks/useTranslation';
 
 export const SectionTitle = ({ children }: { children: React.ReactNode }) => (
     <p className="text-[9px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest mb-2.5">{children}</p>
@@ -69,7 +68,6 @@ export function BarcodeSidebar({
     updateQty,
     setGlobalQty
 }: BarcodeSidebarProps) {
-    const { t } = useTranslation();
     const {
         paperSize, setPaperSize,
         a4Columns, setA4Columns,

@@ -78,15 +78,6 @@ export const mapSettings = (item: any): AppSettings => {
     // Toggles & System
     retailEnabled: s.retail_enabled ?? s.retailEnabled ?? true,
     wholesaleEnabled: s.wholesale_enabled ?? s.wholesaleEnabled ?? false,
-    storeType: s.store_type ?? s.storeType ?? 'both',
-    storeLatitude: s.store_latitude ?? s.storeLatitude,
-    storeLongitude: s.store_longitude ?? s.storeLongitude,
-    shopOpenTime: s.shop_open_time ?? s.shopOpenTime,
-    shopCloseTime: s.shop_close_time ?? s.shopCloseTime,
-    deliveryStartTime: s.delivery_start_time ?? s.deliveryStartTime,
-    deliveryEndTime: s.delivery_end_time ?? s.deliveryEndTime,
-    pickupStartTime: s.pickup_start_time ?? s.pickupStartTime,
-    pickupEndTime: s.pickup_end_time ?? s.pickupEndTime,
     defaultSaleType: s.default_sale_type ?? s.defaultSaleType ?? 'retail',
     touchKeyboardEnabled: s.touch_keyboard_enabled ?? s.touchKeyboardEnabled ?? false,
     soundEnabled: s.sound_enabled ?? s.soundEnabled ?? true,
@@ -99,10 +90,6 @@ export const mapSettings = (item: any): AppSettings => {
     country: s.country ?? s.country ?? 'PK',
     taxId: s.tax_id ?? s.taxId,
     businessType: s.business_type ?? s.businessType ?? 'general',
-
-    // Offline & Sync
-    offlineMode: s.offline_mode ?? s.offlineMode ?? true,
-    autoSync: s.auto_sync ?? s.autoSync ?? true,
 
     // SaaS
     subscriptionTier: s.subscription_tier ?? s.subscriptionTier ?? 'free',
@@ -198,21 +185,10 @@ export const toRemoteSettings = (s: Partial<AppSettings>) => {
 
   if ('retailEnabled' in s) { remote.retail_enabled = s.retailEnabled; }
   if ('wholesaleEnabled' in s) { remote.wholesale_enabled = s.wholesaleEnabled; }
-  if ('storeType' in s) { remote.store_type = s.storeType; }
-  if ('storeLatitude' in s) { remote.store_latitude = s.storeLatitude === '' || s.storeLatitude === null || s.storeLatitude === undefined ? null : Number(s.storeLatitude); }
-  if ('storeLongitude' in s) { remote.store_longitude = s.storeLongitude === '' || s.storeLongitude === null || s.storeLongitude === undefined ? null : Number(s.storeLongitude); }
-  if ('shopOpenTime' in s) { remote.shop_open_time = s.shopOpenTime || null; }
-  if ('shopCloseTime' in s) { remote.shop_close_time = s.shopCloseTime || null; }
-  if ('deliveryStartTime' in s) { remote.delivery_start_time = s.deliveryStartTime || null; }
-  if ('deliveryEndTime' in s) { remote.delivery_end_time = s.deliveryEndTime || null; }
-  if ('pickupStartTime' in s) { remote.pickup_start_time = s.pickupStartTime || null; }
-  if ('pickupEndTime' in s) { remote.pickup_end_time = s.pickupEndTime || null; }
   if ('defaultSaleType' in s) { remote.default_sale_type = s.defaultSaleType; }
 
   if ('touchKeyboardEnabled' in s) { remote.touch_keyboard_enabled = s.touchKeyboardEnabled; }
   if ('soundEnabled' in s) { remote.sound_enabled = s.soundEnabled; }
-  if ('offlineMode' in s) { remote.offline_mode = s.offlineMode; }
-  if ('autoSync' in s) { remote.auto_sync = s.autoSync; }
   if ('country' in s) { remote.country = s.country; }
   if ('taxId' in s) { remote.tax_id = s.taxId ?? null; }
   if ('businessType' in s) { remote.business_type = s.businessType; }

@@ -51,11 +51,20 @@ export function useProductDetailLedger({
       }
       const itemQty = item ? Math.abs(Number(item.weight ? item.weight : item.quantity) || 0) : 0;
       const scale = itemQty > 0 ? qty / itemQty : 1;
-      if (h.type === 'sale') {
+
+      // Retroactive fix for old data where deleted POS returns were saved as 'return' type instead of 'sale'.
+      let effectiveType = h.type;
+      const hNote = (h.note || '').toLowerCase();
+      if (hNote.includes('deleted')) {
+          const rawChange = Number(h.changeQty) || 0;
+          effectiveType = rawChange < 0 ? 'sale' : 'return';
+      }
+
+      if (effectiveType === 'sale') {
         sold += qty;
         if (item) revenue += (Number(item.subtotal) || 0) * scale;
         cogs += unitCost * qty;
-      } else if (h.type === 'return') {
+      } else if (effectiveType === 'return') {
         sold -= qty;
         if (item) revenue -= (Number(item.subtotal) || 0) * scale;
         cogs -= unitCost * qty;

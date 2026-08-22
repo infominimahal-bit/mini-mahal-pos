@@ -43,7 +43,6 @@ export async function commitStockInToInventory({
   recordAsSupplierBill = true,
   suppliers,
   profile,
-  dispatch,
   date = new Date(),
 }: StockInCommitParams) {
   let lastProduct: any = null;
@@ -52,6 +51,21 @@ export async function commitStockInToInventory({
     if (!item.quantity || item.quantity <= 0) continue;
 
     const supplier = item.supplier || 'PO TRANSIT';
+
+    let supplierBillData = null;
+    if (recordAsSupplierBill && supplier !== 'PO TRANSIT' && supplier !== 'DIRECT ENTRY') {
+      const matchedSupplier = suppliers.find(
+        s => s.id === supplier || s.name.toLowerCase() === supplier.toLowerCase()
+      );
+      if (matchedSupplier) {
+        supplierBillData = {
+          supplierId: matchedSupplier.id,
+          amount: item.quantity * (item.costPrice || 0),
+          note: `PO Stock In: ${item.name} x${item.quantity}`,
+          sourceType: 'auto_purchase' as const,
+        };
+      }
+    }
 
     const newRecord = await purchaseRecordsService.create({
       id: generateId(),
@@ -68,29 +82,9 @@ export async function commitStockInToInventory({
       date,
       addedBy: profile?.email || 'System',
       notes: item.notes || `Stock In | ${date.toLocaleDateString()}`
-    });
+    }, supplierBillData);
 
     useInventoryStore.getState().addPurchaseRecord(newRecord);
-
-    // Record supplier ledger transaction if toggle is ON and a supplier is associated
-    if (recordAsSupplierBill && supplier !== 'PO TRANSIT' && supplier !== 'DIRECT ENTRY') {
-      const matchedSupplier = suppliers.find(
-        s => s.name.toLowerCase() === supplier.toLowerCase()
-      );
-      if (matchedSupplier) {
-        try {
-          await suppliersService.recordBill({
-            supplierId: matchedSupplier.id,
-            amount: item.quantity * (item.costPrice || 0),
-            note: `PO Stock In: ${item.name} x${item.quantity}`,
-            referenceId: newRecord.id,
-            sourceType: 'auto_purchase',
-          });
-        } catch (ledgerErr) {
-          console.warn('[StockIn] Failed to record supplier ledger entry:', ledgerErr);
-        }
-      }
-    }
 
     // Read fresh product from localDb so we get the updated stock from within the service
     const freshProduct = await localDb.products.get(item.id);

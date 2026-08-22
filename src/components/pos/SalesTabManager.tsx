@@ -4,7 +4,6 @@ import { Plus, X } from 'lucide-react';
 import { useApp } from '../../context/SupabaseAppContext';
 import { SalesTab } from '../../types';
 import { salesTabsService } from '../../lib/services';
-import { syncNow } from '../../lib/syncEngine';
 import { useAuth } from '../../context/AuthContext';
 import { sonner } from '../../lib/sonner';
 
@@ -74,9 +73,6 @@ const appSelectedCustomer = useCartStore(s => s.selectedCustomer);
       const newTab = await salesTabsService.create(user.id, newTabData);
       useCartStore.getState().addSalesTab(newTab);
       useCartStore.getState().setActiveSalesTab(newTab.id);
-      
-      // Force immediate cloud sync
-      syncNow().catch(null);
     } catch (error) {
       console.error('Error creating new tab:', error);
     }
@@ -106,9 +102,6 @@ const appSelectedCustomer = useCartStore(s => s.selectedCustomer);
 
         await salesTabsService.delete(tabId);
         useCartStore.getState().removeSalesTab(tabId);
-        
-        // Force immediate cloud sync
-        syncNow().catch(null);
       } catch (error) {
         console.error('Error closing tab:', error);
       }

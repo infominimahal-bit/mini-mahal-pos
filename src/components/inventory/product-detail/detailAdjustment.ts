@@ -1,34 +1,39 @@
 import { PurchaseRecord } from '../../../types';
-import { productsService, purchaseRecordsService, generateId, toRemoteStockHistory } from '../../../lib/services';
-import { localDb, queueOp } from '../../../lib/localDb';
+import { purchaseRecordsService, generateId } from '../../../lib/services';
+import { localDb } from '../../../lib/localDb';
+import { supabase } from '../../../lib/supabase';
 import { sonner } from '../../../lib/sonner';
 import { useProductsStore, useInventoryStore } from '../../../stores';
 import { DetailCtx } from './detailContext';
 
 export async function performAdjustment(ctx: DetailCtx) {
-  const rawQty = Math.abs(parseInt(ctx.adjustmentData.quantity));
-  if (!rawQty || rawQty === 0) return;
-  const qtyChange = ctx.adjustmentData.action === 'remove' ? -rawQty : rawQty;
+  const qtyChange = parseInt(ctx.adjustmentData.quantity);
+  if (isNaN(qtyChange) || qtyChange === 0) return;
   const reason = ctx.adjustmentData.reason || 'Correction';
 
   const result = await sonner.confirm(
-    ctx.t('confirm_adjustment_title', 'Confirm Adjustment?'),
-    ctx.t('confirm_adjustment_desc', 'Adjusting stock by <strong>{qty}</strong> due to <strong>{reason}</strong>.')
+    'Confirm Adjustment?',
+    'Adjusting stock by <strong>{qty}</strong> due to <strong>{reason}</strong>.'
       .replace('{qty}', (qtyChange > 0 ? '+' : '') + qtyChange)
       .replace('{reason}', reason),
-    ctx.t('yes_confirm', 'Yes, Confirm')
+    'Yes, Confirm'
   );
 
   if (!result.isConfirmed) return;
 
   ctx.setIsUpdating(true);
-  sonner.loading(ctx.t('adjusting_stock', 'Adjusting stock...'));
+  sonner.loading('Adjusting stock...');
 
   try {
     const now = new Date();
+    const freshProduct = await localDb.products.get(ctx.product.id);
+    const currentStock = freshProduct?.stock ?? ctx.product.stock ?? 0;
+    // Signed new stock (negative allowed per plan PART O — problem is never hidden).
+    const newStock = currentStock + qtyChange;
+    const adjustmentId = generateId();
 
     const newRecord = {
-      id: generateId(),
+      id: adjustmentId,
       productId: ctx.product.id,
       productName: ctx.product.name,
       sku: ctx.product.sku || '',
@@ -39,49 +44,52 @@ export async function performAdjustment(ctx: DetailCtx) {
       supplier: reason.toUpperCase(),
       date: now,
       addedBy: ctx.profile?.email || 'System',
-      notes: ctx.adjustmentData.notes ? `${reason}: ${ctx.adjustmentData.notes}` : `Manual Adjustment: ${reason}`
+      notes: ctx.adjustmentData.notes ? `${reason}: ${ctx.adjustmentData.notes ? ctx.adjustmentData.notes : reason}` : `Manual Adjustment: ${reason}`
     } as PurchaseRecord;
 
-    const freshProduct = await localDb.products.get(ctx.product.id);
-    const currentStock = freshProduct?.stock ?? ctx.product.stock ?? 0;
-    const finalStock = Math.max(0, currentStock + qtyChange);
-    const appliedDelta = finalStock - currentStock;
+    // Cloud: single authoritative stock update via RPC (trigger applies it once).
+    // Never edit products.stock directly. Stable id => idempotent on retry.
+    const { error } = await supabase.rpc('stock_adjustment', {
+      p_product_id: ctx.product.id,
+      p_change_qty: qtyChange,
+      p_type: qtyChange >= 0 ? 'adjustment' : 'adjustment_out',
+      p_note: `Adjustment: ${reason}`,
+      p_cashier: ctx.profile?.email || 'System',
+      p_variant_id: null,
+      p_variant_label: null,
+      p_adjustment_id: adjustmentId
+    });
+    if (error) throw error;
 
-    const updatedProduct = {
-      ...ctx.product,
-      stock: finalStock,
-      updatedAt: now
-    };
-
-    await productsService.update(ctx.product.id, updatedProduct);
+    // Local cache update (display only; cloud trigger already moved stock).
+    const updatedProduct = { ...ctx.product, stock: newStock, updatedAt: now };
+    await localDb.products.update(ctx.product.id, { stock: newStock, updatedAt: now });
     useProductsStore.getState().updateProduct(updatedProduct);
 
-    const histId = generateId();
     const histEntry = {
-      id: histId,
+      id: adjustmentId,
       productId: ctx.product.id,
-      changeQty: appliedDelta,
-      type: appliedDelta >= 0 ? 'adjustment' as const : 'adjustment_out' as const,
-      referenceId: newRecord.id,
+      changeQty: qtyChange,
+      type: (qtyChange >= 0 ? 'adjustment' : 'adjustment_out') as const,
+      referenceId: adjustmentId,
       note: `Adjustment: ${reason}`,
-      balanceAfter: finalStock,
+      balanceAfter: newStock,
       cashierName: ctx.profile?.email || 'System',
       createdAt: now
     };
     await localDb.stockHistory.add(histEntry);
-    await queueOp('stock_history', 'create', histId, toRemoteStockHistory(histEntry));
 
     await purchaseRecordsService.create(newRecord);
     useInventoryStore.getState().addPurchaseRecord(newRecord);
 
-    ctx.setFormData(prev => ({ ...prev, stock: String(finalStock) }));
+    ctx.setFormData(prev => ({ ...prev, stock: String(newStock) }));
 
-    sonner.success(ctx.t('stock_adjusted_success', 'Stock adjusted successfully'));
+    sonner.success('Stock adjusted successfully');
     ctx.setShowAdjustment(false);
     ctx.setAdjustmentData({ action: 'remove', quantity: '1', reason: 'Correction', notes: '' });
   } catch (error) {
     console.error('Adjustment failed:', error);
-    sonner.error(ctx.t('stock_adjusted_error', 'Failed to adjust stock'));
+    sonner.error('Failed to adjust stock');
   } finally {
     ctx.setIsUpdating(false);
     sonner.close();

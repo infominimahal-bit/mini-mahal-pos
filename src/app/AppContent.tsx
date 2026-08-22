@@ -11,7 +11,6 @@ import { SkeletonLoader } from '../shared/ui/SkeletonLoader';
 import { Toaster } from 'sonner';
 import { DialogProvider } from '../shared/ui/DialogProvider';
 import { ErrorBoundary } from '../components/common/ErrorBoundary';
-import { OfflineBanner } from '../components/OfflineBadge';
 import { MobileBottomNav } from '../components/layout/MobileBottomNav';
 import { AppRoutes } from '../appRoutes';
 import { LoadingView } from './LoadingView';
@@ -30,7 +29,7 @@ export function AppContent() {
 
   useAppGlobalEffects();
 
-  if (loading) {
+  if (loading || (user && !appCurrentUser && appLoading)) {
     return <SkeletonLoader type="list" count={8} />;
   }
 
@@ -93,7 +92,6 @@ export function AppContent() {
         <>
           <DialogProvider />
           <Header onShowMobileMenu={() => setIsMobileMenuOpen(true)} isMobileMenuOpen={isMobileMenuOpen} onHideMobileMenu={() => setIsMobileMenuOpen(false)} />
-          <OfflineBanner />
           <main className="flex-1 min-h-0 relative overflow-y-auto overflow-x-hidden bg-gray-50 dark:bg-app" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
               <ErrorBoundary>
               <Suspense fallback={<LoadingView />}>

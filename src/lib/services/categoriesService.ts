@@ -11,7 +11,6 @@ import {
   Category,
   Supplier,
   PurchaseRecord,
-  ProductBatch,
   SupplierTransaction,
   StockHistory,
   Payment,
@@ -21,11 +20,11 @@ import {
   CartItem,
   RefundRequest,
   Topping,
-  ExtraTopping,
   VariantStockHistory,
   ProductAddon,
 } from '../../types';
-import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
+import { localDb, generateId, SETTINGS_ID } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { signAction, withActor } from '../actionToken';
 import { mapDiscount } from './mappers';
@@ -43,30 +42,26 @@ export const categoriesService = {
     const name = typeof nameOrObj === 'object' ? nameOrObj.name : nameOrObj;
     const description = typeof nameOrObj === 'object' ? nameOrObj.description : undefined;
     const cat = { id, name, description, active: true, createdAt: new Date() };
-    await localDb.categories.add(cat);
-    await queueOp('categories', 'create', id, {
+    await cloudWrite('categories', 'create', id, {
       id,
       name,
       description,
       active: true,
       created_at: new Date().toISOString()
     });
+    await localDb.categories.add(cat);
     return cat;
   },
   async update(id: string, updates: Partial<Category>): Promise<void> {
+    const existing = await localDb.categories.get(id);
+    const merged: any = existing ? { ...existing, ...updates } : updates;
+    const remote: any = {
+      name: merged.name,
+      description: merged.description ?? null,
+      active: merged.active ?? true,
+    };
+    await cloudWrite('categories', 'update', id, remote);
     await localDb.categories.where('id').equals(id).modify(updates);
-    const local = await localDb.categories.get(id);
-    const remote: any = {};
-    if (local) {
-      remote.name = local.name;
-      remote.description = local.description || null;
-      remote.active = local.active ?? true;
-    } else {
-      if ('name' in updates) remote.name = updates.name;
-      if ('description' in updates) remote.description = updates.description;
-      if ('active' in updates) remote.active = updates.active;
-    }
-    await queueOp('categories', 'update', id, remote);
   },
   async fetchRemote(lastSyncTime?: Date): Promise<Category[]> {
     const queryFn = () => {
@@ -86,12 +81,10 @@ export const discountsService = {
   async create(data: any) {
     const id = generateId();
     const discount = { ...data, id };
-    await localDb.discounts.add(discount);
     const remote: any = {
       ...discount,
       min_amount: discount.minAmount,
       max_discount: discount.maxDiscount,
-      free_gift_products: discount.freeGiftProducts || [],
       valid_days: discount.validDays || [],
       valid_from: discount.validFrom.toISOString(),
       valid_to: discount.validTo.toISOString(),
@@ -101,14 +94,14 @@ export const discountsService = {
     };
     delete remote.minAmount;
     delete remote.maxDiscount;
-    delete remote.freeGiftProducts;
     delete remote.validDays;
     delete remote.validFrom;
     delete remote.validTo;
     delete remote.isAutoApply;
     delete remote.createdAt;
     delete remote.updatedAt;
-    await queueOp('discounts', 'create', id, remote);
+    await cloudWrite('discounts', 'create', id, remote);
+    await localDb.discounts.add(discount);
   },
 
   async fetchRemote(lastSyncTime?: Date): Promise<Discount[]> {
@@ -125,11 +118,9 @@ export const discountsService = {
     const existing = await localDb.discounts.get(id);
     if (!existing) throw new Error('Discount not found');
     const updated = { ...existing, ...updates, id, updatedAt: new Date() } as Discount;
-    await localDb.discounts.put(updated);
     const remote: any = { ...updated };
     remote.min_amount = updated.minAmount;
     remote.max_discount = updated.maxDiscount;
-    remote.free_gift_products = updated.freeGiftProducts || [];
     remote.valid_days = updated.validDays || [];
     if (updated.validFrom) remote.valid_from = (updated.validFrom as Date).toISOString();
     if (updated.validTo) remote.valid_to = (updated.validTo as Date).toISOString();
@@ -137,20 +128,20 @@ export const discountsService = {
     remote.updated_at = updated.updatedAt instanceof Date ? updated.updatedAt.toISOString() : (updated.updatedAt || new Date().toISOString());
     delete remote.minAmount;
     delete remote.maxDiscount;
-    delete remote.freeGiftProducts;
     delete remote.validDays;
     delete remote.validFrom;
     delete remote.validTo;
     delete remote.isAutoApply;
     delete remote.createdAt;
     delete remote.updatedAt;
-    await queueOp('discounts', 'update', id, remote);
+    await cloudWrite('discounts', 'update', id, remote);
+    await localDb.discounts.put(updated);
     return updated;
   },
 
   async delete(id: string): Promise<void> {
+    await cloudWrite('discounts', 'delete', id, {});
     await localDb.discounts.delete(id);
-    await queueOp('discounts', 'delete', id, {});
   }
 };
 /**

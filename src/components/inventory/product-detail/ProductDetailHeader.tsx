@@ -4,7 +4,7 @@ import type { ProductDetailController } from './useProductDetail';
 
 export function ProductDetailHeader({ d }: { d: ProductDetailController }) {
   const {
-    product, onBack, t, formData, isEditMode, setIsEditMode, setShowMediaLibrary,
+    product, onBack, formData, isEditMode, setIsEditMode, setShowMediaLibrary,
     isInfinite, isOut, isLow, stockPct,
   } = d;
 
@@ -31,19 +31,27 @@ export function ProductDetailHeader({ d }: { d: ProductDetailController }) {
         </div>
 
         <div className="flex flex-col items-center sm:items-start text-center sm:text-left flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
             <Badge
               variant="solid"
               tone={isOut ? 'danger' : isLow ? 'warning' : 'success'}
               className={`!px-3 !py-1 !text-[10px] !shadow-lg ${isOut ? '!bg-red-500 !shadow-red-500/20' : isLow ? '!bg-amber-500 !shadow-amber-500/20' : '!bg-primary !shadow-emerald-500/20'}`}
             >
-              {isInfinite ? t('infinity_mode', 'Infinity Mode') : isOut ? t('out_of_stock', 'Out of Stock') : isLow ? t('low_stock', 'Low Stock') : t('in_stock', 'In Stock')}
+              {isInfinite ? 'Infinity Mode' : isOut ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock'}
             </Badge>
             {product.isFeatured && (
               <div className="p-1.5 bg-yellow-400 text-white rounded-lg shadow-lg shadow-yellow-400/20">
                 <Star className="w-3 h-3 fill-current" />
               </div>
             )}
+            
+            <Button
+              variant={isEditMode ? 'danger' : 'secondary'}
+              onClick={() => setIsEditMode(!isEditMode)}
+              className={`!p-1.5 !px-3 !rounded-xl !text-[10px] !font-black !shadow-sm ml-auto sm:ml-2 ${isEditMode ? '!bg-rose-500 !text-white !shadow-rose-500/20' : '!bg-white dark:!bg-white/5 !border-gray-200 dark:!border-white/10 !text-gray-700 dark:!text-gray-300'}`}
+            >
+              {isEditMode ? <><X className="h-3 w-3 mr-1" /> {"Stop"}</> : <><Edit3 className="h-3 w-3 mr-1" /> {"Edit"}</>}
+            </Button>
           </div>
 
           <div className="flex flex-col gap-1 w-full max-w-xs sm:max-w-none">
@@ -52,39 +60,31 @@ export function ProductDetailHeader({ d }: { d: ProductDetailController }) {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="bg-gray-50 dark:bg-white/5 border-none px-4 py-2 rounded-2xl text-xl font-black text-gray-900 dark:text-white uppercase outline-none text-center sm:text-left ring-1 ring-transparent focus:ring-emerald-500/50 transition-all"
-                placeholder={t('product_name_req', 'Product Name *').replace(' *', '')}
+                placeholder={'Product Name *'.replace(' *', '')}
               />
             ) : (
               <h2 className="text-2xl sm:text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight line-clamp-1">{product.name}</h2>
             )}
             <div className="flex items-center justify-center sm:justify-start gap-4 mt-2">
               <div className="flex flex-col">
-                <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest leading-none mb-1">{t('sku', 'SKU')}</p>
+                <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest leading-none mb-1">{"SKU"}</p>
                 <span className="font-mono text-xs text-gray-600 dark:text-gray-400 font-bold">{product.sku}</span>
               </div>
               <div className="w-px h-6 bg-gray-100 dark:bg-white/5" />
               <div className="flex flex-col">
-                <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest leading-none mb-1">{t('category', 'Category')}</p>
+                <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest leading-none mb-1">{"Category"}</p>
                 <span className="text-xs text-gray-600 dark:text-gray-400 font-bold">{product.category}</span>
               </div>
             </div>
           </div>
         </div>
 
-          <div className="flex sm:flex-col gap-2 w-full sm:w-auto mt-4 sm:mt-0">
-          <Button
-            variant={isEditMode ? 'danger' : 'secondary'}
-            onClick={() => setIsEditMode(!isEditMode)}
-            className={`flex-1 sm:flex-none !p-4 sm:!p-2.5 !rounded-2xl !text-[11px] !font-black !shadow-lg ${isEditMode ? '!shadow-rose-500/20' : '!bg-white dark:!bg-white/5 !border-gray-200 dark:!border-white/10 !shadow-none'}`}
-          >
-            {isEditMode ? <><X className="h-4 w-4" /> {t('stop', 'Stop')}</> : <><Edit3 className="h-4 w-4" /> {t('edit', 'Edit')}</>}
-          </Button>
-        </div>
 
-        <div className="flex flex-wrap sm:flex-nowrap items-center gap-4 sm:gap-6 flex-shrink-0 mt-4 lg:mt-0 w-full lg:w-auto justify-between lg:justify-end border-t lg:border-t-0 pt-4 lg:pt-0">
+
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-4 sm:gap-6 flex-shrink-0 mt-4 sm:mt-0 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 pt-4 sm:pt-0">
           {[
-            { label: t('stock', 'Stock'), value: isInfinite ? '∞' : `${product.stock}`, color: isLow || isOut ? 'text-red-500' : 'text-gray-900 dark:text-white' },
-            { label: t('sales', 'Sales'), value: `${d.totalSoldUnits}`, color: 'text-gray-900 dark:text-white' },
+            { label: 'Stock', value: isInfinite ? '∞' : `${product.stock}`, color: isLow || isOut ? 'text-red-500' : 'text-gray-900 dark:text-white' },
+            { label: 'Sales', value: `${d.totalSoldUnits}`, color: 'text-gray-900 dark:text-white' },
           ].map(stat => (
             <div key={stat.label} className="text-center">
               <p className={`text-xl font-black ${stat.color}`}>{stat.value}</p>
@@ -93,7 +93,7 @@ export function ProductDetailHeader({ d }: { d: ProductDetailController }) {
           ))}
           <div className="w-28">
             <div className="flex justify-between text-[10px] text-gray-600 mb-1 font-bold">
-              <span>{t('health', 'Health')}</span>
+              <span>{"Health"}</span>
               <span>{stockPct.toFixed(0)}%</span>
             </div>
             <div className="w-full h-2 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden">
@@ -109,12 +109,12 @@ export function ProductDetailHeader({ d }: { d: ProductDetailController }) {
       <div className="flex items-center gap-6 mt-6 px-6 overflow-x-auto no-scrollbar">
         <div className="flex items-center gap-2 bg-primary/5 px-3 py-1.5 rounded-full border border-primary/10">
           <BadgeInfo className="w-3.5 h-3.5 text-primary" />
-          <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase">{t('integrated_smart_hub', 'Integrated Smart Hub')}</span>
+          <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase">{"Integrated Smart Hub"}</span>
         </div>
         {isEditMode && (
           <div className="flex items-center gap-2 bg-amber-500/5 px-3 py-1.5 rounded-full border border-amber-500/10 animate-pulse">
             <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
-            <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase">{t('edit_mode_active', 'Edit Mode Active')}</span>
+            <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase">{"Edit Mode Active"}</span>
           </div>
         )}
       </div>

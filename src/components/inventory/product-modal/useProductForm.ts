@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useInventoryStore, useProductsStore, useUsersStore } from '../../../stores';
 import { sonner } from '../../../lib/sonner';
 import { generateBarcodeValue } from '../../../utils/barcode';
-import { Product, ProductBatch, ProductVariant, ProductModifier, VariantData, ProductAddon } from '../../../types';
+import { Product, ProductVariant, ProductModifier, VariantData, ProductAddon } from '../../../types';
 
 export type ProductFormData = {
   name: string;
@@ -54,24 +54,10 @@ export function useProductForm(product: Product | null) {
     productType: 'simple',
   });
 
-  const [batches, setBatches] = useState<ProductBatch[]>([]);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [variantData, setVariantData] = useState<VariantData[]>([]);
   const [modifiers, setModifiers] = useState<ProductModifier[]>([]);
   const [productAddons, setProductAddons] = useState<ProductAddon[]>([]);
-
-  const batchTotalStock = useMemo(() => {
-    return batches.reduce((sum, b) => {
-      const remaining = Number((b as any).qtyRemaining ?? (b as any).qty_remaining ?? b.quantity ?? 0);
-      return sum + (isNaN(remaining) ? 0 : remaining);
-    }, 0);
-  }, [batches]);
-
-  useEffect(() => {
-    if (batches.length > 0) {
-      setFormData(prev => ({ ...prev, stock: batchTotalStock.toString() }));
-    }
-  }, [batchTotalStock, batches.length]);
 
   useEffect(() => {
     if (product) {
@@ -96,7 +82,6 @@ export function useProductForm(product: Product | null) {
         requireSerial: product.requireSerial ?? false,
         productType: (product.productType === 'variable') ? 'variable' : 'simple',
       });
-      setBatches(product.batches || []);
       setVariants((product.variants || []).map(v => ({ ...v, optionsRaw: '' })));
       setVariantData(product.variantData || []);
       setModifiers(product.modifiers || []);
@@ -123,7 +108,6 @@ export function useProductForm(product: Product | null) {
         requireSerial: false,
         productType: 'simple',
       });
-      setBatches([]);
       setVariants([]);
       setVariantData([]);
       setModifiers([]);
@@ -252,8 +236,6 @@ export function useProductForm(product: Product | null) {
     appCurrentUser,
     formData,
     setFormData,
-    batches,
-    setBatches,
     variants,
     setVariants,
     variantData,
@@ -262,7 +244,6 @@ export function useProductForm(product: Product | null) {
     setModifiers,
     productAddons,
     setProductAddons,
-    batchTotalStock,
     categories,
     suppliers,
     handleChange,

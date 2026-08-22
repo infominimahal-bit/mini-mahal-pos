@@ -11,7 +11,6 @@ import {
   Category,
   Supplier,
   PurchaseRecord,
-  ProductBatch,
   SupplierTransaction,
   StockHistory,
   Payment,
@@ -21,11 +20,11 @@ import {
   CartItem,
   RefundRequest,
   Topping,
-  ExtraTopping,
   VariantStockHistory,
   ProductAddon,
 } from '../../types';
-import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
+import { localDb, generateId, SETTINGS_ID } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { signAction, withActor } from '../actionToken';
 import { fetchAllPages, normalizePaymentMethod } from './utils';
@@ -77,7 +76,7 @@ export const mapPayment = (item: any): any => ({
 
 /**
  * Products Service
- * Reads from Dexie, Writes to Dexie + Queues for Supabase
+ * Reads from Dexie cache, Writes to cloud via cloudWrite (apply_payment_movements RPC)
  */
 // ════════════════════════════════════════════════════════════════
 // PAYMENT MODES / WALLETS  (per-method authoritative balances)
@@ -120,8 +119,9 @@ export const seedPaymentModes = async () => {
   const existingIds = new Set(existing.map((m: any) => m.id));
   for (const m of DEFAULT_PAYMENT_MODES) {
     if (!existingIds.has(m.id)) {
+      // Cloud FIRST (idempotent upsert) — cloud is the source of truth for wallets.
+      await cloudWrite('payment_modes', 'upsert', m.id, toRemotePaymentMode({ ...m, balance: 0, isDefault: true, sortOrder: m.sortOrder, color: m.color }));
       await localDb.paymentModes.put({ ...m, balance: 0, isDefault: true, sortOrder: m.sortOrder, color: m.color, updatedAt: new Date() });
-      await queueOp('payment_modes', 'upsert', m.id, toRemotePaymentMode({ ...m, balance: 0, isDefault: true, sortOrder: m.sortOrder, color: m.color }));
     }
   }
   for (const m of DEFAULT_PAYMENT_MODES) {
@@ -139,15 +139,31 @@ export const getPaymentModes = async () => {
 /**
  * Atomically adjust per-method wallet balances.
  * moves: { id, modeId, delta, referenceId?, note? }
- * - Optimistically updates local Dexie (instant UI).
- * - Online: applies via idempotent RPC (payment_movements ledger).
- * - Offline/failed: queued for syncEngine to flush via the same RPC.
+ * - Cloud FIRST: applied via the idempotent apply_payment_movements RPC (authoritative
+ *   ledger). Throws on failure so local wallet balances never diverge from cloud.
+ * - Then mirrors the balance change into the local Dexie cache for instant UI.
  */
 export const adjustPaymentBalances = async (moves: any[], opts?: any) => {
   if (!moves || moves.length === 0) return;
   if (!opts?.batchId) console.warn('[wallet] No batchId — idempotency not guaranteed');
   const now = new Date();
-  for (const mv of moves) {
+
+  // Stamp each move with a stable id shared by the cloud ledger row and the local
+  // cache row (previously local vs remote generated different ids when mv.id absent).
+  const stamped = moves.map(mv => ({ ...mv, id: mv.id || generateId() }));
+
+  // 1. Cloud FIRST — authoritative idempotent ledger.
+  const remoteMoves = stamped.map(mv => ({
+    id: mv.id,
+    mode_id: mv.modeId,
+    delta: Number(mv.delta),
+    reference_id: mv.referenceId || null,
+    note: mv.note || null,
+  }));
+  await cloudWrite('payment_movements', 'upsert', opts?.batchId || generateId(), remoteMoves, opts);
+
+  // 2. Local optimistic cache (cloud already authoritative; realtime pull re-syncs balances).
+  for (const mv of stamped) {
     const mode = await localDb.paymentModes.get(mv.modeId);
     if (mode) {
       await localDb.paymentModes.update(mv.modeId, {
@@ -156,7 +172,7 @@ export const adjustPaymentBalances = async (moves: any[], opts?: any) => {
       });
     }
     await localDb.payment_movements.add({
-      id: mv.id || generateId(),
+      id: mv.id,
       modeId: mv.modeId,
       delta: Number(mv.delta),
       referenceId: mv.referenceId || null,
@@ -165,15 +181,6 @@ export const adjustPaymentBalances = async (moves: any[], opts?: any) => {
       createdAt: now,
     }).catch(() => {});
   }
-  const remoteMoves = moves.map(mv => ({
-    id: mv.id || generateId(),
-    mode_id: mv.modeId,
-    delta: Number(mv.delta),
-    reference_id: mv.referenceId || null,
-    note: mv.note || null,
-  }));
-  // OFFLINE-FIRST: always route through the queue; SyncEngine replays via apply_payment_movements RPC.
-  await queueOp('payment_movements', 'apply', opts?.batchId || generateId(), remoteMoves, opts);
 };
 
 /** PHASE 16/4A: central helper — a credit sale never debited a wallet, so it must
@@ -302,8 +309,8 @@ export const paymentModesService = {
       isActive: true, isDefault: false, sortOrder: 99, color: data.color || '#6366f1',
       updatedAt: new Date(),
     };
+    await cloudWrite('payment_modes', 'upsert', id, toRemotePaymentMode(mode));
     await localDb.paymentModes.put(mode);
-    await queueOp('payment_modes', 'upsert', id, toRemotePaymentMode(mode));
     return mode;
   },
 
@@ -312,8 +319,8 @@ export const paymentModesService = {
     if (!mode) return;
     if ((mode as any).isDefault) throw new Error('Cannot delete default wallet');
     if (Math.abs(Number((mode as any).balance || 0)) > 0.01) throw new Error('Balance must be 0 before deletion');
+    await cloudWrite('payment_modes', 'delete', id, {});
     await localDb.paymentModes.delete(id);
-    await queueOp('payment_modes', 'delete', id, {});
   },
 
   async transfer(fromId: string, toId: string, amount: number, note?: string) {

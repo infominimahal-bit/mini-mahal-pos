@@ -9,7 +9,7 @@ export async function signOutLogic(setLoading: any, setSession: any, setUser: an
     console.warn('Network error during sign out, gracefully logging out locally:', error);
   } finally {
     localStorage.removeItem('pos_session_start');
-    localStorage.removeItem('pos_offline_profile');
+    localStorage.removeItem('pos_actor_profile');
     localStorage.removeItem('zaynahs-pos-auth');
     localStorage.removeItem('zaynahs-pos-admin-auth');
 

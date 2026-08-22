@@ -1,24 +1,25 @@
 import { productsService, generateId, toRemoteStockHistory, productToppingsService, applyVariantStockMovement } from '../../../lib/services';
-import { localDb, queueOp } from '../../../lib/localDb';
+import { localDb } from '../../../lib/localDb';
+import { cloudWrite } from '../../../lib/cloudWrite';
 import { sonner } from '../../../lib/sonner';
 import { useProductsStore } from '../../../stores';
 import { DetailCtx } from './detailContext';
 
 export async function performSave(ctx: DetailCtx) {
   const confirmMsg = ctx.showStockIn
-    ? ctx.t('pending_stock_entry_warning', 'You have a pending Stock Entry open. Proceeding will save product details, but you should finish the Stock Entry separately to update inventory counts. Save changes anyway?')
-    : ctx.t('confirm_changes_desc', 'Commit all modifications for this product to the database?');
+    ? 'You have a pending Stock Entry open. Proceeding will save product details, but you should finish the Stock Entry separately to update inventory counts. Save changes anyway?'
+    : 'Commit all modifications for this product to the database?';
 
   const result = await sonner.confirm(
-    ctx.t('confirm_changes_title', 'Confirm Changes'),
+    'Confirm Changes',
     confirmMsg,
-    ctx.t('yes_confirm', 'Yes, Confirm')
+    'Yes, Confirm'
   );
 
   if (!result.isConfirmed) return;
 
   ctx.setIsUpdating(true);
-  sonner.loading(ctx.t('syncing_changes', 'Syncing changes...'));
+  sonner.loading('Syncing changes...');
 
   try {
     const isInfinity = ctx.formData.trackInventory === false;
@@ -60,8 +61,8 @@ export async function performSave(ctx: DetailCtx) {
         cashierName: ctx.profile?.email || 'System',
         createdAt: now
       };
+      await cloudWrite('stock_history', 'create', histId, toRemoteStockHistory(histEntry));
       await localDb.stockHistory.add(histEntry);
-      await queueOp('stock_history', 'create', histId, toRemoteStockHistory(histEntry));
     } else if (!isInfinity && !wasInfinity) {
       const oldStock = ctx.product.stock || 0;
       const newStockVal = updatedProduct.stock || 0;
@@ -79,8 +80,8 @@ export async function performSave(ctx: DetailCtx) {
           cashierName: ctx.profile?.email || 'System',
           createdAt: now
         };
+        await cloudWrite('stock_history', 'create', adjHistId, toRemoteStockHistory(adjHistEntry));
         await localDb.stockHistory.add(adjHistEntry);
-        await queueOp('stock_history', 'create', adjHistId, toRemoteStockHistory(adjHistEntry));
       }
 
       const savedVariantData = ctx.variantData || [];
@@ -105,13 +106,20 @@ export async function performSave(ctx: DetailCtx) {
       }
     }
 
-    const saved = await productsService.update(ctx.product.id, updatedProduct);
+    // Cloud payload MUST NOT carry stock (or per-variant stock): stock is ledger-driven
+    // via the stock_history inserts above + DB trigger. Writing it directly double-counts.
+    const cloudProduct = { ...updatedProduct };
+    delete (cloudProduct as any).stock;
+    if (Array.isArray((cloudProduct as any).variantData)) {
+      (cloudProduct as any).variantData = (cloudProduct as any).variantData.map((v: any) => { const c = { ...v }; delete c.stock; return c; });
+    }
+    const saved = await productsService.update(ctx.product.id, cloudProduct);
     await productToppingsService.setByProduct(ctx.product.id, (ctx as any).toppingIds || []);
-    useProductsStore.getState().updateProduct(saved);
-    sonner.success(ctx.t('product_updated_success', 'Product updated successfully'));
+    useProductsStore.getState().updateProduct(updatedProduct);
+    sonner.success('Product updated successfully');
     ctx.setIsEditMode(false);
   } catch (error) {
-    sonner.error(ctx.t('product_updated_error', 'Failed to update product'));
+    sonner.error('Failed to update product');
   } finally {
     ctx.setIsUpdating(false);
     sonner.close();

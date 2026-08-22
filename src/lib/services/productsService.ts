@@ -11,7 +11,6 @@ import {
   Category,
   Supplier,
   PurchaseRecord,
-  ProductBatch,
   SupplierTransaction,
   StockHistory,
   Payment,
@@ -21,11 +20,11 @@ import {
   CartItem,
   RefundRequest,
   Topping,
-  ExtraTopping,
   VariantStockHistory,
   ProductAddon,
 } from '../../types';
-import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
+import { localDb, generateId, SETTINGS_ID } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { signAction, withActor } from '../actionToken';
 import { mapProduct, toRemoteProduct, toRemoteStockHistory } from './mappers';
@@ -150,15 +149,13 @@ export const productsService = {
       id,
       barcodeValue: finalBarcodeVal,
       barcode: finalBarcodeVal,
-      batches: [],
       createdAt: now,
       updatedAt: now
     } as Product;
 
-    // 1. Local Write
-    await localDb.products.add(newProduct);
-
-    // 2. Queue Parent Product FIRST (to satisfy FK constraints in cloud)
+    // 1. Cloud FIRST — the product row must exist in cloud before its stock_history
+    // (FK) and before any local cache write, so a failed create can never leave a
+    // local-only ghost that the incremental pull would not reconcile.
     // STRIP stock ONLY when an 'initial' history entry will apply it via trigger
     // (absolute stock + trigger insert would double-count). Non-tracked products
     // (no history entry) must keep their absolute stock value (999999 infinity mode).
@@ -166,9 +163,12 @@ export const productsService = {
     if (product.trackInventory && product.stock > 0) {
       delete remoteCreateProduct.stock;
     }
-    await queueOp('products', 'create', id, remoteCreateProduct);
+    await cloudWrite('products', 'create', id, remoteCreateProduct);
 
-    // 3. Queue History (if tracking enabled)
+    // 2. Local cache write
+    await localDb.products.add(newProduct);
+
+    // 3. Stock history (if tracking enabled) — cloud first, then local cache.
     if (product.trackInventory && product.stock > 0) {
       const initialQty = Number(product.stock) || 0;
 
@@ -184,8 +184,8 @@ export const productsService = {
         note: 'Initial opening stock',
         createdAt: now
       };
+      await cloudWrite('stock_history', 'create', logId, toRemoteStockHistory(stockLog));
       await localDb.stockHistory.add(stockLog as any);
-      await queueOp('stock_history', 'create', logId, toRemoteStockHistory(stockLog));
     }
 
     // 4. Create child variations if productType is 'variable'

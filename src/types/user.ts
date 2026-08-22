@@ -25,7 +25,7 @@ export interface User {
   active: boolean;
   lastLogin?: Date;
   avatar?: string;
-  offlineHash?: string;
+  actionHash?: string;
 }
 
 export interface LoginCredentials {

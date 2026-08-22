@@ -11,7 +11,6 @@ import {
   Category,
   Supplier,
   PurchaseRecord,
-  ProductBatch,
   SupplierTransaction,
   StockHistory,
   Payment,
@@ -21,11 +20,11 @@ import {
   CartItem,
   RefundRequest,
   Topping,
-  ExtraTopping,
   VariantStockHistory,
   ProductAddon,
 } from '../../types';
-import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
+import { localDb, generateId, SETTINGS_ID } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { signAction, withActor } from '../actionToken';
 import { mapStockHistory, toRemoteVariantStockHistory, mapPurchaseRecord, toRemoteProduct, toRemotePurchaseRecord, toRemoteStockHistory } from './mappers';
@@ -51,19 +50,6 @@ export async function applyVariantStockMovement(params: {
 
   const newVariantStock = (variant.stock || 0) + changeQty;
 
-  // Local product variantData update (cloud handled by variant_stock_history trigger)
-  const updatedVariantData = (product.variantData || []).map(v =>
-    v.id === variantId ? { ...v, stock: newVariantStock } : v
-  );
-  // Read fresh product so we never clobber concurrent field edits
-  const fresh = (await localDb.products.get(product.id)) || product;
-  await localDb.products.update(product.id, {
-    variantData: fresh.variantData ? fresh.variantData.map(v =>
-      v.id === variantId ? { ...v, stock: newVariantStock } : v
-    ) : updatedVariantData,
-    updatedAt: now
-  });
-
   const vHistId = generateId();
   const vHistEntry: VariantStockHistory = {
     id: vHistId,
@@ -78,8 +64,25 @@ export async function applyVariantStockMovement(params: {
     cashierName: params.cashierName || 'System',
     createdAt: now,
   };
+
+  // Cloud-direct FIRST: the variant_stock_history insert drives the cloud variant
+  // stock via DB trigger. Throw on failure so we never mutate the local cache when
+  // the authoritative cloud write did not persist.
+  await cloudWrite('variant_stock_history', 'create', vHistId, toRemoteVariantStockHistory(vHistEntry));
+
+  // Local cache update (cloud stock already handled by the trigger above).
+  const updatedVariantData = (product.variantData || []).map(v =>
+    v.id === variantId ? { ...v, stock: newVariantStock } : v
+  );
+  // Read fresh product so we never clobber concurrent field edits
+  const fresh = (await localDb.products.get(product.id)) || product;
+  await localDb.products.update(product.id, {
+    variantData: fresh.variantData ? fresh.variantData.map(v =>
+      v.id === variantId ? { ...v, stock: newVariantStock } : v
+    ) : updatedVariantData,
+    updatedAt: now
+  });
   await localDb.variantStockHistory.add(vHistEntry);
-  await queueOp('variant_stock_history', 'create', vHistId, toRemoteVariantStockHistory(vHistEntry));
 }
 
 /**

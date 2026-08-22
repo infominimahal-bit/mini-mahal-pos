@@ -10,7 +10,6 @@ import { Sale } from '../../types';
 import { ReceiptPrint } from '../pos/ReceiptPrint';
 import { normalizePaymentMethod } from '../../lib/services';
 import { sonner } from '../../lib/sonner';
-import { useTranslation } from '../../hooks/useTranslation';
 import { TransactionDetailModal } from './TransactionDetailModal';
 import { ExportButton } from '../../shared/export';
 import { Button } from '../../shared/ui';
@@ -31,7 +30,6 @@ export function TransactionsManager() {
   const appPayments = usePaymentsStore(s => s.payments);
   const appCustomers = useCustomersStore(s => s.customers);
   const { loadMoreSales } = useApp();
-  const { t } = useTranslation();
   const { profile } = useAuth();
   const isAdmin = true;
   const timezone = getTimezone(appSettings.country);
@@ -53,12 +51,7 @@ export function TransactionsManager() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    const handleRefresh = async () => {
-      setRefreshKey(k => k + 1);
-      await loadMoreSales(0, 1000);
-    };
-    window.addEventListener('pendingops-changed', handleRefresh);
-    return () => window.removeEventListener('pendingops-changed', handleRefresh);
+    // Refresh triggered from other actions (e.g. cloud search) handles loading
   }, [loadMoreSales]);
 
   const { isSearchingRemote, cloudResults, isCloudSearch } = useCloudSearch({
@@ -168,8 +161,8 @@ export function TransactionsManager() {
   const canEditSale = isAdmin || profile?.canEditSale;
   const canDeleteSale = isAdmin || profile?.canDeleteSale;
 
-  const exportColumns = useMemo(() => buildExportColumns(t, isAdmin), [t, isAdmin]);
-  const exportRows = useMemo(() => buildExportRows(filteredTransactions, appCustomers, appUsers, isAdmin, appSettings.country, appSettings.timezone, t), [filteredTransactions, appCustomers, appUsers, isAdmin, appSettings.country, appSettings.timezone, t]);
+  const exportColumns = useMemo(() => buildExportColumns(isAdmin), [isAdmin]);
+  const exportRows = useMemo(() => buildExportRows(filteredTransactions, appCustomers, appUsers, isAdmin, appSettings.country, appSettings.timezone), [filteredTransactions, appCustomers, appUsers, isAdmin, appSettings.country, appSettings.timezone]);
 
   return (
     <div className="main-content-scroll p-4 md:p-6 space-y-3">

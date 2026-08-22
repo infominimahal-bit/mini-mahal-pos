@@ -3,7 +3,6 @@ import { formatCurrency } from '../../../lib/currencies';
 import { HelpTooltip } from '../../../shared/ui/HelpTooltip';
 import { SearchableSelect } from '../../../shared/ui/SearchableSelect';
 import { cn } from '../../../lib/utils';
-import { useTranslation } from '../../../hooks/useTranslation';
 import { useCartStore, useSettingsStore } from '../../../stores';
 import { WalletStrip } from './WalletStrip';
 
@@ -79,8 +78,6 @@ export function PaymentForm({
   setSaleNotes,
   appActiveSalesTab,
 }: PaymentFormProps) {
-  const { t } = useTranslation();
-
   return (
     <div className="p-4 space-y-4 order-1 md:order-2 bg-gray-50/50 dark:bg-app">
 
@@ -107,7 +104,7 @@ export function PaymentForm({
               <button key={st.id} onClick={() => setSaleType(st.id as any)}
                 className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-[9px] font-black uppercase tracking-wide transition-all active:scale-95 touch-manipulation ${saleType === st.id ? 'bg-primary text-white border-primary shadow-sm shadow-emerald-500/20' : 'bg-gray-50 dark:bg-white/[0.03] text-gray-600 border-gray-200 dark:border-white/5 hover:text-gray-600 dark:hover:text-gray-200'}`}>
                 <Icon className="w-3.5 h-3.5" />
-                {t(st.id, st.label)}
+                {st.label}
               </button>
             );
           })}
@@ -128,7 +125,7 @@ export function PaymentForm({
               <button key={m.id} onClick={() => handleSelectMethod(m.id)}
                 className={`flex flex-col items-center justify-center gap-1.5 py-2.5 sm:py-3.5 rounded-2xl border transition-all active:scale-95 touch-manipulation ${isActive ? 'bg-primary border-primary shadow-lg shadow-emerald-500/20' : 'bg-white dark:bg-white/[0.03] border-gray-200 dark:border-white/10 hover:border-primary/30'}`}>
                 <m.icon className={`w-4.5 h-4.5 sm:w-5.5 sm:h-5.5 ${isActive ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
-                <span className={`text-[7px] sm:text-[8px] font-black uppercase tracking-widest ${isActive ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`}>{t(m.id, m.label)}</span>
+                <span className={`text-[7px] sm:text-[8px] font-black uppercase tracking-widest ${isActive ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`}>{m.label}</span>
               </button>
             );
           })}

@@ -15,11 +15,9 @@ import { ReportHeader } from './shared/ReportHeader';
 
 import { useReportsData } from './useReportsData';
 import { useParams } from 'react-router-dom';
-import { useTranslation } from '../../hooks/useTranslation';
 
 export function ReportsManager() {
   const { subTab } = useParams();
-  const { t } = useTranslation();
 
   const validReportTypes = ['sales', 'inventory', 'customers', 'expenses', 'financial', 'suppliers', 'salesmen'] as const;
   type ReportType = typeof validReportTypes[number];
@@ -139,7 +137,7 @@ export function ReportsManager() {
                 />
                 <SearchableSelect
                   label={"PAYMENT"}
-                  options={[{ id: 'All', label: "ALL" }, ...paymentMethods.filter(m => m !== 'All').map(m => ({ id: m, label: t(m, m).toUpperCase() }))]}
+                  options={[{ id: 'All', label: "ALL" }, ...paymentMethods.filter(m => m !== 'All').map(m => ({ id: m, label: m.toUpperCase() }))]}
                   value={selectedPayment}
                   onChange={setSelectedPayment}
                   icon={Wallet}

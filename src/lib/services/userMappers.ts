@@ -13,7 +13,7 @@ export const mapUser = (item: any): User => ({
   canViewRecords: item.can_view_records ?? item.canViewRecords,
   canEditSale: item.can_edit_sale ?? item.canEditSale ?? false,
   lastLogin: item.last_login ? new Date(item.last_login) : (item.lastLogin ? new Date(item.lastLogin) : undefined),
-  offlineHash: item.offline_hash ?? item.offlineHash,
+  actionHash: item.action_hash ?? item.actionHash,
   createdAt: item.created_at ? new Date(item.created_at) : new Date(item.createdAt),
   updatedAt: item.updated_at ? new Date(item.updated_at) : new Date(item.updatedAt)
 });

@@ -19,7 +19,6 @@ export interface InventoryReportRow {
   revenue: number;
   cogs: number;
   grossProfit: number;
-  batches: any[];
   isInfinite: boolean;
   recentSales: any[];
 }

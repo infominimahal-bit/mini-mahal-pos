@@ -11,7 +11,7 @@ import {
 
 // PHASE 17 — auto stock reconciliation flag.
 // When true, the stockHistory hooks below skip recomputing product.stock.
-// Bulk cloud imports (CloudPull) and realtime mirror-writes set this so the
+// Bulk cloud imports and realtime mirror-writes set this so the
 // authoritative cloud value isn't double-counted; only LOCAL mutations trigger
 // the ledger-derived recompute.
 export let stockReconcileSuspended = false;
@@ -34,7 +34,6 @@ const SCHEMA_CURRENT = {
   expenses: 'id, categoryId, date',
   discounts: 'id, name, type, active',
   users: 'id, username, email',
-  productBatches: 'id, productId, created_at, status',
   purchaseRecords: 'id, productId, supplierId, date',
   purchaseOrders: 'id, poNumber, supplierId',
   purchaseOrderItems: 'id, poId, productId',
@@ -44,22 +43,17 @@ const SCHEMA_CURRENT = {
   stockHistory: 'id, productId, timestamp, type, referenceId',
   salesTabs: 'id, userId',
   appSettings: 'id, storeName, currency, theme, interfaceMode, receiptPaperSize, receiptTemplate, country, businessType, posGridColumns, enableSplitPayment',
-  pendingOps: '++id, [entity+entityId], status, createdAt, batchId, conflictState',
   syncHistory: '++id, timestamp',
   bundles: 'id, name, active',
   bundleItems: 'id, bundleId, productId',
-  bundleSlots: 'id, bundleId',
-  bundleSlotOptions: 'id, slotId, productId',
   toppings: 'id, name',
   variantStockHistory: 'id, productId, variantId, createdAt',
   productAddons: 'id, productId, addonProductId, active',
-  app_settings: 'id, storeName, currency, enableSplitPayment, enableExtraCharges',
-  purchase_records: 'id, productId, supplierId, date',
   salesmen: 'id, name, active',
-  customer_ledger: 'id, customerId, saleId, type, createdAt',
   payment_movements: 'id, modeId, referenceId, createdAt',
   sale_audit_log: 'id, saleId, action, createdAt',
   priceHistory: 'id, productId, createdAt',
+  customerLedger: 'id, customerId, saleId, createdAt',
 };
 
 export class PosDB extends Dexie {
@@ -70,7 +64,6 @@ export class PosDB extends Dexie {
   users!: Table<User>;
   categories!: Table<Category>;
   suppliers!: Table<Supplier>;
-  productBatches!: Table<any>;
   purchaseRecords!: Table<any>;
   purchaseOrders!: Table<any>;
   purchaseOrderItems!: Table<any>;
@@ -81,12 +74,9 @@ export class PosDB extends Dexie {
   salesTabs!: Table<SalesTab>;
   expenses!: Table<Expense>;
   appSettings!: Table<any>;
-  pendingOps!: Table<any>;
   syncHistory!: Table<any>;
   bundles!: Table<any>;
   bundleItems!: Table<any>;
-  bundleSlots!: Table<any>;
-  bundleSlotOptions!: Table<any>;
   toppings!: Table<Topping>;
   variantStockHistory!: Table<VariantStockHistory>;
   productAddons!: Table<ProductAddon>;
@@ -95,6 +85,7 @@ export class PosDB extends Dexie {
   payment_movements!: Table<any>;
   sale_audit_log!: Table<any>;
   priceHistory!: Table<any>;
+  customerLedger!: Table<any>;
 
   constructor() {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -138,36 +129,77 @@ export class PosDB extends Dexie {
     this.version(28).stores(SCHEMA_CURRENT);
     this.version(29).stores(SCHEMA_CURRENT);
     this.version(30).stores(SCHEMA_CURRENT);
+    this.version(31).stores(SCHEMA_CURRENT);
+    this.version(32).stores(SCHEMA_CURRENT);
+    this.version(33).stores(SCHEMA_CURRENT);
+    // v34 — Stage 1 decommission: drop vestigial productBatches (FIFO/lot layer, never populated)
+    this.version(34).stores({ productBatches: null });
+    // v35 — Stage 1 decommission: drop combo-layer slot tables (never populated; combo feature removed)
+    this.version(35).stores({ bundleSlots: null, bundleSlotOptions: null });
+    // v36 — Stage 1 decommission: collapse duplicate snake_case stores. These were
+    // vestigial empty orphans (camelCase appSettings/purchaseRecords/customerLedger
+    // are the live handles; migrateV13 already emptied the legacy snake pair). No
+    // code holds a localDb.<snake> handle; snake names elsewhere are cloud entities.
+    this.version(36).stores({ app_settings: null, purchase_records: null, customer_ledger: null });
+    // v37 — Drop pendingOps. The app is cloud-direct.
+    this.version(37).stores({ pendingOps: null });
 
     // PHASE 17 — every local stock_history write recomputes product.stock from
     // the full ledger sum. This makes product.stock ledger-derived (single source
     // of truth) and self-heals any desync, regardless of which code path wrote
     // the movement. Bulk/cloud writes are suspended via stockReconcileSuspended.
-    this.stockHistory.hook('creating', async (_primKey, obj: any) => {
+    const self = this;
+    this.stockHistory.hook('creating', function(_primKey, obj: any) {
       if (stockReconcileSuspended) return;
       const pid = obj?.productId;
       if (!pid) return;
-      const rows = await this.stockHistory.where('productId').equals(pid).toArray() as any[];
-      let sum = 0;
-      for (const h of rows) { if (h.variantId) continue; sum += Number(h.changeQty) || 0; }
-      sum += Number(obj.changeQty) || 0;
-      await this.products.update(pid, { stock: sum, updatedAt: new Date() });
-      const { useProductsStore } = await import('../stores');
-      const prod = useProductsStore.getState().products.find(p => p.id === pid);
-      if (prod) useProductsStore.getState().updateProduct({ ...prod, stock: sum });
+      Dexie.ignoreTransaction(async () => {
+        try {
+          const rows = await self.stockHistory.where('productId').equals(pid).toArray() as any[];
+          let sum = 0;
+          let found = false;
+          for (const h of rows) { 
+            if (h.variantId) continue; 
+            sum += Number(h.changeQty) || 0; 
+            if (h.id === obj.id) found = true;
+          }
+          if (!found) {
+            sum += Number(obj.changeQty) || 0;
+          }
+          await self.products.update(pid, { stock: sum, updatedAt: new Date() });
+          const { useProductsStore } = await import('../stores');
+          const prod = useProductsStore.getState().products.find(p => p.id === pid);
+          if (prod) useProductsStore.getState().updateProduct({ ...prod, stock: sum });
+        } catch (e) {
+          console.error("Hook error", e);
+        }
+      });
     });
-    this.stockHistory.hook('deleting', async (_primKey, obj: any) => {
+    this.stockHistory.hook('deleting', function(_primKey, obj: any) {
       if (stockReconcileSuspended) return;
       const pid = obj?.productId;
       if (!pid) return;
-      const rows = await this.stockHistory.where('productId').equals(pid).toArray() as any[];
-      let sum = 0;
-      for (const h of rows) { if (h.variantId) continue; sum += Number(h.changeQty) || 0; }
-      sum -= Number(obj.changeQty) || 0;
-      await this.products.update(pid, { stock: sum, updatedAt: new Date() });
-      const { useProductsStore } = await import('../stores');
-      const prod = useProductsStore.getState().products.find(p => p.id === pid);
-      if (prod) useProductsStore.getState().updateProduct({ ...prod, stock: sum });
+      Dexie.ignoreTransaction(async () => {
+        try {
+          const rows = await self.stockHistory.where('productId').equals(pid).toArray() as any[];
+          let sum = 0;
+          let found = false;
+          for (const h of rows) { 
+            if (h.variantId) continue; 
+            sum += Number(h.changeQty) || 0; 
+            if (h.id === obj.id) found = true;
+          }
+          if (found) {
+            sum -= Number(obj.changeQty) || 0;
+          }
+          await self.products.update(pid, { stock: sum, updatedAt: new Date() });
+          const { useProductsStore } = await import('../stores');
+          const prod = useProductsStore.getState().products.find(p => p.id === pid);
+          if (prod) useProductsStore.getState().updateProduct({ ...prod, stock: sum });
+        } catch (e) {
+          console.error("Hook error", e);
+        }
+      });
     });
   }
 }

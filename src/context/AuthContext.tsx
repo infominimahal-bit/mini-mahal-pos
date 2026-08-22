@@ -4,7 +4,6 @@ import { supabase, enableFullAuthInit } from '../lib/supabase'
 import { User } from '../types'
 import { usersService } from '../lib/services'
 import { sonner } from '../lib/sonner'
-import { localDb } from '../lib/localDb'
 import { hashPasswordString } from '../lib/authUtils'
 import { signInLogic, signUpLogic, signOutLogic, loadProfileLogic } from './authOperations'
 
@@ -44,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (hoursDiff >= 24) {
         localStorage.removeItem('pos_session_start');
-        localStorage.removeItem('pos_offline_profile');
+        localStorage.removeItem('pos_actor_profile');
         supabase.auth.signOut();
         sonner.error('Your session has expired (24 hours). Please sign in again.');
       }
@@ -57,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Polls the cached flag locally and (when online) the server, force-logging
     // out immediately if the account was blocked/removed after login.
     const forceLogout = async (reason: string) => {
-      localStorage.removeItem('pos_offline_profile');
+      localStorage.removeItem('pos_actor_profile');
       localStorage.removeItem('pos_session_start');
       try { await supabase.auth.signOut(); } catch (e) { /* ignore */ }
       setProfile(null);
@@ -67,23 +66,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const verifyActiveStatus = async () => {
-      const cached = localStorage.getItem('pos_offline_profile');
-      if (!cached) return;
+      if (!navigator.onLine) return;
       try {
-        const parsed = JSON.parse(cached);
-        if (parsed.active === false || parsed.deletedAt != null) {
+        const { data: sess } = await supabase.auth.getSession();
+        const uid = sess?.session?.user?.id;
+        if (!uid) return;
+        const { data: prof, error } = await supabase
+          .from('users')
+          .select('active, deleted_at')
+          .eq('id', uid)
+          .single();
+        if (!error && prof && (prof.active === false || prof.deleted_at != null)) {
           forceLogout('Your account has been deactivated. You have been logged out.');
-          return;
-        }
-        if (navigator.onLine && parsed.id) {
-          const { data: prof, error } = await supabase
-            .from('users')
-            .select('active, deleted_at')
-            .eq('id', parsed.id)
-            .single();
-          if (!error && prof && (prof.active === false || prof.deleted_at != null)) {
-            forceLogout('Your account has been deactivated. You have been logged out.');
-          }
         }
       } catch (e) { /* network error: never sign out on network failure (GEMINI rule) */ }
     };
@@ -103,37 +97,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const initSession = () => {
-      if (!navigator.onLine) {
-        const cached = localStorage.getItem('pos_offline_profile');
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (parsed.lastLogin) parsed.lastLogin = new Date(parsed.lastLogin);
-            setProfile(parsed);
-            setUser({ id: parsed.id, email: parsed.email } as any);
-            setLoading(false);
-            return;
-          } catch (e) {
-          }
-        }
-      }
-
       const storedSession = readStoredSession();
       setSession(storedSession ?? null);
       setUser(storedSession?.user ?? null);
+      // Prime the Realtime socket with the restored token on cold start.
+      if (storedSession?.access_token) {
+        try { supabase.realtime.setAuth(storedSession.access_token); } catch { /* noop */ }
+      }
 
       if (storedSession?.user) {
         loadProfileLogic(storedSession.user.id, setProfile, setUser, setLoading);
       } else {
-        const cached = localStorage.getItem('pos_offline_profile');
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (parsed.lastLogin) parsed.lastLogin = new Date(parsed.lastLogin);
-            setProfile(parsed);
-            setUser({ id: parsed.id, email: parsed.email } as any);
-          } catch (e) { }
-        }
         setLoading(false);
       }
     };
@@ -142,23 +116,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      // Keep the Realtime WebSocket's JWT fresh. Without this the socket holds a
+      // stale token; the server CLOSES the channel when it expires (~1h) and the
+      // client reconnects with the same dead token → endless CLOSED→retry loop
+      // (and multi-device sync silently dies). setAuth pushes the new token to
+      // the socket on SIGNED_IN / TOKEN_REFRESHED.
+      if (session?.access_token) {
+        try { supabase.realtime.setAuth(session.access_token); } catch { /* noop */ }
+      }
+
       if (event === 'PASSWORD_RECOVERY') {
         setIsRecoveringPassword(true);
       }
 
       if (!session?.user) {
-        const cached = localStorage.getItem('pos_offline_profile');
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (parsed.lastLogin) parsed.lastLogin = new Date(parsed.lastLogin);
-            setProfile(parsed);
-            setUser({ id: parsed.id, email: parsed.email } as any);
-            setSession(null);
-            setLoading(false);
-            return;
-          } catch (e) { }
-        }
+        setProfile(null)
+        setLoading(false)
       }
 
       setSession(session)
@@ -220,22 +193,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function updatePassword(password: string) {
     const { error } = await supabase.auth.updateUser({ password })
     if (error) throw error
-
-    if (profile?.email) {
-      const hash = await hashPasswordString(password)
-      localStorage.setItem(`offline_hash_${profile.email}`, hash)
-      try {
-        const localUser = await localDb.users.get(profile.id)
-        if (localUser) {
-          (localUser as any).offlineHash = hash
-          await localDb.users.put(localUser)
-        }
-      } catch (e) {
-      }
-      supabase.from('users').update({ offline_hash: hash }).eq('id', profile.id)
-        .then(({ error }) => {
-        });
-    }
   }
 
   async function refreshProfile() {

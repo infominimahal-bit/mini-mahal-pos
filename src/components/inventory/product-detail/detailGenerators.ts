@@ -4,7 +4,7 @@ import { DetailCtx } from './detailContext';
 
 export function generateBarcode(ctx: DetailCtx) {
   if (!ctx.formData.name.trim()) {
-    sonner.error(ctx.t('barcode_name_required', 'Please enter a product name first to generate a barcode'));
+    sonner.error('Please enter a product name first to generate a barcode');
     return;
   }
   const barcode = generateBarcodeValue(ctx.formData.name);
@@ -13,7 +13,7 @@ export function generateBarcode(ctx: DetailCtx) {
 
 export function generateSku(ctx: DetailCtx) {
   if (!ctx.formData.name.trim()) {
-    sonner.error(ctx.t('sku_name_required', 'Please enter a product name first to generate a smart SKU'));
+    sonner.error('Please enter a product name first to generate a smart SKU');
     return;
   }
 

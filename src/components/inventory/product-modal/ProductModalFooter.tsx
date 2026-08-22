@@ -6,9 +6,10 @@ interface ProductModalFooterProps {
   product: Product | null;
   onClose: () => void;
   onSubmit: () => void;
+  isSubmitting?: boolean;
 }
 
-export function ProductModalFooter({ product, onClose, onSubmit }: ProductModalFooterProps) {
+export function ProductModalFooter({ product, onClose, onSubmit, isSubmitting }: ProductModalFooterProps) {
   return (
     <div className="flex items-center justify-end gap-2 sm:gap-3 w-full">
       <Button
@@ -23,9 +24,11 @@ export function ProductModalFooter({ product, onClose, onSubmit }: ProductModalF
         type="button"
         variant="primary"
         size="md"
+        loading={isSubmitting}
+        disabled={isSubmitting}
         onClick={onSubmit}
         className="flex-1 sm:flex-none sm:!min-w-[240px] hover:!shadow-emerald-500/30 !py-2.5 sm:!py-3.5 !text-[9px] sm:!text-[11px]"
-        icon={<Package className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />}
+        icon={!isSubmitting ? <Package className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" /> : undefined}
       >
         <span className="leading-none mt-[1px]">
           {product ? "commit_changes" : "register_product"}

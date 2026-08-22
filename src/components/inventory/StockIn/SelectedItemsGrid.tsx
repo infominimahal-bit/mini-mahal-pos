@@ -7,28 +7,27 @@ interface Props {
   selectedItems: any[];
   updateItem: (id: string, field: string, value: any) => void;
   removeItem: (id: string) => void;
-  t: (key: string, fallback?: string) => string;
 }
 
-export function SelectedItemsGrid({ selectedItems, updateItem, removeItem, t }: Props) {
+export function SelectedItemsGrid({ selectedItems, updateItem, removeItem }: Props) {
   return (
     <div className="space-y-6">
       <h3 className="text-[11px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
         <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-        {t('staging_matrix', 'Staging Matrix').replace('{count}', selectedItems.length.toString())}
+        {'Staging Matrix'.replace('{count}', selectedItems.length.toString())}
       </h3>
       <div className="bg-white dark:bg-surface rounded-[2rem] border border-gray-200 dark:border-white/5 overflow-hidden">
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-gray-50 dark:bg-white/[0.02]">
-                <th className="px-6 py-4 text-[9px] font-black text-gray-600 uppercase tracking-[0.2em]">{t('product_identity', 'PRODUCT')}</th>
-                <th className="px-6 py-4 text-[9px] font-black text-gray-600 uppercase tracking-[0.2em]">{t('sourcing', 'SUPPLIER')}</th>
-                <th className="px-6 py-4 text-[9px] font-black text-gray-600 uppercase tracking-[0.2em]">{t('variant', 'VARIANT')}</th>
-                <th className="px-6 py-4 text-[9px] font-black text-primary uppercase tracking-[0.2em] text-center">{t('qty', 'QTY')}</th>
-                <th className="px-6 py-4 text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] text-right">{t('cost', 'COST')}</th>
-                <th className="px-6 py-4 text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] text-right">{t('retail', 'RETAIL')}</th>
-                <th className="px-6 py-4 text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] text-center">{t('ops', 'ACT')}</th>
+                <th className="px-6 py-4 text-[9px] font-black text-gray-600 uppercase tracking-[0.2em]">{'PRODUCT'}</th>
+                <th className="px-6 py-4 text-[9px] font-black text-gray-600 uppercase tracking-[0.2em]">{'SUPPLIER'}</th>
+                <th className="px-6 py-4 text-[9px] font-black text-gray-600 uppercase tracking-[0.2em]">{'VARIANT'}</th>
+                <th className="px-6 py-4 text-[9px] font-black text-primary uppercase tracking-[0.2em] text-center">{'QTY'}</th>
+                <th className="px-6 py-4 text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] text-right">{'COST'}</th>
+                <th className="px-6 py-4 text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] text-right">{'RETAIL'}</th>
+                <th className="px-6 py-4 text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] text-center">{'ACT'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
@@ -44,14 +43,14 @@ export function SelectedItemsGrid({ selectedItems, updateItem, removeItem, t }: 
                       value={item.batchSupplier}
                       onChange={(e) => updateItem(item.id, 'batchSupplier', e.target.value)}
                       className="w-full bg-[#f8f9fa] dark:bg-black/20 border-none rounded-lg px-3 py-2 text-[10px] font-black text-gray-900 dark:text-white uppercase"
-                      placeholder={t('direct_entry', 'Direct Entry')}
+                      placeholder={'Direct Entry'}
                     />
                   </td>
                   <td className="px-6 py-4 min-w-[170px]">
                     {(item.variantData || []).some((vd: any) => vd.trackInventory !== false) ? (
                       <SearchableSelect
                         options={[
-                          { id: '__general__', label: t('general_stock', 'GENERAL STOCK') },
+                          { id: '__general__', label: 'GENERAL STOCK' },
                           ...(item.variantData || []).map((vd: any) => ({
                             id: vd.id,
                             label: `${vd.option1 || ''}${vd.option2 ? ` / ${vd.option2}` : ''}`,
@@ -66,7 +65,7 @@ export function SelectedItemsGrid({ selectedItems, updateItem, removeItem, t }: 
                         }}
                       />
                     ) : (
-                      <span className="text-[9px] font-black text-gray-400 uppercase">{t('general', 'General')}</span>
+                      <span className="text-[9px] font-black text-gray-400 uppercase">{'General'}</span>
                     )}
                   </td>
                   <td className="px-6 py-4 text-center">

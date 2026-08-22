@@ -1,8 +1,9 @@
-import { Sale, RefundRequest, StockHistory, VariantStockHistory, Payment } from '../../types';
-import { localDb, queueOp, generateId } from '../localDb';
-import { toRemoteProduct, toRemoteCustomer, toRemoteSale, toRemoteStockHistory, toRemoteVariantStockHistory } from './mappers';
-import { refundSaleAtomic, applyStockMovementsRemote, activeReturns } from './atomicOps';
-import { adjustPaymentBalances, buildReversePaymentMoves, buildRefundPaymentMoves, toRemotePayment } from './paymentsService';
+import { Sale, RefundRequest, VariantStockHistory, Payment } from '../../types';
+import { localDb, generateId } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
+import { toRemoteProduct, toRemoteCustomer } from './mappers';
+import { refundSaleAtomic, activeReturns } from './atomicOps';
+import { adjustPaymentBalances, buildRefundPaymentMoves, toRemotePayment } from './paymentsService';
 import { normalizePaymentMethod } from './utils';
 import { recordCustomerLedger } from './customersService';
 import { logAuditEvent } from './auditLogService';
@@ -47,7 +48,6 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
 
     // Phase 1: collect reverse-stock movements for atomic cloud commit.
     const returnMovements: any[] = [];
-    const returnQueue: Array<{ entity: string; histId: string; remote: any; opts: any }> = [];
 
     const isFullRefund = !request || request.type === 'full';
     const itemsToReverse = isFullRefund ? sale.items.map((item, index) => {
@@ -71,7 +71,6 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
 
     // R3 FIX: block over-refund BEFORE any local mutation so a repeated/partial
     // double-refund request can never restore stock or reverse payment twice.
-    // (The cloud RPC also guards this, but local-first restore must be pre-checked.)
     if ((sale.refundedAmount || 0) + totalRefundAmount > (sale.total || 0) + 0.01) {
       throw new Error('Refund amount exceeds remaining sale total — blocked to prevent double refund');
     }
@@ -95,7 +94,7 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
           updatedAt: now
         });
 
-        // Log Return in History + Queue cloud sync
+        // Log Return in History (local cache) + movement for atomic cloud commit
         const retHistId = generateId();
         const retHistEntry = {
           id: retHistId,
@@ -118,7 +117,6 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
           variant_label: '',
           cashier_name: currentCashierName || sale.cashier || 'System',
         });
-        returnQueue.push({ entity: 'stock_history', histId: retHistId, remote: toRemoteStockHistory(retHistEntry), opts: { batchId: id } });
 
         // --- VARIANT-LEVEL STOCK RESTORATION (mirror of sale deduction) ---
         if (item.selectedVariantId && product.variantData) {
@@ -144,7 +142,7 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
               note: `Sale #${sale.invoiceNumber} Refunded (Variant)`,
               balanceAfter: newVariantStock,
               cashierName: currentCashierName || sale.cashier || 'System',
-              createdAt: now,
+              createdAt: now
             };
             await localDb.variantStockHistory.add(vRetHistEntry);
             returnMovements.push({
@@ -157,7 +155,6 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
               variant_label: item.selectedVariantLabel || variant.cardTitle || variant.option1,
               cashier_name: currentCashierName || sale.cashier || 'System',
             });
-            returnQueue.push({ entity: 'variant_stock_history', histId: vRetHistId, remote: toRemoteVariantStockHistory(vRetHistEntry), opts: { batchId: id } });
           }
         }
       }
@@ -178,7 +175,7 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
             // STRIP stock — cloud stock is updated ONLY via stock_history trigger (avoids double-count)
             const remoteRefundAddon = toRemoteProduct({ ...addonProduct, stock: newAddonStock, updatedAt: now });
             delete remoteRefundAddon.stock;
-            await queueOp('products', 'update', addonProduct.id, remoteRefundAddon, { batchId: id });
+            await cloudWrite('products', 'update', addonProduct.id, remoteRefundAddon, { batchId: id });
 
             const aHistId = generateId();
             const aHistoryEntry = {
@@ -203,7 +200,6 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
               variant_label: '',
               cashier_name: currentCashierName || sale.cashier || 'System',
             });
-            returnQueue.push({ entity: 'stock_history', histId: aHistId, remote: toRemoteStockHistory(aHistoryEntry), opts: { batchId: id } });
           }
         }
       }
@@ -227,7 +223,6 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
           await localDb.stockHistory.add(he);
           returnMovements.push({ id: hid, product_id: gp.id, change_qty: qty, type: 'return',
             note: he.note, variant_id: '', variant_label: '', cashier_name: he.cashierName });
-          returnQueue.push({ entity: 'stock_history', histId: hid, remote: toRemoteStockHistory(he), opts: { batchId: id } });
         }
       }
     }
@@ -265,17 +260,17 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
     await localDb.sales.put(returnUpdate); // use put instead of update to overwrite fully
 
     // 1b. Atomic cloud commit: reverse stock + update status in ONE tx (online).
-    const onlineRet = typeof navigator === 'undefined' || navigator.onLine;
-    let returnsCommitted = false;
-    if (onlineRet) {
-      returnsCommitted = await refundSaleAtomic(id, returnMovements, finalStatus, newRefundedAmount);
+    // Cloud-direct: no offline buffer. If the cloud commit fails we throw so the UI
+    // shows a failure instead of silently keeping only the local optimistic state.
+    const returnsCommitted = await refundSaleAtomic(id, returnMovements, finalStatus, newRefundedAmount);
+    if (!returnsCommitted) {
+      throw new Error('Cloud refund failed. Please retry — stock was not reversed.');
     }
-    if (returnsCommitted) {
-      try { await queueOp('sales', 'update', id, { payment_status: finalStatus } as any, { batchId: id }); } catch (_) { /* non-fatal */ }
-    }
+
+    // Mirror sale status/payment_status to cloud (display cache sync).
+    await cloudWrite('sales', 'update', id, { payment_status: finalStatus, status: finalStatus } as any, { batchId: id });
+
     // P6/P24: record refund on the customer ledger (credit reduces what they owe).
-    // Recorded REGARDLESS of online/offline (offline-first: localDb + queueOp), and the
-    // credit is the INCREMENTAL amount of THIS refund, not the cumulative total (GAP 4).
     const custId = (sale as any).customerId;
     if (custId) {
       await recordCustomerLedger({
@@ -286,25 +281,6 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
         reference: (sale as any).invoiceNumber,
         note: 'Refund',
       });
-    }
-    if (!returnsCommitted) {
-      if (returnMovements.length > 0) {
-        const stockOk = await applyStockMovementsRemote(returnMovements);
-        if (!stockOk) {
-          for (const q of returnQueue) {
-            await queueOp(q.entity, 'create', q.histId, q.remote, q.opts);
-          }
-        }
-      }
-    }
-
-    // 3. Queue RPC Sync (legacy fallback only — atomic refund already handled cloud)
-    if (!returnsCommitted) {
-      await queueOp('sales', 'update', id, {
-        ...toRemoteSale(returnUpdate),
-        status: finalStatus,
-        updated_at: now.toISOString()
-      }, { batchId: id });
     }
 
     // 4. Reverse Customer Stats
@@ -320,7 +296,7 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
           updatedAt: now
         };
         await localDb.customers.put(updatedCustomer);
-        await queueOp('customers', 'update', customer.id, toRemoteCustomer(updatedCustomer), { batchId: id });
+        await cloudWrite('customers', 'update', customer.id, toRemoteCustomer(updatedCustomer), { batchId: id });
       }
     }
 
@@ -340,7 +316,7 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
         createdAt: now,
       };
       await localDb.payments.add(refundPayment);
-      await queueOp('payments', 'create', refundPayId, toRemotePayment(refundPayment), { batchId: id });
+      await cloudWrite('payments', 'create', refundPayId, toRemotePayment(refundPayment), { batchId: id });
       // Refund wallet moves: same-wallet → reverse proportionally, different-wallet → deduct chosen only (BUG-C01/C08)
       const walletMoves = buildRefundPaymentMoves(sale, totalRefundAmount, refundWalletId);
       await adjustPaymentBalances(walletMoves, { batchId: id });

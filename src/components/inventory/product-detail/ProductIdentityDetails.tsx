@@ -6,8 +6,12 @@ import { ProductVariants } from './ProductVariants';
 import { ProductStatus } from './ProductStatus';
 import type { ProductDetailController } from './useProductDetail';
 
+import { useInventoryStore } from '../../../stores/inventoryStore';
+
 export function ProductIdentityDetails({ d }: { d: ProductDetailController }) {
-  const { t, formData, setFormData, generateSku, generateBarcode, setActiveScannerField, setShowScanner } = d;
+  const { formData, setFormData, generateSku, generateBarcode, setActiveScannerField, setShowScanner } = d;
+  const categories = useInventoryStore(s => s.categories);
+  const suppliers = useInventoryStore(s => s.suppliers).map(s => s.name);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in slide-in-from-bottom-4">
@@ -16,15 +20,15 @@ export function ProductIdentityDetails({ d }: { d: ProductDetailController }) {
         <div className="flex items-center gap-3 mb-8">
           <div className="p-3 bg-violet-500/10 text-violet-500 rounded-[1.5rem]"><BadgeInfo className="w-6 h-6" /></div>
           <div>
-            <h3 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tight">{t('identity_details', 'Identity Details')}</h3>
-            <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{t('global_product_properties', 'Global product properties')}</p>
+            <h3 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tight">{"Identity Details"}</h3>
+            <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">{"Global product properties"}</p>
           </div>
         </div>
         <div className="space-y-6">
           <SegmentedControl
             options={[
-              { value: 'simple', label: t('simple_product', 'Simple Product') },
-              { value: 'variable', label: t('variable_product', 'Variable Product') },
+              { value: 'simple', label: 'Simple Product' },
+              { value: 'variable', label: 'Variable Product' },
             ]}
             value={formData.productType}
             onChange={(v) => setFormData(prev => ({ ...prev, productType: v }))}
@@ -32,7 +36,7 @@ export function ProductIdentityDetails({ d }: { d: ProductDetailController }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <SearchableSelect
-                label={t('category_req', 'Category *').replace(' *', '')}
+                label={'Category *'.replace(' *', '')}
                 options={categories.map(c => ({ id: c, label: c }))}
                 value={formData.category}
                 onChange={(val) => setFormData({ ...formData, category: val })}
@@ -40,8 +44,8 @@ export function ProductIdentityDetails({ d }: { d: ProductDetailController }) {
             </div>
             <div className="space-y-1.5">
               <SearchableSelect
-                label={t('supplier_label', 'SUPPLIER')}
-                options={[{ id: '', label: t('none', 'NONE') }, ...suppliers.map(s => ({ id: s, label: s }))]}
+                label={"SUPPLIER"}
+                options={[{ id: '', label: 'NONE' }, ...suppliers.map(s => ({ id: s, label: s }))]}
                 value={formData.supplier}
                 onChange={(val) => setFormData({ ...formData, supplier: val })}
               />
@@ -50,13 +54,13 @@ export function ProductIdentityDetails({ d }: { d: ProductDetailController }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t('sku_optional', 'SKU (Optional)')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{"SKU (Optional)"}</label>
               <div className="relative">
                 <input
                   value={formData.sku}
                   onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
                   className="w-full bg-gray-50 dark:bg-black/30 border-none pl-5 pr-20 py-4 rounded-[1.5rem] text-sm font-mono outline-none ring-1 ring-gray-100 dark:ring-white/5 focus:ring-emerald-500/50"
-                  placeholder={t('enter_sku', 'ENTER SKU')}
+                  placeholder={"ENTER SKU"}
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                   {formData.sku && (
@@ -71,7 +75,7 @@ export function ProductIdentityDetails({ d }: { d: ProductDetailController }) {
                     variant="ghost"
                     onClick={generateSku}
                     className="!min-h-0 !p-2.5 !rounded-2xl !bg-white dark:!bg-[#262626] !text-primary !shadow-sm hover:!scale-110"
-                    title={t('generate_sku_tooltip', 'Generate Smart SKU')}
+                    title={"Generate Smart SKU"}
                     icon={<Wand2 className="w-4 h-4" />}
                   />
                 </div>
@@ -79,13 +83,13 @@ export function ProductIdentityDetails({ d }: { d: ProductDetailController }) {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{t('barcode_ean', 'Barcode / EAN')}</label>
+              <label className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest ml-1">{"Barcode / EAN"}</label>
               <div className="relative">
                 <input
                   value={formData.barcode}
                   onChange={(e) => setFormData({ ...formData, barcode: e.target.value.toUpperCase() })}
                   className="w-full bg-gray-50 dark:bg-black/30 border-none pl-5 pr-32 py-4 rounded-[1.5rem] text-sm font-mono outline-none ring-1 ring-gray-100 dark:ring-white/5 focus:ring-emerald-500/50"
-                  placeholder={t('scan_barcode', 'SCAN BARCODE')}
+                  placeholder={"SCAN BARCODE"}
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                   {formData.barcode && (
@@ -100,14 +104,14 @@ export function ProductIdentityDetails({ d }: { d: ProductDetailController }) {
                     variant="ghost"
                     onClick={generateBarcode}
                     className="!min-h-0 !p-2 !rounded-xl !bg-white dark:!bg-[#262626] !text-primary !shadow-sm hover:!scale-110 !border !border-primary/10"
-                    title={t('generate_barcode_tooltip', 'Generate Barcode')}
+                    title={"Generate Barcode"}
                     icon={<Wand2 className="w-4 h-4" />}
                   />
                   <Button
                     variant="ghost"
                     onClick={() => { setActiveScannerField('barcode'); setShowScanner(true); }}
                     className="!min-h-0 !p-2 !rounded-xl !bg-white dark:!bg-[#262626] !text-blue-500 !shadow-sm hover:!scale-110 !border !border-blue-500/10"
-                    title={t('scan_with_camera_tooltip', 'Scan with Camera')}
+                    title={"Scan with Camera"}
                     icon={<Camera className="w-4 h-4" />}
                   />
                 </div>

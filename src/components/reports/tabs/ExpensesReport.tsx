@@ -4,7 +4,6 @@ import { formatCurrency, getCurrencySymbol } from '../../../lib/currencies';
 import { formatAppDate } from '../../../lib/dateUtils';
 import { EXPENSE_CATEGORIES } from '../../../types';
 import { Expense } from '../../../types';
-import { useTranslation } from '../../../hooks/useTranslation';
 import { normalizePaymentMethod } from '../../../lib/services';
 import { Pagination, usePagination } from '../../../shared/ui';
 import { ExportButton } from '../../../shared/export';
@@ -27,7 +26,6 @@ export function ExpensesReport({
   filteredExpenses, expensesTrendData, expenseCategoryData,
   totalExpenseAmount, currency, theme, country
 }: ExpensesReportProps) {
-  const { t } = useTranslation();
   const { page, totalPages, pageItems, goToPage, pageSize, setPageSize } = usePagination(filteredExpenses, 25);
   const tooltipStyle = {
     backgroundColor: theme === 'dark' ? '#171717' : 'white',
@@ -53,9 +51,9 @@ export function ExpensesReport({
       description: e.description,
       notes: e.notes || '',
       category: e.category,
-      paymentMethod: t(e.paymentMethod, e.paymentMethod),
+      paymentMethod: e.paymentMethod,
       amount: Number(e.amount) || 0,
-    })), [filteredExpenses, country, t]);
+    })), [filteredExpenses, country]);
 
   return (
     <>
@@ -74,7 +72,7 @@ export function ExpensesReport({
           return (
             <div key={method} className={`stat-card bg-gradient-to-br ${item.gradient} group`}>
               <div className="stat-card-inner">
-                <span className="stat-card-label">{t(method, method)} {"Expenses"}</span>
+                <span className="stat-card-label">{method} {"Expenses"}</span>
                 <span className="stat-card-value">{formatCurrency(walletExpenses, currency)}</span>
                 <p className="text-[7px] font-black text-white/40 uppercase tracking-[0.2em] mt-1">{walletCount} {"entries"}</p>
               </div>
@@ -167,7 +165,7 @@ export function ExpensesReport({
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${expense.paymentMethod === 'cash' ? 'bg-primary/10 text-primary' : expense.paymentMethod === 'card' ? 'bg-blue-500/10 text-blue-600' : 'bg-purple-500/10 text-purple-600'}`}>
                       {expense.paymentMethod === 'cash' ? <Banknote className="w-3 h-3" /> : expense.paymentMethod === 'card' ? <CreditCard className="w-3 h-3" /> : <Smartphone className="w-3 h-3" />}
-                      {t(expense.paymentMethod, expense.paymentMethod)}
+                      {expense.paymentMethod}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right font-black text-rose-600 dark:text-rose-400 text-xs">-{formatCurrency(Number(expense.amount), currency)}</td>
@@ -207,7 +205,7 @@ export function ExpensesReport({
                 <span className="px-2 py-0.5 rounded-lg bg-gray-100 dark:bg-white/5 text-gray-600 text-[8px] font-black uppercase tracking-widest border border-gray-200/50 dark:border-white/5">{expense.category}</span>
                 <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest ${expense.paymentMethod === 'cash' ? 'text-primary bg-primary/5' : expense.paymentMethod === 'card' ? 'text-blue-500 bg-blue-500/5' : 'text-purple-500 bg-purple-500/5'}`}>
                   {expense.paymentMethod === 'cash' ? <Banknote className="w-3 h-3" /> : expense.paymentMethod === 'card' ? <CreditCard className="w-3 h-3" /> : <Smartphone className="w-3 h-3" />}
-                  {t(expense.paymentMethod, expense.paymentMethod)}
+                  {expense.paymentMethod}
                 </div>
               </div>
             </div>

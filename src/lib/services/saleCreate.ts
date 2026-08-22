@@ -1,13 +1,14 @@
 import { Sale, StockHistory, VariantStockHistory } from '../../types';
-import { localDb, queueOp, generateId } from '../localDb';
+import { localDb, generateId } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 import { getDeviceId } from '../deviceId';
 import { getActor } from '../actionToken';
 import { mapSale, toRemoteVariantStockHistory, toRemoteProduct, toRemoteCustomer, toRemoteSale, toRemoteStockHistory } from './mappers';
 import { derivePaymentStatus } from './utils';
-import { commitSaleAuthoritative, revertLocalSaleStock } from './atomicOps';
+import { revertLocalSaleStock } from './atomicOps';
 import { recordCustomerLedger } from './customersService';
 import { collectSaleMovements } from './saleCreate.stock';
-import { adjustPaymentBalances, buildSalePaymentMoves } from './paymentsService';
+import { buildSalePaymentMoves } from './paymentsService';
 import { logAuditEvent } from './auditLogService';
 
 export async function createSale(sale: Omit<Sale, 'id'>): Promise<Sale> {
@@ -35,102 +36,131 @@ export async function createSale(sale: Omit<Sale, 'id'>): Promise<Sale> {
     createdAt: now
   } as Sale;
 
-  // We must process items FIRST to calculate true FIFO cost before saving the sale
+  // We must process items FIRST to calculate true FIFO cost before saving the sale.
   // DRAFT RULE: pending drafts must NEVER touch stock or revenue.
   // A draft is only a saved cart — it deducts stock ONLY when it is completed.
-  // ESTORE RULE (2026-08-12): an online order has NO stock effect until the
-  // POS bills it. Fulfilling (creating this sale with sourceOrderId) is the
-  // bill — so stock IS deducted here, exactly once, via the normal sale path.
   const isDraftSale = sale.status === 'pending' || !!sale.notes?.includes('DRAFT_SALE');
   const skipStockEffects = isDraftSale;
 
-  const { movements, historyQueue, anyOversold } = await collectSaleMovements(newSale, id, now, skipStockEffects);
+  const { movements, anyOversold } = await collectSaleMovements(newSale, id, now, skipStockEffects);
 
-  // 1. Local Write (Now contains precise purchaseCost per item)
-  (newSale as any).paymentStatus = derivePaymentStatus(newSale);
-  // NOTE: collectSaleMovements() above already adjusted local product stock +
-  // wrote local stock_history. For ONLINE sales we enforce ALL-OR-NOTHING: if the
-  // cloud commit fails we fully REVERT these local writes (see cloudFailedHard)
-  // so local & cloud can never silently diverge. Offline sales stay local-first
-  // and are queued for later sync (no divergence once reconnected).
-  await localDb.sales.add(newSale);
+  let paymentMoves: any[] = [];
+  if (!isDraftSale) {
+    paymentMoves = buildSalePaymentMoves(newSale);
+  }
 
-  // 2. Atomic cloud commit (online) OR legacy per-op queue fallback (offline).
-  // Commit the sale + ALL stock movements in ONE transaction via the `commit_sale`
-  // RPC so products.stock / variant_data can NEVER diverge from sales. If the RPC
-  // succeeds, the legacy 'sales' + 'stock_history' queue ops are skipped.
-  const onlineNow = typeof navigator === 'undefined' || navigator.onLine;
-  let cloudCommitted = false;
-  let cloudFailedHard = false;
-  if (onlineNow && !skipStockEffects && !isDraftSale) {
-    const commitRes = await commitSaleAuthoritative(toRemoteSale(newSale), movements);
-    if (commitRes && commitRes.already_fulfilled) {
-      await revertLocalSaleStock(newSale.id, movements);
-      cloudCommitted = true;
-    } else if (commitRes) {
-      cloudCommitted = true;
-    } else {
-      // ONLINE but cloud rejected/timed-out. ALL-OR-NOTHING: do NOT leave a
-      // half-synced sale locally — revert every local write for this sale.
-      cloudFailedHard = true;
-    }
-    // P26/P27: persist payment_status on the cloud sale row via the sync queue
-    // (OFFLINE-FIRST compliant — never a direct supabase-js write).
-    if (cloudCommitted) {
-      try {
-        await queueOp('sales', 'update', newSale.id, { payment_status: (newSale as any).paymentStatus } as any, { batchId: id });
-      } catch (_) { /* non-fatal */ }
+  let customerLedgerPayload: any = null;
+  let customerToUpdate: any = null;
+  if (newSale.customerId && !isDraftSale) {
+    const customer = await localDb.customers.get(newSale.customerId);
+    if (customer) {
+      customerToUpdate = customer;
+      const ledgerId = generateId();
+      customerLedgerPayload = {
+        id: ledgerId,
+        customer_id: customer.id,
+        type: 'sale',
+        debit: newSale.total,
+        credit: 0,
+        balance_after: Number(customer.balance || 0) + newSale.total,
+        reference: newSale.invoiceNumber,
+        note: 'Sale',
+        created_by: actor?.id ?? null,
+      };
     }
   }
 
-  // 2.1 ALL-OR-NOTHING ROLLBACK for online sales whose cloud commit failed.
-  if (cloudFailedHard) {
-    await revertLocalSaleStock(newSale.id, movements);
-    await localDb.stockHistory.where('referenceId').equals(newSale.id).delete();
-    await localDb.variantStockHistory.filter((h: any) => h.referenceId === newSale.id).delete();
+  (newSale as any).paymentStatus = derivePaymentStatus(newSale);
+
+  // collectSaleMovements() above already adjusted local product stock + wrote local
+  // stock_history (optimistic). Persist the sale row locally too, THEN commit to
+  // cloud. ALL-OR-NOTHING: if the cloud commit fails we fully REVERT every local
+  // write and throw, so local & cloud can never silently diverge.
+  await localDb.sales.add(newSale);
+
+  // Cloud is the SINGLE SOURCE OF TRUTH — commit the sale + ALL stock movements +
+  // wallet moves + customer ledger in ONE atomic transaction via commit_sale.
+  // Idempotent (idempotency_key = sale id); invoice-collision retry lives inside
+  // cloudWrite. Drafts carry empty history/moves (commit_sale just inserts the row).
+  const megaPayload: any = toRemoteSale(newSale);
+  megaPayload.history = skipStockEffects ? [] : movements;
+  megaPayload.paymentMoves = paymentMoves.map(p => ({
+    id: p.id,
+    mode_id: p.modeId,
+    delta: p.delta,
+    reference_id: p.referenceId,
+    note: p.note,
+  }));
+  megaPayload.customerLedger = customerLedgerPayload;
+
+  try {
+    await cloudWrite('sales', 'create', id, megaPayload, { batchId: id });
+  } catch (e) {
+    // ALL-OR-NOTHING ROLLBACK: undo the optimistic local writes so nothing is left half-applied.
+    if (!skipStockEffects) {
+      await revertLocalSaleStock(newSale.id, movements);
+      await localDb.stockHistory.where('referenceId').equals(newSale.id).delete();
+      await localDb.variantStockHistory.filter((h: any) => h.referenceId === newSale.id).delete();
+    }
     await localDb.sales.delete(newSale.id);
     throw new Error('SALE_NOT_SYNCED: Cloud unreachable — the sale was NOT saved (nothing changed locally). Retry when online.');
   }
 
-  if (!cloudCommitted) {
-    await queueOp('sales', 'create', id, toRemoteSale(newSale), { batchId: id });
-    for (const q of historyQueue) {
-      await queueOp(q.entity, 'create', q.histId, q.remote, q.opts);
-    }
-  }
-
-  // 2.5. Record Payment Movements (Wallets)
-  if (!isDraftSale) {
-    const paymentMoves = buildSalePaymentMoves(newSale);
-    await adjustPaymentBalances(paymentMoves, { batchId: id });
-  }
-
-  // 3. Update Customer Stats if identified (NEVER for drafts — drafts are not revenue)
-  if (newSale.customerId && !isDraftSale) {
-    const customer = await localDb.customers.get(newSale.customerId);
-    if (customer) {
-      const updatedCustomer = {
-        ...customer,
-        totalPurchases: (customer.totalPurchases || 0) + newSale.total,
-        lastPurchase: newSale.timestamp,
-        updatedAt: now
-      };
-      await localDb.customers.put(updatedCustomer);
-      await queueOp('customers', 'update', customer.id, toRemoteCustomer(updatedCustomer), { batchId: id });
-      // P6/P24: record customer ledger (local-first, synced via queueOp) + maintain balance.
-      const balAfter = await recordCustomerLedger({
-        customerId: customer.id,
-        saleId: newSale.id,
-        type: 'sale',
-        debit: newSale.total,
-        reference: newSale.invoiceNumber,
-        note: 'Sale',
-      });
-      if (typeof balAfter === 'number') {
-        await localDb.customers.update(customer.id, { balance: balAfter });
-        await queueOp('customers', 'update', customer.id, toRemoteCustomer({ ...customer, balance: balAfter, updatedAt: now }), { batchId: id });
+  // Cloud is authoritative. Mirror the wallet balance changes into the local cache
+  // (commit_sale already applied them server-side; realtime pull re-affirms).
+  if (!isDraftSale && paymentMoves.length > 0) {
+    const nowTime = new Date();
+    for (const mv of paymentMoves) {
+      const mode = await localDb.paymentModes.get(mv.modeId);
+      if (mode) {
+        await localDb.paymentModes.update(mv.modeId, { balance: Number(mode.balance || 0) + Number(mv.delta), updatedAt: nowTime });
       }
+      await localDb.payment_movements.add({
+        id: mv.id,
+        modeId: mv.modeId,
+        delta: Number(mv.delta),
+        referenceId: mv.referenceId,
+        referenceType: mv.referenceType,
+        note: mv.note,
+        createdAt: nowTime,
+      }).catch(() => {});
     }
+  }
+
+  // Mirror the customer ledger + stats locally. commit_sale already inserted the
+  // ledger row and updated the balance server-side; the STATS (totalPurchases /
+  // lastPurchase) are a secondary best-effort push — a failure there must never
+  // fail an already-committed sale.
+  if (customerToUpdate && customerLedgerPayload && !isDraftSale) {
+    const balAfter = customerLedgerPayload.balance_after;
+    const afterCommit = new Date();
+    const updatedCustomer = {
+      ...customerToUpdate,
+      totalPurchases: (customerToUpdate.totalPurchases || 0) + newSale.total,
+      lastPurchase: newSale.timestamp,
+      balance: balAfter,
+      updatedAt: afterCommit
+    };
+    await localDb.customers.put(updatedCustomer);
+    try {
+      await cloudWrite('customers', 'update', customerToUpdate.id, { ...toRemoteCustomer(updatedCustomer), id: customerToUpdate.id }, { batchId: id });
+    } catch (err) {
+      console.warn('[createSale] customer stats push failed (sale already committed):', err);
+    }
+
+    await localDb.customerLedger.add({
+      id: customerLedgerPayload.id,
+      customerId: customerLedgerPayload.customer_id,
+      saleId: newSale.id,
+      type: 'sale',
+      debit: newSale.total,
+      credit: 0,
+      balanceAfter: balAfter,
+      reference: newSale.invoiceNumber,
+      note: 'Sale',
+      createdBy: actor?.id ?? null,
+      createdAt: now
+    }).catch(() => {});
   }
 
   (newSale as any).wasOversold = anyOversold;

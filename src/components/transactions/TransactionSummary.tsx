@@ -1,6 +1,5 @@
 import { Layers } from 'lucide-react';
 import { formatCurrency } from '../../lib/currencies';
-import { useTranslation } from '../../hooks/useTranslation';
 
 interface TransactionSummaryProps {
   transaction: any;
@@ -9,8 +8,6 @@ interface TransactionSummaryProps {
 }
 
 export function TransactionSummary({ transaction, appSettings, showDiscount }: TransactionSummaryProps) {
-  const { t } = useTranslation();
-
   return (
     <div className="p-4 bg-gray-50 dark:bg-white/[0.03] rounded-2xl space-y-2">
       {transaction.notes && (
@@ -26,7 +23,7 @@ export function TransactionSummary({ transaction, appSettings, showDiscount }: T
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
             {transaction.splitPayments.map((p: any, i: number) => (
               <div key={i} className="flex justify-between items-center text-[9px] font-black uppercase">
-                <span className="text-gray-500">{t(p.method, p.method)}</span>
+                <span className="text-gray-500">{p.method}</span>
                 <span className="text-gray-700 dark:text-gray-300">{formatCurrency(p.amount, appSettings.currency)}</span>
               </div>
             ))}

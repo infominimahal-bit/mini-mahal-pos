@@ -3,7 +3,6 @@ import { Receipt } from 'lucide-react';
 import { Sale } from '../../../../types';
 import { formatCurrency, getCurrencySymbol } from '../../../../lib/currencies';
 import { formatAppDateTime } from '../../../../lib/dateUtils';
-import { useTranslation } from '../../../../hooks/useTranslation';
 import { Pagination, usePagination } from '../../../../shared/ui';
 import { ExportButton } from '../../../../shared/export';
 
@@ -15,7 +14,6 @@ interface Props {
 }
 
 export function SalesHistoryTable({ filteredSales, currency, country, users }: Props) {
-  const { t } = useTranslation();
   const { page, totalPages, pageItems, goToPage, pageSize, setPageSize } = usePagination(filteredSales, 25);
 
   const statusLabel = (s: any) => {
@@ -24,7 +22,7 @@ export function SalesHistoryTable({ filteredSales, currency, country, users }: P
     if (s.status === 'partially_refunded') return "Partially Refunded";
     if (s.status === 'deleted') return "Deleted";
     if (s.status === 'pending' || s.notes?.includes('DRAFT_SALE')) return "Draft";
-    return t(s.status, s.status);
+    return s.status;
   };
 
   const netTotal = (s: any) =>
@@ -47,12 +45,12 @@ export function SalesHistoryTable({ filteredSales, currency, country, users }: P
     invoiceNumber: sale.invoiceNumber || '',
     dateTime: formatAppDateTime(sale.timestamp, country),
     customer: sale.customerName || "Walk-in Customer",
-    paymentMethod: t(sale.paymentMethod, sale.paymentMethod),
+    paymentMethod: sale.paymentMethod,
     cashier: sale.cashier || 'System',
     salesman: sale.salesmanName || '',
     revenue: netTotal(sale),
     status: statusLabel(sale),
-  })), [filteredSales, country, t]);
+  })), [filteredSales, country]);
 
   return (
     <div className="card shadow-xl border-none bg-white dark:bg-surface overflow-hidden">
@@ -97,7 +95,7 @@ export function SalesHistoryTable({ filteredSales, currency, country, users }: P
                 <td className="px-6 py-4 text-xs text-gray-600 dark:text-gray-400 font-bold">{formatAppDateTime(sale.timestamp, country)}</td>
                 <td className="px-6 py-4">
                   <p className="text-sm font-bold text-gray-800 dark:text-gray-200">{sale.customerName || "Walk-in Customer"}</p>
-                  <p className="text-[10px] text-gray-600 uppercase font-black">{t(sale.paymentMethod, sale.paymentMethod)} {"Payment"}</p>
+                  <p className="text-[10px] text-gray-600 uppercase font-black">{sale.paymentMethod} {"Payment"}</p>
                 </td>
                 <td className="px-6 py-4">
                   <p className="text-xs font-bold text-gray-700 dark:text-gray-300 leading-tight">{sale.cashier}</p>
@@ -111,7 +109,7 @@ export function SalesHistoryTable({ filteredSales, currency, country, users }: P
                   )}
                 </td>
                 <td className="px-6 py-4 text-sm font-black text-gray-900 dark:text-white text-right">{formatCurrency(sale.total - (sale.refundedAmount || 0), currency)}</td>
-                <td className="px-6 py-4 text-center"><span className={`inline-flex px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${sale.status === 'partially_refunded' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-primary/10 text-primary dark:text-emerald-400 border border-primary/20'}`}>{t(sale.status === 'partially_refunded' ? 'partially_refunded' : 'completed', sale.status === 'partially_refunded' ? 'Partial' : 'Completed')}</span></td>
+                <td className="px-6 py-4 text-center"><span className={`inline-flex px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${sale.status === 'partially_refunded' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-primary/10 text-primary dark:text-emerald-400 border border-primary/20'}`}>{sale.status === 'partially_refunded' ? 'Partial' : 'Completed'}</span></td>
               </tr>
             ))}
           </tbody>
@@ -135,7 +133,7 @@ export function SalesHistoryTable({ filteredSales, currency, country, users }: P
               <div className="space-y-1">
                 <p className="text-sm font-bold text-gray-800 dark:text-gray-200 leading-none">{sale.customerName || "Walk-in Customer"}</p>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{t(sale.paymentMethod, sale.paymentMethod)}</span>
+                  <span className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{sale.paymentMethod}</span>
                   <span className="text-[8px] text-gray-600">•</span>
                   <span className="text-[9px] font-black text-primary/80 uppercase tracking-widest">{"By"} {sale.cashier}</span>
                   {sale.salesmanName && (
@@ -146,7 +144,7 @@ export function SalesHistoryTable({ filteredSales, currency, country, users }: P
                   )}
                 </div>
               </div>
-              <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-[0.15em] ${sale.status === 'partially_refunded' ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' : 'bg-primary/10 text-primary border border-primary/10'}`}>{t(sale.status === 'partially_refunded' ? 'partially_refunded' : 'completed', sale.status === 'partially_refunded' ? 'PARTIAL' : 'COMPLETED')}</span>
+              <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-[0.15em] ${sale.status === 'partially_refunded' ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' : 'bg-primary/10 text-primary border border-primary/10'}`}>{sale.status === 'partially_refunded' ? 'PARTIAL' : 'COMPLETED'}</span>
             </div>
           </div>
         ))}

@@ -9,7 +9,7 @@ export function PricingStockFields(props: ProductFormFieldsProps) {
       <div className="space-y-4">
         <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
           <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-          E-Store Visibility & Sorting
+          Featured Product
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -25,7 +25,7 @@ export function PricingStockFields(props: ProductFormFieldsProps) {
               <div className="text-xs font-black text-amber-900 dark:text-amber-200 uppercase tracking-wide flex items-center">
                 {"Featured"}
               </div>
-              <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mt-0.5">Sorts to top of E-Store</div>
+              <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mt-0.5">Sorts to top & highlights</div>
             </div>
           </label>
         </div>

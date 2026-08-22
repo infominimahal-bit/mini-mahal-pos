@@ -66,7 +66,7 @@ export function InventoryReportDesktopTable({
                     <td className="px-3 py-4">
                       <div className="flex items-center gap-3">
                         <div className={`p-1 rounded-lg transition-all ${expandedRows.has(item.id) ? 'bg-primary text-white' : 'text-gray-600 group-hover:text-primary'}`}>
-                          {item.batches && item.batches.length > 0 ? (expandedRows.has(item.id) ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />) : <Database className="w-3.5 h-3.5 opacity-20" />}
+                          {item.recentSales && item.recentSales.length > 0 ? (expandedRows.has(item.id) ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />) : <Database className="w-3.5 h-3.5 opacity-20" />}
                         </div>
                         <div>
                           <p className="text-xs font-black text-gray-900 dark:text-white leading-tight">{item.name}</p>
@@ -102,35 +102,9 @@ export function InventoryReportDesktopTable({
                       </span>
                     </td>
                   </tr>
-                  {expandedRows.has(item.id) && (item.batches.length > 0 || (item.recentSales && item.recentSales.length > 0)) && (
+                  {expandedRows.has(item.id) && item.recentSales && item.recentSales.length > 0 && (
                     <tr className="bg-gray-50/50 dark:bg-white/[0.01]">
                       <td colSpan={9} className="px-12 py-4 space-y-6">
-                        {item.batches.length > 0 && (
-                          <div>
-                            <div className="flex items-center gap-2 mb-4">
-                              <Clock className="w-3.5 h-3.5 text-primary" />
-                              <h4 className="text-[9px] font-black text-gray-600 uppercase tracking-[0.2em]">{"Batch Purchase History"}</h4>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                              {item.batches.map((batch: any, bIdx: number) => (
-                                <div key={batch.id || bIdx} className="p-3 bg-white dark:bg-zinc-800/80 rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm">
-                                  <div className="flex justify-between items-center mb-2">
-                                    <span className="text-[9px] font-black text-primary uppercase">Batch #{batch.batchNumber || bIdx + 1}</span>
-                                    {batch.qtyRemaining > 0
-                                      ? <Badge size="sm" tone="success" className="!text-[8px] !px-1.5 !py-0.5 !rounded !bg-primary/10 !text-primary dark:!text-primary">{"Active"}</Badge>
-                                      : <Badge size="sm" tone="danger" className="!text-[8px] !px-1.5 !py-0.5 !rounded !bg-rose-500/10 !text-rose-500 dark:!text-rose-500">{"Closed"}</Badge>}
-                                  </div>
-                                  <div className="space-y-1">
-                                    <div className="flex justify-between text-[10px]"><span className="text-gray-600 font-bold uppercase tracking-tight">{"Acquisition"}</span><span className="text-gray-900 dark:text-white font-black">{batch.manufacturingDate ? formatAppDate(new Date(batch.manufacturingDate)) : '—'}</span></div>
-                                    <div className="flex justify-between text-[10px]"><span className="text-gray-600 font-bold uppercase tracking-tight">{"Pur. Price"}</span><span className="text-gray-900 dark:text-white font-black">{formatCurrency(batch.costPrice, appSettings.currency)}</span></div>
-                                    <div className="flex justify-between text-[10px] pt-1 border-t border-gray-200 dark:border-white/5"><span className="text-gray-600 font-bold uppercase tracking-tight">{"Remaining"}</span><span className="text-gray-900 dark:text-white font-black">{batch.qtyRemaining} / {batch.quantity}</span></div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
                         {item.recentSales && item.recentSales.length > 0 && (
                           <div>
                             <div className="flex items-center gap-2 mb-4">

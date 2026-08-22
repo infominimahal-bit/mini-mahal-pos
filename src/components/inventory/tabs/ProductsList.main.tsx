@@ -17,7 +17,6 @@ interface Props {
   appProducts: Product[];
   categories: string[];
   suppliers: string[];
-  t: (key: string, defaultText?: string) => string;
   isAdmin: boolean;
   canManageStock: boolean;
   profile: any;
@@ -29,7 +28,7 @@ interface Props {
 }
 
 export function ProductsList({
-  appProducts, categories, suppliers, t, isAdmin, canManageStock, profile,
+  appProducts, categories, suppliers, isAdmin, canManageStock, profile,
   setEditingProduct, setShowProductModal, handleEditProduct,
   setShowBarcodeGenerator, showBarcodeGenerator
 }: Props) {
@@ -167,7 +166,7 @@ export function ProductsList({
             localStorage.removeItem('barcode_show_generator');
           }} className="!min-h-0 !p-2 !rounded-xl !bg-transparent !text-gray-600 dark:!text-gray-400 hover:!bg-gray-100 dark:hover:!bg-white/5">
             <ChevronLeft className="h-5 w-5" />
-            <span className="text-[10px] font-black uppercase tracking-widest">{t("back", "Back")}</span>
+            <span className="text-[10px] font-black uppercase tracking-widest">{"Back"}</span>
           </Button>
           <div className="h-6 w-px bg-gray-200 dark:bg-white/10 mx-1" />
           <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest opacity-60">Management / Barcode Print Engine</p>
@@ -192,10 +191,10 @@ export function ProductsList({
     <>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mt-2">
         {[
-          { label: t("active_items", "Active Items"), value: appProducts.filter(p => p.active !== false && p.productType !== 'variation').length, icon: Package, color: 'from-blue-600 to-indigo-700' },
-          { label: t("low_stock", "Low Stock"), value: lowStockProducts.length, icon: AlertTriangle, color: 'from-amber-500 to-orange-700' },
-          { label: t("stock_value", "Stock Value"), value: formatCurrency(totalValue, appSettings.currency), icon: TrendingUp, color: 'from-emerald-500 to-teal-700' },
-          { label: t("out_of_stock", "Out of Stock"), value: outOfStockProducts.length, icon: TrendingDown, color: 'from-rose-500 to-red-700' },
+          { label: "Active Items", value: appProducts.filter(p => p.active !== false && p.productType !== 'variation').length, icon: Package, color: 'from-blue-600 to-indigo-700' },
+          { label: "Low Stock", value: lowStockProducts.length, icon: AlertTriangle, color: 'from-amber-500 to-orange-700' },
+          { label: "Stock Value", value: formatCurrency(totalValue, appSettings.currency), icon: TrendingUp, color: 'from-emerald-500 to-teal-700' },
+          { label: "Out of Stock", value: outOfStockProducts.length, icon: TrendingDown, color: 'from-rose-500 to-red-700' },
         ].map((stat, i) => (
           <div key={i} className={`stat-card bg-gradient-to-br ${stat.color} shadow-lg shadow-black/5`}>
             <div className="stat-card-inner">
@@ -227,7 +226,6 @@ export function ProductsList({
         onPrintBarcodes={() => { setBarcodeProducts(appProducts.filter(p => selectedProductIds.includes(p.id))); setShowBarcodeGenerator(true); }}
         onAddProduct={() => { setEditingProduct(null); setShowProductModal(true); }}
         onScanClick={() => setShowScannerInInventory(true)}
-        t={t}
       />
 
       <InventoryTable
@@ -246,7 +244,6 @@ export function ProductsList({
         isAdmin={isAdmin}
         profile={profile}
         canManageStock={canManageStock}
-        t={t}
       />
 
       <BulkEditModal selectedIds={selectedProductIds} isOpen={showBulkEditModal} onClose={() => setShowBulkEditModal(false)} categories={categories} suppliers={suppliers} />

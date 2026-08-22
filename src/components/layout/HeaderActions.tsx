@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router-dom';
 import { RefreshCw, Sun, Moon, Settings, LogOut } from 'lucide-react';
 import { sonner } from '../../lib/sonner';
 import { can } from '../../lib/permissions';
-import { SyncStatusBadge } from './SyncStatusBadge';
 import { Button, Avatar } from '../../shared/ui';
 
 interface HeaderActionsProps {
@@ -18,7 +17,6 @@ export function HeaderActions({ appSettings, appCurrentUser, toggleTheme, handle
   const navigate = useNavigate();
   return (
     <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-      <SyncStatusBadge />
       <Button
         variant="ghost"
         onClick={async () => {

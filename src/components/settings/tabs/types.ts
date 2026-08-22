@@ -8,7 +8,6 @@ export interface SettingsTabProps {
   handleRepairCounter: () => Promise<void>;
   handleResetCalibration: () => void;
   appSettings: any;
-  t: (key: string, fallback: string) => string;
   profile?: any;
   canEditSettings: boolean;
   isOnline: boolean;

@@ -13,7 +13,6 @@ import { Expense, EXPENSE_CATEGORIES } from '../../types';
 import { ExpenseModal } from './ExpenseModal';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { formatCurrency } from '../../lib/currencies';
-import { useTranslation } from '../../hooks/useTranslation';
 import { SharedSearchBar } from '../../shared/modules/search-and-list';
 import { Button, DateRangePicker, Pagination } from '../../shared/ui';
 import { ExpenseTable } from './ExpenseTable';
@@ -25,7 +24,6 @@ export function ExpenseManager() {
   const appExpenses = useExpensesStore(s => s.expenses);
   const appCurrentUser = useUsersStore(s => s.currentUser);
 
-  const { t } = useTranslation();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'all' | 'cash' | 'card' | 'online'>('all');
   const [selectedCashier, setSelectedCashier] = useState<string>('all');

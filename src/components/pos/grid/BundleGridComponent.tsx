@@ -1,10 +1,9 @@
 import { useState, useMemo } from 'react';
 import { Gift } from 'lucide-react';
 import { Product } from '../../../types';
-import { ComboSelectionModal } from '../ComboSelectionModal';
 import { DealSizeSelectorModal } from '../DealSizeSelectorModal';
 import { BundleCard } from './BundleCard';
-import { isBundleInSchedule, buildGroupedBundles } from './bundleUtils';
+import { buildGroupedBundles } from './bundleUtils';
 import { getGridClasses } from './bundleGridClasses';
 import { useBundleGridHandlers } from './useBundleGridHandlers';
 
@@ -20,14 +19,13 @@ interface BundleGridProps {
 }
 
 export function BundleGrid({ onAddToCart, currency, isTouchMode, isReturnMode, gridCols = 4, appBundles, appProducts, appCart }: BundleGridProps) {
-  const rawBundles = (appBundles || []).filter(b => b.active !== false && isBundleInSchedule(b));
+  const rawBundles = (appBundles || []).filter(b => b.active !== false);
 
-  const [activeCombo, setActiveCombo] = useState<any>(null);
   const [activeGroup, setActiveGroup] = useState<any>(null);
 
   const groupedBundles = useMemo(() => buildGroupedBundles(rawBundles, appProducts), [rawBundles, appProducts]);
 
-  const { handleBundleQuantity, processBundleAdd, handleAddBundle } = useBundleGridHandlers({ appCart, appProducts, isReturnMode, currency, setActiveCombo, setActiveGroup });
+  const { handleBundleQuantity, processBundleAdd, handleAddBundle } = useBundleGridHandlers({ appCart, appProducts, isReturnMode, currency, setActiveGroup });
 
   if (groupedBundles.length === 0) {
     return (
@@ -133,17 +131,6 @@ export function BundleGrid({ onAddToCart, currency, isTouchMode, isReturnMode, g
         })}
       </div>
 
-      {activeCombo && (
-        <ComboSelectionModal
-          bundle={activeCombo}
-          products={appProducts}
-          currency={currency}
-          isOpen={true}
-          onClose={() => setActiveCombo(null)}
-          onConfirm={(selectedItems, toppingsMap) => processBundleAdd(activeCombo, selectedItems, toppingsMap)}
-        />
-      )}
-
       {activeGroup && (
         <DealSizeSelectorModal
           isOpen={true}
@@ -152,11 +139,7 @@ export function BundleGrid({ onAddToCart, currency, isTouchMode, isReturnMode, g
           bundles={activeGroup.bundles}
           currency={currency}
           onSelect={(selectedBundle) => {
-            if (selectedBundle.isCombo) {
-              setActiveCombo(selectedBundle);
-            } else {
-              processBundleAdd(selectedBundle);
-            }
+            processBundleAdd(selectedBundle);
           }}
         />
       )}

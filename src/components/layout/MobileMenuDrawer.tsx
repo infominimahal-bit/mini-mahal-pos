@@ -2,7 +2,6 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { AppIcons } from '../../lib/icons';
-import { SyncStatusBadge } from './SyncStatusBadge';
 import { Button, Avatar } from '../../shared/ui';
 import { can } from '../../lib/permissions';
 
@@ -79,9 +78,6 @@ export function MobileMenuDrawer({
                 </p>
                 <div className="flex items-center justify-between mt-1">
                   <span className="text-[10px] text-gray-600 opacity-80 capitalize font-bold">{appCurrentUser?.role}</span>
-                  <div className="transform scale-90 origin-right">
-                    <SyncStatusBadge />
-                  </div>
                 </div>
               </div>
             </div>

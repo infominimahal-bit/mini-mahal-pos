@@ -11,7 +11,6 @@ import {
   Category,
   Supplier,
   PurchaseRecord,
-  ProductBatch,
   SupplierTransaction,
   StockHistory,
   Payment,
@@ -21,11 +20,11 @@ import {
   CartItem,
   RefundRequest,
   Topping,
-  ExtraTopping,
   VariantStockHistory,
   ProductAddon,
 } from '../../types';
-import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
+import { localDb, generateId, SETTINGS_ID } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { signAction, withActor } from '../actionToken';
 import { mapExpense, toRemoteExpense } from './mappers';
@@ -39,17 +38,35 @@ export const expensesService = {
   async create(expense: Omit<Expense, 'id'>): Promise<Expense> {
     const id = generateId();
     const newExp = { ...expense, id, createdAt: new Date() } as Expense;
-    await localDb.expenses.add(newExp);
-    await queueOp('expenses', 'create', id, toRemoteExpense(newExp));
-    // Wallet ledger: expense is money OUT (MASTER §6 — every movement leaves
-    // a trace in payment_movements, not just payment_modes.balance).
-    await adjustPaymentBalances([{
-      id,
-      modeId: normalizePaymentMethod(newExp.paymentMethod || 'cash'),
+
+    const pMove = {
+      id: generateId(),
+      mode_id: normalizePaymentMethod(newExp.paymentMethod || 'cash'),
       delta: -Number(newExp.amount || 0),
-      referenceId: id,
+      reference_id: id,
       note: `Expense ${newExp.description || 'Expense'}`,
-    }], { batchId: `exp_${id}` });
+    };
+
+    // 1. Cloud FIRST — atomic commit_expense RPC writes the expense row AND the wallet
+    // ledger move together. Throws on failure so the local cache never diverges.
+    await cloudWrite('expenses', 'create', id, { ...toRemoteExpense(newExp), p_payment_moves: [pMove] } as any);
+
+    // 2. Local cache: expense row + wallet balance mirror (cloud already authoritative).
+    await localDb.expenses.add(newExp);
+    const nowTime = new Date();
+    const mode = await localDb.paymentModes.get(pMove.mode_id);
+    if (mode) {
+       await localDb.paymentModes.update(pMove.mode_id, { balance: Number(mode.balance || 0) + pMove.delta, updatedAt: nowTime });
+    }
+    await localDb.payment_movements.add({
+       id: pMove.id,
+       modeId: pMove.mode_id,
+       delta: pMove.delta,
+       referenceId: pMove.reference_id,
+       note: pMove.note,
+       createdAt: nowTime
+    }).catch(() => {});
+
     return newExp;
   },
 
@@ -57,9 +74,11 @@ export const expensesService = {
     const existing = await localDb.expenses.get(id);
     if (!existing) throw new Error('Expense not found');
     const updated = { ...existing, ...updates, updatedAt: new Date() } as Expense;
+
+    // Cloud FIRST, then local cache.
+    await cloudWrite('expenses', 'update', id, { ...toRemoteExpense(updated), id });
     await localDb.expenses.put(updated);
-    await queueOp('expenses', 'update', id, toRemoteExpense(updated));
-    // Reverse the old amount from the wallet, then apply the new amount.
+    // Reverse the old amount from the wallet, then apply the new amount (cloud-first RPC inside).
     await adjustPaymentBalances([
       {
         id: generateId(),
@@ -84,10 +103,16 @@ export const expensesService = {
     // Reverse the linked supplier payable (if this was a Supplies expense) so the
     // supplier balance is NOT left inflated after the expense is deleted.
     const linkedBill = (await localDb.supplierTransactions.toArray()).find(t => t.referenceId === id);
+
+    // 1. Cloud FIRST — delete expense and any linked supplier bill.
+    await cloudWrite('expenses', 'delete', id, {});
+    if (linkedBill) await cloudWrite('supplier_transactions', 'delete', linkedBill.id, {});
+
+    // 2. Local mirror: remove linked bill, then recompute supplier running balance and
+    // persist it to CLOUD (source of truth) + local — the old code updated local only,
+    // leaving the cloud supplier balance permanently stale after a bill delete.
     if (linkedBill) {
       await localDb.supplierTransactions.delete(linkedBill.id);
-      await queueOp('supplier_transactions', 'delete', linkedBill.id, {});
-      // Recalculate supplier running balance after removing the linked bill
       if (linkedBill.supplierId) {
         const allTxns = await localDb.supplierTransactions
           .where('supplierId').equals(linkedBill.supplierId).toArray();
@@ -96,13 +121,13 @@ export const expensesService = {
         const debits = allTxns.filter(t => t.type === 'payment' || t.type === 'return')
           .reduce((s, t) => s + (Number(t.amount) || 0), 0);
         const newBalance = credits - debits;
+        await cloudWrite('suppliers', 'update', linkedBill.supplierId, { id: linkedBill.supplierId, balance: newBalance, updated_at: new Date().toISOString() });
         await localDb.suppliers.update(linkedBill.supplierId, { balance: newBalance, updatedAt: new Date() });
       }
     }
     await localDb.expenses.delete(id);
-    await queueOp('expenses', 'delete', id, {});
     if (existing) {
-      // Reverse the expense from the wallet (money back IN).
+      // Reverse the expense from the wallet (money back IN) — cloud-first RPC inside.
       await adjustPaymentBalances([{
         id: generateId(),
         modeId: normalizePaymentMethod(existing.paymentMethod || 'cash'),

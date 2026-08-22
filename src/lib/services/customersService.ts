@@ -11,7 +11,6 @@ import {
   Category,
   Supplier,
   PurchaseRecord,
-  ProductBatch,
   SupplierTransaction,
   StockHistory,
   Payment,
@@ -21,11 +20,11 @@ import {
   CartItem,
   RefundRequest,
   Topping,
-  ExtraTopping,
   VariantStockHistory,
   ProductAddon,
 } from '../../types';
-import { localDb, queueOp, generateId, SETTINGS_ID } from '../localDb';
+import { localDb, generateId, SETTINGS_ID } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 import { generateBarcodeValue } from '../../utils/barcode';
 import { signAction, withActor } from '../actionToken';
 import { mapCustomer, toRemoteCustomer, toRemoteSale } from './mappers';
@@ -64,8 +63,8 @@ export async function recordCustomerLedger(entry: {
       createdBy: entry.createdBy || null,
       createdAt: new Date(),
     };
+    await cloudWrite('customer_ledger', 'create', ledgerId, toRemoteCustomerLedger(row));
     await localDb.customerLedger.add(row);
-    await queueOp('customer_ledger', 'create', ledgerId, toRemoteCustomerLedger(row));
     return balanceAfter;
   } catch (e: any) {
     console.error('[customer_ledger] record failed (non-fatal):', e?.message || e);
@@ -109,8 +108,8 @@ export const customersService = {
     const now = new Date();
     const newCustomer = { ...customer, id, createdAt: now } as Customer;
 
+    await cloudWrite('customers', 'create', id, toRemoteCustomer(newCustomer));
     await localDb.customers.add(newCustomer);
-    await queueOp('customers', 'create', id, toRemoteCustomer(newCustomer));
 
     return newCustomer;
   },
@@ -120,15 +119,15 @@ export const customersService = {
     if (!existing) throw new Error('Customer not found');
 
     const updated = { ...existing, ...updates, updatedAt: new Date() };
+    await cloudWrite('customers', 'update', id, { ...toRemoteCustomer({ ...updates, updatedAt: updated.updatedAt }), id });
     await localDb.customers.put(updated);
-    await queueOp('customers', 'update', id, toRemoteCustomer({ ...updates, updatedAt: updated.updatedAt }));
 
     return updated;
   },
 
   async delete(id: string): Promise<void> {
+    await cloudWrite('customers', 'delete', id, {});
     await localDb.customers.delete(id);
-    queueOp('customers', 'delete', id, {});
   },
 
   async getCustomerPayments(customerId: string): Promise<any[]> {

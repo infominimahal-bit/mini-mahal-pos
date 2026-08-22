@@ -1,8 +1,7 @@
 import { supabase } from '../../lib/supabase';
-import { localDb } from '../../lib/localDb';
 import { can } from '../../lib/permissions';
 import { sonner } from '../../lib/sonner';
-import { hashPasswordString, getAuthErrorMessage } from '../../lib/authUtils';
+import { getAuthErrorMessage } from '../../lib/authUtils';
 import { User } from '../../types';
 
 export async function signUpLogic(
@@ -31,12 +30,6 @@ export async function signUpLogic(
       };
       const { data: profileData } = await supabase.from('users').upsert(profilePayload, { onConflict: 'id' }).select().maybeSingle();
       const pData = profileData || profilePayload;
-      try {
-        const hash = await hashPasswordString(password);
-        localStorage.setItem(`offline_hash_${email}`, hash);
-        (pData as any).offlineHash = hash;
-        await localDb.users.put(pData);
-      } catch (e) {}
       if (pData) {
         setProfile({
           id: pData.id, username: pData.username, name: pData.name, email: pData.email, role: pData.role as any,
@@ -45,7 +38,6 @@ export async function signUpLogic(
           canManagePO: can(pData.role, 'manage_po'), canViewRecords: can(pData.role, 'view_records'), active: pData.active ?? true,
           lastLogin: pData.last_login ? new Date(pData.last_login) : undefined, avatar: pData.avatar || undefined,
         });
-        localStorage.setItem('pos_offline_profile', JSON.stringify(pData));
       }
       setLoading(false);
       sonner.success('Welcome! ✅ Account created successfully as Admin.');

@@ -6,7 +6,6 @@ import { Expense, EXPENSE_CATEGORIES } from '../../types';
 import { Modal } from '../../shared/ui/Modal';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { cn } from '../../lib/utils';
-import { useTranslation } from '../../hooks/useTranslation';
 import { sonner } from '../../lib/sonner';
 import { Button, ToggleSwitch, Select } from '../../shared/ui';
 import { buildExpensePayload } from './expenseModalUtils';
@@ -24,7 +23,6 @@ export function ExpenseModal({ isOpen, onClose, onSave, expense }: ExpenseModalP
   const appCurrentUser = useUsersStore(s => s.currentUser);
   const appSuppliers = useInventoryStore(s => s.suppliers);
 
-  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
@@ -191,7 +189,7 @@ export function ExpenseModal({ isOpen, onClose, onSave, expense }: ExpenseModalP
               >
                 {EXPENSE_CATEGORIES.map(cat => (
                   <option key={cat} value={cat} className="dark:bg-surface">
-                    {t('category_' + cat.toLowerCase(), cat)}
+                    {cat}
                   </option>
                 ))}
               </Select>

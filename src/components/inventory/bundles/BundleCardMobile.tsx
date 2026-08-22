@@ -102,11 +102,6 @@ export function BundleCardMobile({ bundle, appSettings, isExpandedLocal, canMana
             {bundle.discountType === 'percentage' && discAmt > 0 ? `-${bundle.discountValue}%` : discAmt > 0 ? `-${formatCurrency(discAmt, appSettings.currency)}` : ''}
           </span>
           <span className="text-[10px] font-black text-primary whitespace-nowrap">{formatCurrency(finalAmt, appSettings.currency)}</span>
-          {bundle.scheduleType === 'scheduled' && (
-            <Badge tone="warning" className="!bg-amber-100 dark:!bg-amber-500/10 !text-amber-700 dark:!text-amber-400 !px-1.5 !py-0.5 !rounded !text-[8px]">
-              Scheduled
-            </Badge>
-          )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {productImages.slice(0, 3).map(({ bi, product }, idx) => (

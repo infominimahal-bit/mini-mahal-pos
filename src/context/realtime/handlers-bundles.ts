@@ -35,22 +35,6 @@ export function attachBundleHandlers(channel: any, ctx: RealtimeCtx) {
         await localDb.bundleItems.delete(payload.old.id).catch(() => { });
       }
     })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'bundle_slots' }, async (payload) => {
-      if (await isPendingDelete('bundle_slots', payload.new?.id || payload.old?.id)) return;
-      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-        await localDb.bundleSlots.put(payload.new).catch(() => { });
-      } else if (payload.eventType === 'DELETE') {
-        await localDb.bundleSlots.delete(payload.old.id).catch(() => { });
-      }
-    })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'bundle_slot_options' }, async (payload) => {
-      if (await isPendingDelete('bundle_slot_options', payload.new?.id || payload.old?.id)) return;
-      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-        await localDb.bundleSlotOptions.put(payload.new).catch(() => { });
-      } else if (payload.eventType === 'DELETE') {
-        await localDb.bundleSlotOptions.delete(payload.old.id).catch(() => { });
-      }
-    })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'variant_stock_history' }, async (payload) => {
       if (await isPendingDelete('variant_stock_history', payload.new?.id || payload.old?.id)) return;
       if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {

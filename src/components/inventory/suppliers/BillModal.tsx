@@ -13,19 +13,18 @@ interface Props {
   setIsBillManualOverride: (v: boolean) => void;
   submitBill: () => void;
   formLoading: boolean;
-  t: (key: string, fallback?: string) => string;
 }
 
 export function BillModal({
   isOpen, onClose, billAmount, setBillAmount, billNote, setBillNote,
-  isBillManualOverride, setIsBillManualOverride, submitBill, formLoading, t
+  isBillManualOverride, setIsBillManualOverride, submitBill, formLoading
 }: Props) {
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={t('record_manual_bill', 'RECORD MANUAL BILL')}
-      subtitle={t('add_manual_invoice_amount', 'ADD MANUAL INVOICE AMOUNT TO LEDGER')}
+      title={'RECORD MANUAL BILL'}
+      subtitle={'ADD MANUAL INVOICE AMOUNT TO LEDGER'}
       maxWidth="sm"
       footer={
         <div className="flex items-center justify-end gap-2 sm:gap-3 w-full">
@@ -34,7 +33,7 @@ export function BillModal({
             onClick={onClose}
             className="flex-1 sm:flex-none !px-4 sm:!px-6 !py-2.5 sm:!py-3.5 !text-[9px] sm:!text-[10px] !font-black !rounded-2xl !text-gray-600 !border-gray-200 dark:!border-white/10 shrink-0"
           >
-            {t('cancel', 'Cancel')}
+            {'Cancel'}
           </Button>
           <Button
             variant="danger"
@@ -42,7 +41,7 @@ export function BillModal({
             disabled={formLoading}
             className="flex-1 sm:flex-none sm:min-w-[200px] !px-4 sm:!px-6 !py-2.5 sm:!py-3.5 !bg-rose-500 hover:!bg-rose-600 !text-[9px] sm:!text-[11px] !font-black !rounded-2xl !shadow-lg !shadow-rose-500/20"
           >
-            {formLoading ? t('processing', 'Recording...') : t('record_bill', 'Record Bill')}
+            {formLoading ? 'Recording...' : 'Record Bill'}
           </Button>
         </div>
       }

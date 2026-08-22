@@ -1,12 +1,9 @@
-import { supabase } from '../supabase';
-import { localDb, queueOp } from '../localDb';
-import { signAction } from '../actionToken';
+import { localDb } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 import { toRemoteSale, toRemoteCustomer } from './mappers';
 import { buildSaleStockMovements } from './saleStockMovements';
 import { adjustPaymentBalances, buildReversePaymentMoves, buildSalePaymentMoves } from './paymentsService';
 import { recordCustomerLedger } from './customersService';
-import { createSale } from './saleCreate';
-import { deleteSale } from './saleDelete';
 import { logAuditEvent } from './auditLogService';
 
 // PHASE 5b — Atomic bill edit. Replaces the old two-call (create + delete)
@@ -37,41 +34,17 @@ export async function editSaleAtomic(oldSale: any, newSale: any, cashier: string
   const newMovements = await buildSaleStockMovements(newSale, false, newSale.invoiceNumber);
   const oldReverseMovements = await buildSaleStockMovements(oldSale, true, oldSale.invoiceNumber);
 
-  const online = typeof navigator === 'undefined' || navigator.onLine;
-  let committed = false;
-  if (online) {
-    const token = await signAction('edit_sale');
-    const rpcPayload: any = {
-      p_new_sale: toRemoteSale(newSale),
-      p_new_history: newMovements,
-      p_old_sale_id: oldSale.id,
-      p_old_reverse_history: oldReverseMovements,
-    };
-    // PHASE 39A: server-side role enforcement (admin|manager). Always pass the
-    // token params (null when no actor) so the call hits the guarded 7-arg
-    // overload — never the legacy unguarded 4-arg one (which was dropped).
-    rpcPayload.p_user_id = token?.p_user_id ?? null;
-    rpcPayload.p_role = token?.p_role ?? null;
-    rpcPayload.p_sig = token?.p_sig ?? null;
-    const res = await supabase.rpc('edit_sale_atomic', rpcPayload);
-    if (res.error) {
-      console.error('[editSaleAtomic] RPC failed, falling back to a queued edit:', res.error);
-    } else {
-      committed = true;
-    }
-  }
-
-  if (!committed) {
-    // Offline / RPC failure: fall back to the existing reliable two-step flow.
-    await createSale(newSale);
-    await deleteSale(oldSale.id, cashier, { newInvoice: newSale.invoiceNumber });
-    // deleteSale already reversed the OLD sale's wallet balances (refund-aware).
-    // Apply the NEW sale's wallet balances so the drawer/wallet stays net-correct.
-    if (!isDraft) {
-      await adjustPaymentBalances(buildSalePaymentMoves(newSale));
-    }
-    return newSale;
-  }
+  // CLOUD FIRST — atomic bill edit. The RPC inserts the new sale, deducts new
+  // stock, restores old stock, and hard-deletes the old sale in ONE transaction.
+  // Throws on failure so stock can NEVER leak and no half-applied edit is left
+  // behind. (cloudWrite signs the edit_sale action + enforces admin|manager role.)
+  await cloudWrite('sales', 'update', oldSale.id, {
+    isAtomicEdit: true,
+    newSale: toRemoteSale(newSale),
+    newHistory: newMovements,
+    oldSaleId: oldSale.id,
+    oldReverseHistory: oldReverseMovements,
+  });
 
   // ---- Side effects (frontend, after atomic RPC success) ----
   // 1. Payment balances: reverse old (refund-aware, mirrors deleteSale), apply new.
@@ -92,7 +65,7 @@ export async function editSaleAtomic(oldSale: any, newSale: any, cashier: string
         updatedAt: now,
       };
       await localDb.customers.put(updatedCustomer);
-      await queueOp('customers', 'update', customer.id, toRemoteCustomer(updatedCustomer));
+      await cloudWrite('customers', 'update', customer.id, { ...toRemoteCustomer(updatedCustomer), id: customer.id });
       const balAfter = await recordCustomerLedger({
         customerId: customer.id,
         saleId: oldSale.id,
@@ -103,7 +76,7 @@ export async function editSaleAtomic(oldSale: any, newSale: any, cashier: string
       });
       if (typeof balAfter === 'number') {
         await localDb.customers.update(customer.id, { balance: balAfter });
-        await queueOp('customers', 'update', customer.id, toRemoteCustomer({ ...customer, balance: balAfter, updatedAt: now }));
+        await cloudWrite('customers', 'update', customer.id, { ...toRemoteCustomer({ ...customer, balance: balAfter, updatedAt: now }), id: customer.id });
       }
       await recordCustomerLedger({
         customerId: customer.id,

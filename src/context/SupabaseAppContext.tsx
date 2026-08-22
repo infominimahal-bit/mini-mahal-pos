@@ -3,9 +3,9 @@ import { useAuth } from './AuthContext';
 import { useUsersStore, useProductsStore, useSettingsStore } from '../stores';
 import { localDb } from '../lib/localDb';
 import { seedPaymentModes, seedMissingBarcodes } from '../lib/services';
-import { startCloudPull, stopCloudPull } from '../lib/cloudPull';
 import { useAppLoadData } from './useAppLoadData';
-import { useAppRealtime } from './useAppRealtime';
+// Realtime disabled — single-tenant POS, saves bandwidth. Data loads on page load / manual refresh.
+// import { useAppRealtime } from './useAppRealtime';
 import { useAppPersistence } from './useAppPersistence';
 import { supabase } from '../lib/supabase';
 import { sonner } from '../lib/sonner';
@@ -27,22 +27,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const appProducts = useProductsStore(s => s.products);
   const hasBooted = useRef(false);
 
-  const { loadData, loadMoreSales, searchSales, handleCloudPullChanged } = useAppLoadData(initialized, setInitialized);
+  const { loadData, loadMoreSales, searchSales } = useAppLoadData(initialized, setInitialized);
 
   // 💾 POS State Persistence hooks
   useAppPersistence();
 
-  // 🔄 REALTIME SYNC hooks
-  useAppRealtime(subscriptionsInitialized, reconnectTrigger, setReconnectTrigger);
+  // 🔄 REALTIME SYNC — DISABLED (single-tenant, saves bandwidth)
+  // useAppRealtime(subscriptionsInitialized, reconnectTrigger, setReconnectTrigger);
 
   // If the current user is blocked/deactivated on another device, force logout.
   useEffect(() => {
     const handleUserBlocked = () => {
-      console.warn('[CloudPull] User blocked — signing out.');
+      console.warn('[Auth] User blocked — signing out.');
       sonner.error('Your account has been deactivated by the administrator.');
       supabase.auth.signOut().catch(() => { });
       localStorage.removeItem('pos_session_start');
-      localStorage.removeItem('pos_offline_profile');
       setTimeout(() => {
         window.location.href = '/login';
       }, 1500);
@@ -59,14 +58,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         console.error('[loadData] unhandled rejection on login:', err);
         hasBooted.current = false;
       });
-      startCloudPull(handleCloudPullChanged);
     } else if (!user) {
       hasBooted.current = false;
-      stopCloudPull();
       setInitialized(false);
       useSettingsStore.getState().setLoading(false);
     }
-  }, [user, profile, initialized, loadData, handleCloudPullChanged]);
+  }, [user, profile, initialized, loadData]);
 
   // Auto-seed missing barcodes on app load
   const autoSeedDone = useRef(false);

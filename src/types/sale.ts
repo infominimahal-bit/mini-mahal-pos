@@ -46,10 +46,9 @@ export interface Discount {
   id: string;
   name: string;
   description: string;
-  type: 'percentage' | 'fixed' | 'bogo' | 'free_gift' | 'mix_and_match';
+  type: 'percentage' | 'fixed';
   value: number;
   conditions: DiscountCondition[];
-  freeGiftProducts?: string[]; // Product IDs for free gifts
   minAmount?: number;
   maxDiscount?: number;
   validFrom: Date;
@@ -65,10 +64,6 @@ export interface DiscountCondition {
   value: any;
   operator?: 'equals' | 'greater_than' | 'less_than' | 'in_array';
   minQuantity?: number; // For specific_products or category condition - minimum quantity required
-  // For Mix & Match Deals
-  targetQuantity?: number; // e.g., Buy 2
-  rewardType?: 'fixed_total' | 'percentage_off_all' | 'cheapest_free';
-  rewardValue?: number; // e.g., 2000 (Fixed Total)
 }
 
 export interface SplitPayment {
@@ -141,7 +136,7 @@ export interface AppliedDiscount {
   discountId: string;
   discountName: string;
   discountAmount: number;
-  type: 'percentage' | 'fixed' | 'bogo' | 'free_gift';
+  type: 'percentage' | 'fixed';
 }
 
 export interface SalesTab {

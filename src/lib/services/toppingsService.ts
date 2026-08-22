@@ -1,9 +1,9 @@
 import { supabase, adminUserAction } from '../supabase';
 import {
   localDb,
-  queueOp,
   generateId,
 } from '../localDb';
+import { cloudWrite } from '../cloudWrite';
 import {
   Topping,
 } from '../../types';
@@ -38,21 +38,20 @@ export const toppingsService = {
   async create(topping: Partial<Topping>): Promise<Topping> {
     const id = (topping as any).id || generateId();
     const remote = { ...toRemoteTopping(topping), id };
-    // OFFLINE-FIRST: persist locally + queue (never direct supabase write).
+    await cloudWrite('toppings', 'create', id, remote);
     await localDb.toppings.put({ ...(topping as any), id } as any);
-    await queueOp('toppings', 'create', id, remote);
     return mapTopping(remote as any);
   },
 
   async update(id: string, topping: Partial<Topping>): Promise<Topping> {
-    const remote = toRemoteTopping(topping);
+    const remote = { ...toRemoteTopping(topping), id };
+    await cloudWrite('toppings', 'update', id, remote);
     await localDb.toppings.update(id, topping as any);
-    await queueOp('toppings', 'update', id, remote);
     return mapTopping({ ...remote, id } as any);
   },
 
   async remove(id: string): Promise<void> {
+    await cloudWrite('toppings', 'delete', id, {});
     await localDb.toppings.delete(id);
-    await queueOp('toppings', 'delete', id, {});
   },
 };

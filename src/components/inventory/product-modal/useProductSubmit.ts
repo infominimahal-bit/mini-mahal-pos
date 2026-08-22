@@ -3,11 +3,20 @@ import { useProductsStore, useInventoryStore } from '../../../stores';
 import { Product } from '../../../types';
 import type { ProductFormData } from './useProductForm';
 
+// Remove scalar + per-variant stock so a product write never sets products.stock
+// directly — stock is ledger-driven (stock_history insert → DB trigger).
+function stripStockFields(p: any) {
+  const c = { ...p };
+  delete c.stock;
+  if (Array.isArray(c.variantData)) {
+    c.variantData = c.variantData.map((v: any) => { const x = { ...v }; delete x.stock; return x; });
+  }
+  return c;
+}
+
 interface UseProductSubmitArgs {
   product: Product | null;
   formData: ProductFormData;
-  batches: any[];
-  batchTotalStock: number;
   variants: any[];
   variantData: any[];
   modifiers: any[];
@@ -15,7 +24,6 @@ interface UseProductSubmitArgs {
   appCurrentUser: any;
   appSuppliers: any[];
   setFormData: React.Dispatch<React.SetStateAction<ProductFormData>>;
-  setBatches: React.Dispatch<React.SetStateAction<any[]>>;
   setVariants: React.Dispatch<React.SetStateAction<any[]>>;
   setVariantData: React.Dispatch<React.SetStateAction<any[]>>;
   setModifiers: React.Dispatch<React.SetStateAction<any[]>>;
@@ -25,8 +33,6 @@ interface UseProductSubmitArgs {
 export function useProductSubmit({
   product,
   formData,
-  batches,
-  batchTotalStock,
   variants,
   variantData,
   modifiers,
@@ -34,7 +40,6 @@ export function useProductSubmit({
   appCurrentUser,
   appSuppliers,
   setFormData,
-  setBatches,
   setVariants,
   setVariantData,
   setModifiers,
@@ -85,7 +90,7 @@ export function useProductSubmit({
       barcode: formData.barcode || undefined,
       price: parseFloat(formData.price) || 0,
       cost: parseFloat(formData.cost) || 0,
-      stock: formData.trackInventory ? (batches.length > 0 ? batchTotalStock : (parseFloat(formData.stock) || 0)) : 999999,
+      stock: formData.trackInventory ? (parseFloat(formData.stock) || 0) : 999999,
       minStock: formData.trackInventory ? (parseFloat(formData.minStock) || 0) : 0,
       targetStock: formData.trackInventory && formData.targetStock ? (parseFloat(formData.targetStock) || undefined) : undefined,
       category: formData.category,
@@ -102,7 +107,6 @@ export function useProductSubmit({
       isFeatured: formData.isFeatured,
       isService: formData.isService,
       requireSerial: formData.requireSerial,
-      batches,
       variants: variants.map(({ name, options }) => ({ name, options })),
       variantData,
       modifiers,
@@ -116,7 +120,8 @@ export function useProductSubmit({
 
       if (product) {
         if (product.trackInventory && productData.trackInventory && product.stock !== productData.stock) {
-          const { localDb, queueOp, generateId } = await import('../../../lib/localDb');
+          const { localDb, generateId } = await import('../../../lib/localDb');
+          const { cloudWrite } = await import('../../../lib/cloudWrite');
           const { toRemoteStockHistory } = await import('../../../lib/services');
           const diff = (productData.stock || 0) - (product.stock || 0);
           const histId = generateId();
@@ -131,10 +136,11 @@ export function useProductSubmit({
             cashierName: 'System',
             createdAt: new Date()
           };
+          await cloudWrite('stock_history', 'create', histId, toRemoteStockHistory(histEntry));
           await localDb.stockHistory.add(histEntry);
-          await queueOp('stock_history', 'create', histId, toRemoteStockHistory(histEntry));
         }
-        await productsService.update(productData.id, productData);
+        // stock already applied via the stock_history insert above; never write it directly.
+        await productsService.update(productData.id, stripStockFields(productData));
         useProductsStore.getState().updateProduct(productData);
       } else {
         if (formData.supplier.trim()) {
@@ -153,8 +159,28 @@ export function useProductSubmit({
           }
         }
 
-        const newProduct = await productsService.create(productData);
-        useProductsStore.getState().addProduct(newProduct);
+        // Create WITHOUT stock (cloud default 0); initial stock is ledger-driven.
+        const newProduct = await productsService.create(stripStockFields(productData));
+        if (productData.trackInventory && (productData.stock || 0) > 0) {
+          const { localDb, generateId } = await import('../../../lib/localDb');
+          const { cloudWrite } = await import('../../../lib/cloudWrite');
+          const { toRemoteStockHistory } = await import('../../../lib/services');
+          const initId = generateId();
+          const initEntry = {
+            id: initId,
+            productId: newProduct.id,
+            changeQty: productData.stock,
+            type: 'stock_in' as const,
+            note: 'Initial Stock on Create',
+            balanceAfter: productData.stock,
+            cashierName: 'System',
+            createdAt: new Date()
+          };
+          await cloudWrite('stock_history', 'create', initId, toRemoteStockHistory(initEntry));
+          await localDb.stockHistory.add(initEntry);
+        }
+        // Local cache keeps the intended stock for display (cloud trigger will match).
+        useProductsStore.getState().addProduct({ ...newProduct, stock: productData.stock, variantData: productData.variantData });
       }
 
       sonner.success(product ? 'Product updated successfully' : 'Product added successfully');
@@ -180,7 +206,6 @@ export function useProductSubmit({
           isService: false,
           requireSerial: false,
         });
-        setBatches([]);
         setVariants([]);
         setVariantData([]);
         setModifiers([]);
