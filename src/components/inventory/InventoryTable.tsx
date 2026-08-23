@@ -43,8 +43,8 @@ export function InventoryTable({
   onPageSizeChange,
   isAdmin,
   profile,
-  canManageStock: _canManageStock,
-  canEditProduct: _canEditProduct,
+  canManageStock,
+  canEditProduct,
 }: InventoryTableProps) {
   const appSettings = useSettingsStore(s => s.settings);
   // RBAC: cost/profit figures are visible to admin|manager only (view_profit)
