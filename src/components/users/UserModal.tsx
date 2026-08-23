@@ -1,5 +1,5 @@
-import React from 'react';
-import { User, Lock, Shield, Crown, Loader2, Camera, Save, Tag, CreditCard, Package, Edit, Trash2, Database, ClipboardList, History, Wallet, Users, BarChart3 } from 'lucide-react';
+import React, { useState } from 'react';
+import { User, Lock, Shield, Crown, Loader2, Camera, Save, Tag, CreditCard, Package, Edit, Trash2, Database, ClipboardList, History, Wallet, Users, BarChart3, Eye, EyeOff } from 'lucide-react';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { User as UserType } from '../../types';
 import { Modal } from '../../shared/ui/Modal';
@@ -15,6 +15,7 @@ interface UserModalProps {
 }
 
 export function UserModal({ isOpen, onClose, user }: UserModalProps) {
+  const [showPassword, setShowPassword] = useState(false);
   const {
     appCurrentUser, loading, formData, setFormData,
     showMediaLibrary, setShowMediaLibrary, handleSubmit, handleChange,
@@ -134,14 +135,21 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600" />
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
                   required={!user}
-                  className="w-full pl-12 pr-4 bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all font-medium"
+                  className="w-full pl-12 pr-12 bg-[#f8f9fa] dark:bg-black/75 border-none text-gray-900 dark:text-white text-sm rounded-xl py-2.5 focus:ring-2 focus:ring-emerald-500 transition-all font-medium"
                   placeholder={user ? t('leave_blank_keep_current', 'Leave blank to keep current') : t('min_6_chars', 'Min 6 characters')}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-emerald-500 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
           </div>
