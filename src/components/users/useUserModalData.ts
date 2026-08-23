@@ -35,14 +35,14 @@ const appUsers = useUsersStore(s => s.users);
     active: true,
     avatar: '',
     canEditPrice: false,
-    canGiveDiscount: true,
+    canGiveDiscount: false,
     canDeleteSale: false,
     canViewProfit: false,
     canManageStock: false,
     canManagePO: false,
     canViewRecords: false,
     canEditSale: false,
-    permissions: [] as string[]
+    permissions: ['access_customers']
   });
   const [showMediaLibrary, setShowMediaLibrary] = useState(false);
 
@@ -76,17 +76,59 @@ const appUsers = useUsersStore(s => s.users);
         active: true,
         avatar: '',
         canEditPrice: false,
-        canGiveDiscount: true,
+        canGiveDiscount: false,
         canDeleteSale: false,
         canViewProfit: false,
         canManageStock: false,
         canManagePO: false,
         canViewRecords: false,
         canEditSale: false,
-        permissions: [] as string[]
+        permissions: ['access_customers']
       });
     }
   }, [user]);
+
+  const handleRoleChange = (newRole: 'admin' | 'manager' | 'cashier') => {
+    setFormData(prev => {
+      const defaults = {
+        manager: {
+          canEditPrice: true,
+          canGiveDiscount: true,
+          canDeleteSale: false,
+          canViewProfit: true,
+          canManageStock: true,
+          canManagePO: true,
+          canViewRecords: true,
+          canEditSale: true,
+          permissions: ['access_payments', 'access_expenses', 'access_customers', 'access_reports', 'access_inventory']
+        },
+        cashier: {
+          canEditPrice: false,
+          canGiveDiscount: false,
+          canDeleteSale: false,
+          canViewProfit: false,
+          canManageStock: false,
+          canManagePO: false,
+          canViewRecords: false,
+          canEditSale: false,
+          permissions: ['access_customers']
+        },
+        admin: {
+          canEditPrice: true,
+          canGiveDiscount: true,
+          canDeleteSale: true,
+          canViewProfit: true,
+          canManageStock: true,
+          canManagePO: true,
+          canViewRecords: true,
+          canEditSale: true,
+          permissions: ['access_payments', 'access_expenses', 'access_customers', 'access_reports', 'access_inventory']
+        }
+      };
+      
+      return { ...prev, role: newRole, ...defaults[newRole] };
+    });
+  };
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -130,15 +172,15 @@ const appUsers = useUsersStore(s => s.users);
           role: formData.role as 'cashier',
           active: formData.active,
           avatar: formData.avatar || undefined,
-          canEditPrice: true,
-          canGiveDiscount: true,
-          canDeleteSale: true,
-          canViewProfit: true,
-          canManageStock: true,
-          canManagePO: true,
-          canViewRecords: true,
-          canEditSale: true,
-          permissions: ['access_payments', 'access_expenses', 'access_customers', 'access_reports', 'access_inventory'],
+          canEditPrice: formData.canEditPrice,
+          canGiveDiscount: formData.canGiveDiscount,
+          canDeleteSale: formData.canDeleteSale,
+          canViewProfit: formData.canViewProfit,
+          canManageStock: formData.canManageStock,
+          canManagePO: formData.canManagePO,
+          canViewRecords: formData.canViewRecords,
+          canEditSale: formData.canEditSale,
+          permissions: formData.permissions,
         };
 
         const updatedUser = await usersService.update(user.id, updatePayload);
@@ -199,15 +241,15 @@ const appUsers = useUsersStore(s => s.users);
           role: formData.role,
           active: formData.active,
           username: formData.username,
-          permissions: ['access_payments', 'access_expenses', 'access_customers', 'access_reports', 'access_inventory'],
-          can_edit_price: true,
-          can_give_discount: true,
-          can_delete_sale: true,
-          can_view_profit: true,
-          can_manage_stock: true,
-          can_manage_po: true,
-          can_view_records: true,
-          can_edit_sale: true,
+          permissions: formData.permissions,
+          can_edit_price: formData.canEditPrice,
+          can_give_discount: formData.canGiveDiscount,
+          can_delete_sale: formData.canDeleteSale,
+          can_view_profit: formData.canViewProfit,
+          can_manage_stock: formData.canManageStock,
+          can_manage_po: formData.canManagePO,
+          can_view_records: formData.canViewRecords,
+          can_edit_sale: formData.canEditSale,
           avatar: formData.avatar || null,
           action_hash: hash
         }, { onConflict: 'id' });
@@ -227,15 +269,15 @@ const appUsers = useUsersStore(s => s.users);
           name: formData.name,
           email: resolvedEmail,
           role: formData.role as 'cashier',
-          permissions: ['access_payments', 'access_expenses', 'access_customers', 'access_reports', 'access_inventory'],
-          canEditPrice: true,
-          canGiveDiscount: true,
-          canDeleteSale: true,
-          canViewProfit: true,
-          canManageStock: true,
-          canManagePO: true,
-          canViewRecords: true,
-          canEditSale: true,
+          permissions: formData.permissions,
+          canEditPrice: formData.canEditPrice,
+          canGiveDiscount: formData.canGiveDiscount,
+          canDeleteSale: formData.canDeleteSale,
+          canViewProfit: formData.canViewProfit,
+          canManageStock: formData.canManageStock,
+          canManagePO: formData.canManagePO,
+          canViewRecords: formData.canViewRecords,
+          canEditSale: formData.canEditSale,
           active: formData.active,
           avatar: formData.avatar || undefined
         };
@@ -284,6 +326,7 @@ const appUsers = useUsersStore(s => s.users);
     setShowMediaLibrary,
     handleSubmit,
     handleChange,
+    handleRoleChange,
     toggleAccessPerm,
     t,
   };

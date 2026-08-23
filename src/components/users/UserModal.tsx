@@ -19,7 +19,7 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
   const {
     appCurrentUser, loading, formData, setFormData,
     showMediaLibrary, setShowMediaLibrary, handleSubmit, handleChange,
-    toggleAccessPerm, t
+    handleRoleChange, toggleAccessPerm, t
   } = useUserModalData(user, onClose);
 
   if (!isOpen) return null;
@@ -169,7 +169,7 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
               { id: 'cashier', label: t('terminal_operator', 'TERMINAL OPERATOR') }
             ]}
             value={formData.role}
-            onChange={(val) => setFormData(prev => ({ ...prev, role: val as any }))}
+            onChange={(val) => handleRoleChange(val as any)}
             icon={Shield}
             disabled={user?.id === appCurrentUser?.id}
           />
