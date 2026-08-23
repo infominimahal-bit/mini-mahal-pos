@@ -1,4 +1,3 @@
-import { format } from 'date-fns';
 
 const DEFAULT_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 

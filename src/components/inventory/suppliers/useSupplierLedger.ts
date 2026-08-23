@@ -1,5 +1,5 @@
 import { useSettingsStore, useUsersStore, useExpensesStore } from '../../../stores';
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Supplier } from '../../../types';
 import { suppliersService, expensesService, generateId } from '../../../lib/services';
 import { sonner } from '../../../lib/sonner';

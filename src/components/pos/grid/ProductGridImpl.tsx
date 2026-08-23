@@ -24,15 +24,15 @@ interface ProductGridProps {
   isReturnMode?: boolean;
 }
 
-export function ProductGrid({ onAddToCart, onOpenDrafts, onAddTab, isReturnMode = false }: ProductGridProps) {
-  const navigate = useNavigate();
+export function ProductGrid({ onAddToCart, onOpenDrafts, onAddTab: _onAddTab, isReturnMode = false }: ProductGridProps) {
+  const _navigate = useNavigate();
   const appProducts = useProductsStore(s => s.products);
   const appSales = useSalesStore(s => s.sales);
   const appSettings = useSettingsStore(s => s.settings);
   const appCart = useCartStore(s => s.cart);
   const appBundles = useAppStore(s => s.bundles);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('Featured');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const prevSearchRef = useRef('');
   const categoriesRef = useRef<HTMLDivElement>(null);
   const [showLeftScroll, setShowLeftScroll] = useState(false);
@@ -97,7 +97,7 @@ export function ProductGrid({ onAddToCart, onOpenDrafts, onAddTab, isReturnMode 
 
   const filteredProducts = useMemo(() => filterProducts(appProducts, searchTerm, selectedCategory), [appProducts, searchTerm, selectedCategory]);
 
-  const categories = ['Featured', 'All', '__BUNDLES__', ...Array.from(new Set((appProducts ?? []).map(p => p.category))).filter(Boolean)];
+  const categories = ['All', '__BUNDLES__', ...Array.from(new Set((appProducts ?? []).map(p => p.category))).filter(Boolean)];
   const isTouchMode = appSettings?.interfaceMode === 'touch';
 
   const checkScrollButtons = () => {
@@ -126,11 +126,10 @@ export function ProductGrid({ onAddToCart, onOpenDrafts, onAddTab, isReturnMode 
     }
   };
 
-  const handleColumnChange = (cols: number) => {
+  const _handleColumnChange = (cols: number) => {
     useSettingsStore.getState().setSettings({ posGridColumns: cols });
 
-    settingsService.update({ posGridColumns: cols })
-      .catch(err => console.error('[POS] Failed to sync grid settings:', err));
+    // Removed DB sync since grid columns are a local device UI preference
 
     sonner.success(`Grid density set to ${cols} columns`);
   };

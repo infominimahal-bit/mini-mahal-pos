@@ -3,6 +3,7 @@ import { purchaseRecordsService, generateId } from '../../../lib/services';
 import { localDb } from '../../../lib/localDb';
 import { supabase } from '../../../lib/supabase';
 import { sonner } from '../../../lib/sonner';
+import { signAction } from '../../../lib/actionToken';
 import { useProductsStore, useInventoryStore } from '../../../stores';
 import { DetailCtx } from './detailContext';
 
@@ -49,6 +50,14 @@ export async function performAdjustment(ctx: DetailCtx) {
 
     // Cloud: single authoritative stock update via RPC (trigger applies it once).
     // Never edit products.stock directly. Stable id => idempotent on retry.
+    // Signed actor proof: server guard allows admin|manager only (RBAC matrix).
+    const token = await signAction('stock_adjustment');
+    if (!token) {
+      sonner.error('Session missing action credentials. Please sign in again.');
+      ctx.setIsUpdating(false);
+      sonner.close();
+      return;
+    }
     const { error } = await supabase.rpc('stock_adjustment', {
       p_product_id: ctx.product.id,
       p_change_qty: qtyChange,
@@ -57,7 +66,8 @@ export async function performAdjustment(ctx: DetailCtx) {
       p_cashier: ctx.profile?.email || 'System',
       p_variant_id: null,
       p_variant_label: null,
-      p_adjustment_id: adjustmentId
+      p_adjustment_id: adjustmentId,
+      ...token
     });
     if (error) throw error;
 

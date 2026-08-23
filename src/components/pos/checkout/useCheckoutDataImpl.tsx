@@ -1,28 +1,13 @@
 import { useAppStore, useCartStore, useProductsStore, useSalesStore, useSettingsStore, useUsersStore } from '../../../stores';
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Check, RefreshCw, Keyboard, Store, Package, CreditCard, Banknote, Building2, Layers } from 'lucide-react';
+import { Store, Package, CreditCard, Banknote, Building2, Layers } from 'lucide-react';
 import { Sale } from '../../../types';
 import { useInvoiceGeneration } from '../../../hooks/useInvoice';
 import { useCartCalculations } from '../../../hooks/useCartCalculations';
 import { useAuth } from '../../../context/AuthContext';
-import { KOTPrint } from '../KOTPrint';
-import { ReceiptPrint } from '../ReceiptPrint';
-import { salesService, generateId, adjustPaymentBalances, buildSalePaymentMoves } from '../../../lib/services';
-import { localDb } from '../../../lib/localDb';
-import { sonner } from '../../../lib/sonner';
-import { formatCurrency } from '../../../lib/currencies';
-import { Modal } from '../../../shared/ui/Modal';
-import { ShortcutsModal } from '../ShortcutsModal';
 import { usePOSKeyboard } from '../../../hooks/usePOSKeyboard';
-import { PaymentForm } from './PaymentForm';
-import { OrderSummary } from './OrderSummary';
 import { useCheckoutPayment } from './useCheckoutPayment';
 import { computeQuickAmounts } from './checkoutUtils';
-
-interface CheckoutPageProps {
-  onClose: () => void;
-  onComplete: (sale: Sale) => void;
-}
 
 export function useCheckoutData(onClose: () => void, onComplete: (sale: Sale) => void) {
   const appSettings = useSettingsStore(s => s.settings);
@@ -30,7 +15,7 @@ export function useCheckoutData(onClose: () => void, onComplete: (sale: Sale) =>
   const appEditingSaleId = useCartStore(s => s.editingSaleId);
   const appSales = useSalesStore(s => s.sales);
   const appNotes = useCartStore(s => s.notes);
-  const appProducts = useProductsStore(s => s.products);
+  const _appProducts = useProductsStore(s => s.products);
   const appSalesmen = useUsersStore(s => s.salesmen);
   const appUsers = useUsersStore(s => s.users);
   const appSelectedCustomer = useCartStore(s => s.selectedCustomer);
@@ -39,8 +24,8 @@ export function useCheckoutData(onClose: () => void, onComplete: (sale: Sale) =>
   const appActiveSalesTab = useCartStore(s => s.activeSalesTab);
   const appBundles = useAppStore(s => s.bundles);
 
-  const { user, profile } = useAuth();
-  const generateInvoice = useInvoiceGeneration();
+  useAuth();
+  const _generateInvoice = useInvoiceGeneration();
 
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [amountPaid, setAmountPaid] = useState('');

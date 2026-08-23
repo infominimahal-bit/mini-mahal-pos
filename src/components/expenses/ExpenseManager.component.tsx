@@ -3,10 +3,8 @@ import { useState, useMemo, useRef } from 'react';
 import {
   Plus, TrendingDown,
   Tag, CreditCard, User,
-  Wallet, LayoutGrid, Zap,
-  Utensils, Fuel, Home, Users,
-  Package, Megaphone, Wrench, ShieldCheck,
-  Receipt, MoreHorizontal
+  Wallet,
+  Receipt
 } from 'lucide-react';
 import { computeExpenseDateBoundaries, buildCashiersList, filterExpenses, computeExpenseStats, computeTopCategory } from './expenseManagerUtils';
 import { Expense, EXPENSE_CATEGORIES } from '../../types';
@@ -36,33 +34,8 @@ export function ExpenseManager() {
   const [currentPage, setCurrentPage] = useState(1);
   const [ITEMS_PER_PAGE, setPageSize] = useState(25);
 
-  const paymentMethodScrollRef = useRef<HTMLDivElement>(null);
-  const categoryScrollRef = useRef<HTMLDivElement>(null);
-
-  const scroll = (ref: React.RefObject<HTMLDivElement>, direction: 'left' | 'right') => {
-    if (ref.current) {
-      const scrollAmount = 200;
-      ref.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
-      });
-    }
-  };
-
-  const CATEGORY_ICONS: Record<string, any> = {
-    'all': LayoutGrid,
-    'Utilities': Zap,
-    'Food': Utensils,
-    'Fuel': Fuel,
-    'Rent': Home,
-    'Salaries': Users,
-    'Supplies': Package,
-    'Marketing': Megaphone,
-    'Maintenance': Wrench,
-    'Insurance': ShieldCheck,
-    'Taxes': Receipt,
-    'Other': MoreHorizontal
-  };
+  const _paymentMethodScrollRef = useRef<HTMLDivElement>(null);
+  const _categoryScrollRef = useRef<HTMLDivElement>(null);
 
   const { validStartDate, validEndDate } = useMemo(() =>
     computeExpenseDateBoundaries(dateRange, startDateInput, endDateInput, appSettings.country),

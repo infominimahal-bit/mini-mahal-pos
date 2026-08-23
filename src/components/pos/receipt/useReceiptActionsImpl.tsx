@@ -46,11 +46,11 @@ export function useReceiptActions(
       settings,
     });
 
-    // @ts-ignore
+    // @ts-ignore -- electronAPI is injected by the optional Electron shell only
     if (window.electronAPI && window.electronAPI.isElectron) {
       console.log('[ReceiptPrint] Using Electron print');
       try {
-        // @ts-ignore
+        // @ts-ignore -- electronAPI is injected by the optional Electron shell only
         await window.electronAPI.printHtml(printHTML);
       } catch (error) {
         console.error('Electron print failed:', error);

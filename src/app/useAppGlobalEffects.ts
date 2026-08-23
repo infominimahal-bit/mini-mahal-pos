@@ -28,9 +28,9 @@ export function useAppGlobalEffects() {
     if (!appSettings) return;
     const bizName = appSettings.storeName?.trim() || 'POS';
 
-    let name = bizName.startsWith('POS') ? bizName : `POS - ${bizName}`;
-    let shortName = bizName.length > 12 ? bizName.substring(0, 10) + '\u2026' : bizName;
-    let title = `${bizName} - POS`;
+    const name = bizName.startsWith('POS') ? bizName : `POS - ${bizName}`;
+    const shortName = bizName.length > 12 ? bizName.substring(0, 10) + '\u2026' : bizName;
+    const title = `${bizName} - POS`;
 
     const appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
     if (appleIcon) appleIcon.setAttribute('href', '/zaynahs-logo.svg');
@@ -79,7 +79,7 @@ export function useAppGlobalEffects() {
   }, []);
 
   useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
+    const handleWheel = (_e: WheelEvent) => {
       if (document.activeElement?.getAttribute('type') === 'number') {
         (document.activeElement as HTMLElement).blur();
       }
@@ -90,7 +90,7 @@ export function useAppGlobalEffects() {
 
   useEffect(() => {
     const fallbackTheme = localStorage.getItem('theme');
-    const theme = appSettings?.theme || fallbackTheme || 'dark';
+    const theme = fallbackTheme || appSettings?.theme || 'dark';
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
     const applyTheme = () => {

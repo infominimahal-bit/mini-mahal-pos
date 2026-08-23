@@ -1,6 +1,6 @@
 import { useCustomersStore, useExpensesStore, useInventoryStore, usePaymentsStore, useProductsStore, useSalesStore, useSettingsStore, useUsersStore } from '../../stores';
-import { useState, useMemo, useEffect } from 'react';
-import { getEffectiveTotal, getItemCOGS, getItemRevenue, isDraftSale, netItemQty } from '../../lib/reportsUtils';
+import { useState, useMemo } from 'react';
+import { getEffectiveTotal } from '../../lib/reportsUtils';
 import { useReportFilters } from './hooks/useReportFilters';
 import { useSalesStats } from './hooks/useSalesStats';
 import { useExpenseStats } from './hooks/useExpenseStats';
@@ -40,7 +40,7 @@ export function useReportsData(subTab: string | undefined) {
         setRepairProgress(percent); sonner.update('Auditing Data...', `${percent}% Complete`);
       });
       sonner.close(); await sonner.alert('Data Audit Complete', `Patched ${count} legacy sales records.`); window.location.reload();
-    } catch (error) { sonner.close(); await sonner.alert('Repair Failed', 'Failed to repair data.'); } finally { setRepairing(false); setRepairProgress(null); }
+    } catch (_error) { sonner.close(); await sonner.alert('Repair Failed', 'Failed to repair data.'); } finally { setRepairing(false); setRepairProgress(null); }
   };
 
   const filterProps = useReportFilters(appSettings, appSales, appExpenses, appPayments, appProducts);

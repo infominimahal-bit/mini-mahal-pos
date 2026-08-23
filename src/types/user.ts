@@ -13,8 +13,8 @@ export interface User {
   name: string;
   email: string;
   role: 'admin' | 'manager' | 'cashier' | 'salesman';
-  permissions: string[];
   canEditPrice: boolean;
+  canEditProduct: boolean;
   canGiveDiscount: boolean;
   canDeleteSale: boolean;
   canViewProfit: boolean;

@@ -3,7 +3,7 @@ import { Building2, TrendingUp, TrendingDown, Wallet, ChevronDown, ChevronUp } f
 import { formatCurrency, getCurrencySymbol } from '../../../lib/currencies';
 import { formatAppDate } from '../../../lib/dateUtils';
 import { SharedSearchBar } from '../../../shared/modules/search-and-list';
-import { Badge, Button } from '../../../shared/ui';
+import { Button } from '../../../shared/ui';
 import { ExportButton } from '../../../shared/export';
 import { useSuppliersReportData } from './SuppliersReport.data';
 import { getSourceBadge } from './SuppliersReport.utils';

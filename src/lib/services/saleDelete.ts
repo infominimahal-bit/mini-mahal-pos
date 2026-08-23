@@ -7,7 +7,7 @@ import { adjustPaymentBalances, buildReversePaymentMoves } from './paymentsServi
 import { recordCustomerLedger } from './customersService';
 import { logAuditEvent } from './auditLogService';
 
-export async function deleteSale(id: string, currentCashierName?: string, editInfo?: { newInvoice?: string }): Promise<Product[]> {
+export async function deleteSale(id: string, currentCashierName?: string, editInfo?: { newInvoice?: string }, overrideToken?: { p_user_id: string; p_role: string; p_sig: string } | null): Promise<Product[]> {
   const sale = await localDb.sales.get(id);
   if (!sale) return [];
 
@@ -62,7 +62,6 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
         const reversedQty = Number(item.refundedQuantity) || 0;
         const netQtyMag = Math.max(0, grossQty - reversedQty);
         const qty = netQtyMag * sign;
-        const itemQtyMag = netQtyMag;
         if (netQtyMag <= 0) continue;
         const newStock = (product.stock || 0) + qty;
 
@@ -214,7 +213,7 @@ export async function deleteSale(id: string, currentCashierName?: string, editIn
   // 1b. Atomic cloud commit: reverse stock + hard-delete sale in ONE tx (online).
   // Cloud-direct: no offline buffer. If the cloud commit fails we throw so the
   // caller learns immediately instead of keeping a half-deleted local state.
-  const deleteCommitted = await deleteSaleAtomic(id, returnMovements);
+  const deleteCommitted = await deleteSaleAtomic(id, returnMovements, [], null, overrideToken);
   if (!deleteCommitted) {
     throw new Error('Cloud delete failed. Please retry — stock was not reversed.');
   }

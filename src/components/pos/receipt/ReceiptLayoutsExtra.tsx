@@ -1,6 +1,6 @@
 import { formatCurrency } from '../../../lib/currencies';
 import { BarcodePreview } from '../../../shared/ui/BarcodePreview';
-import { TwoCol, renderLogo, RECEIPT_WATERMARK } from './parts';
+import { renderLogo, RECEIPT_WATERMARK } from './parts';
 import { renderMetaSection } from './ReceiptHeader';
 import { renderItemsSection, renderTotalsSection, renderPaymentSection } from './ReceiptBody';
 import { renderFooterSection } from './ReceiptFooter';

@@ -1,5 +1,4 @@
 // Standardized Settings Layout - Thin Tab Router
-import { useState, useEffect, useCallback } from 'react';
 import {
   Sliders,
   Globe,
@@ -13,7 +12,6 @@ import {
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ReceiptPrint } from '../pos/ReceiptPrint';
-import { localDb } from '../../lib/localDb';
 import { Button } from '../../shared/ui';
 import { StickyFormFooter } from '../../shared/ui/StickyFormFooter';
 

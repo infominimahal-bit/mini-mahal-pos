@@ -2,7 +2,6 @@ import { useAppStore, useSettingsStore, useUsersStore } from '../../stores';
 import { useState } from 'react';
 import { Plus, Edit, Trash2, Percent, Gift } from 'lucide-react';
 import { Discount } from '../../types';
-import { useApp } from '../../context/SupabaseAppContext';
 import { can } from '../../lib/permissions';
 import { DiscountModal } from './DiscountModal';
 import { sonner } from '../../lib/sonner';

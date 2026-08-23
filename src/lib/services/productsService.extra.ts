@@ -1,34 +1,9 @@
-import { supabase, adminUserAction } from '../supabase';
 import {
   Product,
-  Customer,
-  Sale,
-  Discount,
-  User,
-  AppSettings,
-  SalesTab,
-  Expense,
-  Category,
-  Supplier,
-  PurchaseRecord,
-  SupplierTransaction,
-  StockHistory,
-  Payment,
-  PurchaseOrder,
-  Bundle,
-  BundleItem,
-  CartItem,
-  RefundRequest,
-  Topping,
-  VariantStockHistory,
-  ProductAddon,
 } from '../../types';
-import { localDb, generateId, SETTINGS_ID } from '../localDb';
+import { localDb, generateId } from '../localDb';
 import { cloudWrite } from '../cloudWrite';
-import { generateBarcodeValue } from '../../utils/barcode';
-import { signAction, withActor } from '../actionToken';
-import { mapProduct, toRemoteProduct, toRemoteStockHistory } from './mappers';
-import { fetchAllPages } from './utils';
+import { toRemoteProduct, toRemoteStockHistory } from './mappers';
 import { buildChildProduct } from './productsServiceHelpers';
 import { logPriceChange } from './priceHistoryService';
 // productsService is composed by spreading productsServiceExtra into it, so this is

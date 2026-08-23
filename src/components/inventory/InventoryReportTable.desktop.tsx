@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   TrendingUp, TrendingDown,
-  ArrowUpDown, ChevronRight, ChevronDown, Database, Clock, Package
+  ArrowUpDown, ChevronRight, ChevronDown, Database
 } from 'lucide-react';
 import { formatCurrency } from '../../lib/currencies';
 import { formatAppDate } from '../../lib/dateUtils';
@@ -14,7 +14,7 @@ export function InventoryReportDesktopTable({
   data,
   allData,
   sortField,
-  sortDir,
+  _sortDir,
   onToggleSort,
   expandedRows,
   onToggleRow,
@@ -27,7 +27,6 @@ export function InventoryReportDesktopTable({
   const appSettings = useSettingsStore(s => s.settings);
 
   const totalStockValue = allData.reduce((s, p) => s + p.stockValue, 0);
-  const totalPotentialRevenue = allData.reduce((s, p) => s + p.potentialRevenue, 0);
   const totalActualRevenue = allData.reduce((s, p) => s + p.revenue, 0);
   const totalCOGS = allData.reduce((s, p) => s + p.cogs, 0);
   const totalGrossProfit = allData.reduce((s, p) => s + p.grossProfit, 0);

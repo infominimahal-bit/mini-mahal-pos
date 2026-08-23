@@ -13,7 +13,8 @@ interface UseExpenseManagerActionsOpts {
 export function useExpenseManagerActions(opts: UseExpenseManagerActionsOpts) {
   const { editingExpense, setEditingExpense, setIsModalOpen, appCurrentUser } = opts;
 
-  const isAdmin = true;
+  // RBAC matrix: expense edit/delete = admin|manager; cashier = create only
+  const isAdmin = appCurrentUser?.role === 'admin' || appCurrentUser?.role === 'manager';
 
   const handleSave = async (expenseData: Omit<Expense, 'id' | 'createdAt'> & { supplierId?: string }) => {
     if (editingExpense && !isAdmin) {

@@ -25,7 +25,10 @@ export function attachCoreHandlers(channel: any, ctx: RealtimeCtx) {
         if (await isPendingDelete('products', payload.new.id)) return;
         const mapped = mapProduct(payload.new);
         await localDb.products.put(mapped);
-        (payload.eventType === 'INSERT' ? useProductsStore.getState().addProduct(mapped) : useProductsStore.getState().updateProduct(mapped));
+        {
+          const store = useProductsStore.getState();
+          if (payload.eventType === 'INSERT') store.addProduct(mapped); else store.updateProduct(mapped);
+        }
       } else if (payload.eventType === 'DELETE') {
         await localDb.products.delete(payload.old.id);
         useProductsStore.getState().deleteProduct(payload.old.id);
@@ -44,7 +47,10 @@ export function attachCoreHandlers(channel: any, ctx: RealtimeCtx) {
         if (await isPendingDelete('customers', payload.new.id)) return;
         const mapped = mapCustomer(payload.new);
         await localDb.customers.put(mapped);
-        (payload.eventType === 'INSERT' ? useCustomersStore.getState().addCustomer(mapped) : useCustomersStore.getState().updateCustomer(mapped));
+        {
+          const store = useCustomersStore.getState();
+          if (payload.eventType === 'INSERT') store.addCustomer(mapped); else store.updateCustomer(mapped);
+        }
       } else if (payload.eventType === 'DELETE') {
         await localDb.customers.delete(payload.old.id);
         useCustomersStore.getState().deleteCustomer(payload.old.id);

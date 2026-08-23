@@ -14,8 +14,9 @@ const DiscountManager = lazy(() => import('./components/discounts/DiscountManage
 const UsersPage = lazy(() => import('./components/users/UsersPage').then(m => ({ default: m.UsersPage })));
 const ExpenseManager = lazy(() => import('./components/expenses/ExpenseManager').then(m => ({ default: m.ExpenseManager })));
 const SupplierManager = lazy(() => import('./components/inventory/suppliers/SupplierManager').then(m => ({ default: m.SupplierManager })));
-const PurchaseOrderSystem = lazy(() => import('./components/inventory/PurchaseOrderSystem').then(m => ({ default: m.PurchaseOrderSystem })));
+const _PurchaseOrderSystem = lazy(() => import('./components/inventory/PurchaseOrderSystem').then(m => ({ default: m.PurchaseOrderSystem })));
 const DashboardManager = lazy(() => import('./components/dashboard/DashboardManager').then(m => ({ default: m.DashboardManager })));
+import { toast } from 'sonner';
 
 // ── Route-based access control (real enforcement, MASTER §2.1.3) ──
 // Fail-closed: unknown role or missing permission => redirect to POS, never render.
@@ -24,6 +25,13 @@ function RequireAccess({ action, children }: { action: Permission; children: Rea
 
   const user = appCurrentUser;
   const allowed = !!user && user.active !== false && can(user.role, action);
+  
+  useEffect(() => {
+    if (user && !allowed) {
+      toast.error('ACCESS DENIED', { description: 'You do not have permission to view this module.' });
+    }
+  }, [user, allowed]);
+
   if (!allowed) {
     return <Navigate to="/pos" replace />;
   }

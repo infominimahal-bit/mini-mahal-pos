@@ -1,4 +1,4 @@
-import { CheckSquare, MinusSquare, Square, Package, Star, Power, Trash2 } from 'lucide-react';
+import { CheckSquare, MinusSquare, Square, Package, Power, Trash2 } from 'lucide-react';
 import { Button, Badge, Pagination } from '../../shared/ui';
 import { BarcodePreview } from '../../shared/ui/BarcodePreview';
 import { Product } from '../../types';
@@ -7,6 +7,7 @@ import { productsService } from '../../lib/services';
 import { useProductsStore } from '../../stores';
 import { formatCurrency } from '../../lib/currencies';
 import { sonner } from '../../lib/sonner';
+import { can } from '../../lib/permissions';
 
 interface InventoryTableProps {
   paginatedProducts: Product[];
@@ -24,6 +25,7 @@ interface InventoryTableProps {
   isAdmin: boolean;
   profile: any;
   canManageStock: boolean;
+  canEditProduct: boolean;
 }
 
 export function InventoryTable({
@@ -41,9 +43,12 @@ export function InventoryTable({
   onPageSizeChange,
   isAdmin,
   profile,
-  canManageStock,
+  canManageStock: _canManageStock,
+  canEditProduct: _canEditProduct,
 }: InventoryTableProps) {
   const appSettings = useSettingsStore(s => s.settings);
+  // RBAC: cost/profit figures are visible to admin|manager only (view_profit)
+  const showCost = isAdmin || can(profile?.role, 'view_profit');
 
   return (
     <div className="bg-white dark:bg-surface rounded-3xl border border-gray-200 dark:border-white/5 overflow-hidden shadow-xl">
@@ -79,7 +84,7 @@ export function InventoryTable({
                       {product.image ? <img src={product.image} className="h-full w-full object-cover transition-transform group-hover:scale-110" /> : <Package className="h-5 w-5 text-gray-600" />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-black text-gray-900 dark:text-white uppercase text-xs truncate max-w-[200px] group-hover:text-primary transition-colors">{product.name} {product.isFeatured && <Star className="h-2.5 w-2.5 inline text-yellow-500 fill-yellow-500 mb-1" />}</p>
+                      <p className="font-black text-gray-900 dark:text-white uppercase text-xs truncate max-w-[200px] group-hover:text-primary transition-colors">{product.name}</p>
                       <p className="text-[10px] text-gray-600 font-bold uppercase truncate">{product.category}{product.supplier ? ` · ${product.supplier}` : ''}</p>
                       {(product.isService || product.requireSerial) && (
                         <div className="flex flex-wrap gap-1 mt-1">
@@ -103,7 +108,7 @@ export function InventoryTable({
                 </td>
                 <td className="p-4 text-left">
                   <p className="text-xs font-black text-gray-900 dark:text-white tracking-widest">{formatCurrency(product.price, appSettings.currency)}</p>
-                  {(true) && <p className="text-[9px] text-gray-600 uppercase font-black opacity-50">Cost: {formatCurrency(product.cost || 0, appSettings.currency)}</p>}
+                  {showCost && <p className="text-[9px] text-gray-600 uppercase font-black opacity-50">Cost: {formatCurrency(product.cost || 0, appSettings.currency)}</p>}
                 </td>
                 <td className="p-4 text-center">
                   <div className="flex flex-col items-center gap-1">
@@ -118,7 +123,7 @@ export function InventoryTable({
                 <td className="p-4 text-right">
                   <div className="flex justify-end items-center gap-2 lg:opacity-0 group-hover:opacity-100 transition-opacity">
                     {/* Enable / Disable Toggle */}
-                    {(isAdmin || profile?.canManageStock) && (
+                    {canEditProduct && (
                       <Button
                         variant="ghost"
                         onClick={async (e) => {
@@ -139,25 +144,7 @@ export function InventoryTable({
                         icon={<Power className="h-3.5 w-3.5" />}
                       />
                     )}
-                    {/* Featured Toggle */}
-                    <Button
-                      variant="ghost"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        const newStatus = !product.isFeatured;
-                        try {
-                          const updated = { id: product.id, isFeatured: newStatus, updatedAt: new Date() };
-                          await productsService.update(product.id, updated);
-                          useProductsStore.getState().updateProduct(updated);
-                        } catch (error) {
-                          sonner.error('Failed to toggle featured status');
-                        }
-                      }}
-                      className={`!min-h-0 !p-2 !rounded-xl hover:!scale-110 ${product.isFeatured ? '!bg-yellow-500/10 !text-yellow-500 !shadow-sm' : '!bg-gray-100 dark:!bg-white/5 !text-gray-600 hover:!text-yellow-500'}`}
-                      title={product.isFeatured ? 'Unmark Featured' : 'Mark as Featured'}
-                      icon={<Star className={`h-3.5 w-3.5 ${product.isFeatured ? 'fill-yellow-500' : ''}`} />}
-                    />
-                    {(isAdmin || profile?.canManageStock) && (
+                    {canEditProduct && (
                       <Button
                         variant="ghost"
                         onClick={(e) => {
@@ -231,11 +218,6 @@ export function InventoryTable({
                     ) : (
                       <Package className="h-6 w-6 text-gray-600" />
                     )}
-                    {product.isFeatured && (
-                      <div className="absolute bottom-1 right-1 bg-yellow-500 rounded-md p-1 shadow-md">
-                        <Star className="h-2 w-2 text-white fill-white" />
-                      </div>
-                    )}
                   </div>
 
                   <div className="min-w-0 flex-1 flex flex-col">
@@ -262,7 +244,7 @@ export function InventoryTable({
                           {product.trackInventory === false || product.stock >= 990000 ? '∞' : product.stock}
                         </Badge>
                       </div>
-                      {(true) && (
+                      {showCost && (
                         <div className="flex items-center justify-between opacity-50">
                           <span className="text-[7px] font-black text-gray-600 dark:text-gray-500 uppercase">{"Cost"}</span>
                           <span className="text-[7px] font-black text-gray-600 dark:text-gray-400">{formatCurrency(product.cost || 0, appSettings.currency)}</span>

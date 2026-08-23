@@ -1,7 +1,7 @@
 import { useAppStore, useCustomersStore, useProductsStore, useSalesStore, useSettingsStore } from '../../stores';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Printer, MessageCircle, RotateCcw, Edit, Trash2, Layers, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Printer, MessageCircle, RotateCcw, Edit, Trash2, MapPin } from 'lucide-react';
 import { formatAppDate } from '../../lib/dateUtils';
 import { formatCurrency } from '../../lib/currencies';
 import { Sale } from '../../types';
@@ -10,9 +10,12 @@ import { getDealCountBreakdown } from '../../lib/utils';
 import { Modal } from '../../shared/ui/Modal';
 import { Badge, Button } from '../../shared/ui';
 import RefundSaleModal from './RefundSaleModal';
+import { SupervisorPinModal } from './SupervisorPinModal';
 import { TransactionItemsTable } from './TransactionItemsTable';
 import { TransactionSummary } from './TransactionSummary';
 import { useTransactionDetailActions } from './TransactionDetailModal.actions';
+import { useAuth } from '../../context/AuthContext';
+import { can } from '../../lib/permissions';
 
 interface TransactionDetailModalProps {
   transaction: Sale;
@@ -30,9 +33,14 @@ export function TransactionDetailModal({ transaction, allTransactions, onNavigat
   const appCustomers = useCustomersStore(s => s.customers);
   const appBundles = useAppStore(s => s.bundles);
   const appProducts = useProductsStore(s => s.products);
-  // Role logic removed — single-tenant POS: authenticated user has full access
-  const isAdmin = true;
-  const profile = { canEditSale: true, canDeleteSale: true };
+  const { profile: userProfile } = useAuth();
+  // RBAC matrix: refund = admin|manager|cashier(limited); edit/delete = admin|manager
+  const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'manager';
+  const canRefund = can(userProfile?.role, 'refund_sale');
+  const profile = {
+    canEditSale: !!userProfile?.canEditSale,
+    canDeleteSale: !!userProfile?.canDeleteSale,
+  };
 
   const showDiscount = appSettings.receiptShowDiscount !== false &&
     !(transaction.items || []).some((item: any) => item.bundleHideItemPrices === true || item.bundle_hide_item_prices === true);
@@ -46,6 +54,10 @@ export function TransactionDetailModal({ transaction, allTransactions, onNavigat
     handleWhatsAppShare,
     handleDeleteSale,
     sourceTag,
+    supervisorGate,
+    isVerifyingSupervisor,
+    retryWithSupervisor,
+    clearSupervisorGate,
   } = useTransactionDetailActions({
     transaction,
     appCustomers,
@@ -59,6 +71,10 @@ export function TransactionDetailModal({ transaction, allTransactions, onNavigat
   });
 
   const handleRefundSale = () => {
+    if (!canRefund) {
+      sonner.error('You do not have permission to refund sales.');
+      return;
+    }
     if (transaction.status === 'refunded') {
       sonner.error('Sale is already fully refunded.');
       return;
@@ -110,6 +126,7 @@ export function TransactionDetailModal({ transaction, allTransactions, onNavigat
               >
                 <MessageCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">{"WhatsApp"}</span>
               </Button>
+              {canRefund && (
               <Button
                 variant="danger"
                 onClick={handleRefundSale}
@@ -118,6 +135,8 @@ export function TransactionDetailModal({ transaction, allTransactions, onNavigat
               >
                 <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">{"Refund"}</span>
               </Button>
+              )}
+              {profile.canEditSale && (
               <Button
                 variant="secondary"
                 onClick={handleEditSale}
@@ -126,6 +145,8 @@ export function TransactionDetailModal({ transaction, allTransactions, onNavigat
               >
                 <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">{"Edit"}</span>
               </Button>
+              )}
+              {profile.canDeleteSale && (
               <Button
                 variant="danger"
                 onClick={handleDeleteSale}
@@ -134,6 +155,7 @@ export function TransactionDetailModal({ transaction, allTransactions, onNavigat
               >
                 <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">{"Delete"}</span>
               </Button>
+              )}
             </div>
           </div>
         }
@@ -258,6 +280,19 @@ export function TransactionDetailModal({ transaction, allTransactions, onNavigat
           isProcessing={isProcessingAction}
         />
       )}
+
+      <SupervisorPinModal
+        isOpen={!!supervisorGate}
+        title={supervisorGate?.action === 'delete' ? 'Admin Approval — Delete Sale' : 'Admin Approval — Refund'}
+        description={
+          supervisorGate?.action === 'delete'
+            ? 'Sale reverse/delete sirf admin approve kar sakta hai. Admin credentials enter karein.'
+            : `Ye refund admin threshold se zyada hai. Admin approval zaroori hai. Amount: ${formatCurrency(transaction.total - (transaction.refundedAmount || 0), appSettings.currency)}`
+        }
+        isProcessing={isVerifyingSupervisor || isProcessingAction}
+        onSubmit={retryWithSupervisor}
+        onClose={clearSupervisorGate}
+      />
     </>
   );
 }

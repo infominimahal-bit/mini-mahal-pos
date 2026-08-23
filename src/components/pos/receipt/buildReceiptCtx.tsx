@@ -6,7 +6,7 @@ import { computeGrouped } from './grouping';
 import { RECEIPT_WATERMARK } from './parts';
 import { type ReceiptCtx } from './types';
 
-export function buildReceiptCtx(sale: Sale): ReceiptCtx {
+export function useReceiptCtx(sale: Sale): ReceiptCtx {
   const appSettings = useSettingsStore(s => s.settings);
   const appBundles = useAppStore(s => s.bundles);
 
@@ -15,8 +15,6 @@ export function buildReceiptCtx(sale: Sale): ReceiptCtx {
 
   const showDiscount = settings.receiptShowDiscount !== false &&
     !(sale.items || []).some((item: any) => item.bundleHideItemPrices === true || item.bundle_hide_item_prices === true);
-
-  const isAutoPrint = settings.receiptPrinter;
 
   const is58mm = settings.receiptPaperSize === '58mm';
   const isA4 = settings.receiptPaperSize === 'A4';
@@ -45,8 +43,6 @@ export function buildReceiptCtx(sale: Sale): ReceiptCtx {
   };
 
   const template = settings.receiptTemplate || 'modern';
-
-  const isNewLayout = ['horizontal_header', 'centered_flow', 'left_grid', 'split_columns', 'floating_totals', 'offset_logo', 'boxed_sections', 'tear_off', 'vertical_line', 'emphasized_total'].includes(template);
 
   const fontFamily = (() => {
     switch (template) {

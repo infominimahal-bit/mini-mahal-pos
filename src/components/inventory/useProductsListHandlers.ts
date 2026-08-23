@@ -1,4 +1,4 @@
-import { useProductsStore, useSettingsStore } from '../../stores';
+import { useProductsStore } from '../../stores';
 import { sonner } from '../../lib/sonner';
 import { productsService } from '../../lib/services';
 import { localDb } from '../../lib/localDb';
@@ -19,8 +19,8 @@ export function useProductsListHandlers({
   setSelectedProductIds,
   filteredProducts,
   fileInputRef,
-  setShowBarcodeGenerator,
-  setBarcodeProducts
+  setShowBarcodeGenerator: _setShowBarcodeGenerator,
+  setBarcodeProducts: _setBarcodeProducts
 }: UseProductsListHandlersArgs) {
   const handleDeleteProduct = async (productId: string) => {
     const result = await sonner.deleteConfirm('product');
@@ -29,7 +29,7 @@ export function useProductsListHandlers({
         await productsService.delete(productId);
         useProductsStore.getState().deleteProduct(productId);
         sonner.success('Product deleted successfully!');
-      } catch (error) {
+      } catch (_error) {
         sonner.error('Failed to delete product');
       }
     }
@@ -61,7 +61,7 @@ export function useProductsListHandlers({
         useProductsStore.getState().setProducts(appProducts.filter(p => !selectedProductIds.includes(p.id)));
         setSelectedProductIds([]);
         sonner.success('Bulk deletion completed');
-      } catch (error) {
+      } catch (_error) {
         sonner.error('Failed to bulk delete products.');
       } finally {
         sonner.close();
@@ -95,7 +95,7 @@ export function useProductsListHandlers({
       sonner.loading('Reading file...');
       const text = await file.text();
       let importData;
-      try { importData = JSON.parse(text); } catch (e) { throw new Error('Invalid JSON file.'); }
+      try { importData = JSON.parse(text); } catch (_e) { throw new Error('Invalid JSON file.'); }
       const products = importData.data?.products || importData.products || (Array.isArray(importData) ? importData : null);
       if (!products || !Array.isArray(products)) throw new Error('Invalid file format.');
 

@@ -1,4 +1,3 @@
-import { Fragment } from 'react';
 import { Badge } from '../../../shared/ui';
 import { Supplier } from '../../../types';
 

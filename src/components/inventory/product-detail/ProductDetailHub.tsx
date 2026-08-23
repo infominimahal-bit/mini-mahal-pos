@@ -1,4 +1,3 @@
-import { Button } from '../../../shared/ui';
 import { StickyFormFooter } from '../../../shared/ui/StickyFormFooter';
 import { BatchStockInSystem } from '../BatchStockInSystem';
 import { TransactionDetailModal } from '../../transactions/TransactionDetailModal';
@@ -65,7 +64,7 @@ export function ProductDetailHub(props: ProductDetailHubProps) {
           transaction={selectedSale}
           allTransactions={productSales}
           onNavigate={setSelectedSale}
-          onReprint={(sale) => {
+          onReprint={(_sale) => {
             sonner.info('Print requested', 'Navigate to Transactions to print this sale');
           }}
           onClose={() => {

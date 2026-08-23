@@ -1,5 +1,4 @@
 import { useSettingsStore } from '../../stores';
-import { useApp } from '../../context/SupabaseAppContext';
 import { settingsService } from '../../lib/services';
 import { sonner } from '../../lib/sonner';
 
@@ -11,9 +10,7 @@ export function GridDensityController() {
   const handleColumnChange = (cols: number) => {
     useSettingsStore.getState().setSettings({ posGridColumns: cols });
 
-    // Instant sync to DB
-    settingsService.update({ posGridColumns: cols })
-      .catch(err => console.error('[POS] Failed to sync grid settings:', err));
+    // Removed DB sync since grid columns are a local device UI preference
 
     sonner.success(`Grid density set to ${cols} columns`);
   };

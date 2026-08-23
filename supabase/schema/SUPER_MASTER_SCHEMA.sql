@@ -42,6 +42,29 @@
 -- ════════════════════════════════════════════════════════════════
 -- Every structural DB change MUST be logged here AND in a migration file.
 --
+-- [2026-08-23] Drop legacy users.permissions TEXT[] column
+--   Files: SUPER_MASTER_SCHEMA.sql, migration 20260823050000_drop_users_permissions_column.sql
+--   Tag-based permission system removed from code (readers/writers). Role matrix
+--   + signed action guards are the single authority.
+--
+-- [2026-08-23] RBAC FINAL — server-level permission matrix enforcement
+--   Files: SUPER_MASTER_SCHEMA.sql, migration 20260823040000_rbac_final.sql
+--   1. delete_sale_atomic: allow-list narrowed to ['admin'] (supervisor override
+--      via signed admin token). DRAFT sales (pending + DRAFT_SALE) exempt.
+--   2. refund_sale_atomic: refunds above app_settings.refund_approval_threshold
+--      (NUMERIC NOT NULL DEFAULT 5000, 0=off) require role='admin' → raises
+--      APPROVAL_REQUIRED (42501). Client: SupervisorPinModal override flow.
+--
+-- [2026-08-23] RBAC Harden — permission matrix enforcement
+--   Files: SUPER_MASTER_SCHEMA.sql, migration 20260823030000_rbac_harden.sql
+--   1. verify_action_token: FAIL-CLOSED (removed NULL-hash + NULL-sig => true bypass).
+--   2. stock_adjustment: added signed actor proof params (p_user_id/p_role/p_sig)
+--      + require_action('stock_adjustment', ['admin','manager']). Legacy unguarded
+--      8-param overload dropped. Client (detailAdjustment.ts) signs via signAction.
+--   Code side: 7 UI isAdmin=true bypasses restored to real role checks;
+--     manager lost view_users/manage_users/view_settings/manage_settings (admin-only);
+--     admin-users edge function restricted to admin only.
+--
 -- [2026-08-22] Stage 2 Hardening - refund_sale_atomic double-reversal guard
 --   Files: SUPER_MASTER_SCHEMA.sql, migration 20260822040000_refund_double_reversal_guard.sql
 --   refund_sale_atomic now no-ops when the sale is deleted / already fully
@@ -75,7 +98,7 @@
 --     badge_icon, badge_bg_color, badge_text_color, extra_toppings, highlight_tag
 --   KEPT: bundles, bundle_items, bundles.override_price, bundles.hide_item_prices,
 --     toppings, product_toppings,
---     products.highlight_tag / products.is_featured (product scope).
+--     products.highlight_tag (product scope).
 --
 -- [2026-08-17] Verification & Repair Protocol Fixes
 --   Files: SUPER_MASTER_SCHEMA.sql, migrations 20260818010000 - 20260818040000
@@ -249,7 +272,6 @@ CREATE TABLE IF NOT EXISTS users (
     name                TEXT NOT NULL,
     email               TEXT,
     role                TEXT NOT NULL DEFAULT 'cashier' CHECK (role IN ('admin', 'manager', 'cashier', 'salesman')),
-    permissions         TEXT[] DEFAULT '{}',
 
     -- Granular ACL Booleans
     can_edit_price      BOOLEAN DEFAULT false,
@@ -397,6 +419,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
 
     -- §4.2 MASTER: negative stock control
     allow_negative_stock        BOOLEAN DEFAULT true,
+    refund_approval_threshold   NUMERIC NOT NULL DEFAULT 5000,
 
     -- Timestamps
     created_at                  TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
@@ -541,7 +564,6 @@ CREATE TABLE IF NOT EXISTS products (
     price_per_unit      DECIMAL(10,2),
     unit                TEXT DEFAULT 'piece',
     track_inventory     BOOLEAN DEFAULT true,
-    is_featured         BOOLEAN DEFAULT false,
     variants            JSONB DEFAULT '[]'::jsonb,
     variant_data        JSONB DEFAULT '[]'::jsonb,
     modifiers           JSONB DEFAULT '[]'::jsonb,
@@ -1727,7 +1749,8 @@ ALTER TABLE app_settings
   ADD COLUMN IF NOT EXISTS auto_save_receipt_png          BOOLEAN DEFAULT false,
   ADD COLUMN IF NOT EXISTS allow_credit_over_limit        BOOLEAN DEFAULT true,
   ADD COLUMN IF NOT EXISTS pos_grid_columns               INTEGER DEFAULT 4,
-  ADD COLUMN IF NOT EXISTS allow_negative_stock            BOOLEAN DEFAULT true;
+  ADD COLUMN IF NOT EXISTS allow_negative_stock            BOOLEAN DEFAULT true,
+  ADD COLUMN IF NOT EXISTS refund_approval_threshold       NUMERIC NOT NULL DEFAULT 5000;
 
 DO $$
 BEGIN
@@ -1951,36 +1974,6 @@ ON CONFLICT (id) DO NOTHING;
 -- REALTIME CONFIGURATION
 -- ════════════════════════════════════════════════════════════════
 -- Enable Realtime on ALL core tables (SET TABLE is idempotent)
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
-    ALTER PUBLICATION supabase_realtime SET TABLE
-      app_settings,
-      bundles,
-      bundle_items,
-      categories,
-      customers,
-      customer_ledger,
-      discounts,
-      expenses,
-      payments,
-      product_addons,
-      products,
-      purchase_order_items,
-      purchase_orders,
-      purchase_records,
-      sales,
-      sales_tabs,
-
-      stock_history,
-      supplier_transactions,
-      suppliers,
-      users,
-      variant_stock_history,
-      price_history,
-      sessions;
-  END IF;
-END $$;
 
 -- ════════════════════════════════════════════════════════════════
 -- SYSTEM AUDIT — Commented out after initial validation.
@@ -2725,7 +2718,7 @@ CREATE OR REPLACE FUNCTION commit_sale(
   p_payment_moves jsonb DEFAULT '[]'::jsonb,
   p_customer_ledger jsonb DEFAULT NULL
 )
-RETURNS jsonb LANGUAGE plpgsql AS $
+RETURNS jsonb LANGUAGE plpgsql AS $$
 DECLARE
   v_id uuid;
   h jsonb;
@@ -2819,7 +2812,7 @@ BEGIN
 
   RETURN jsonb_build_object('success', true, 'id', v_id);
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION apply_stock_movements(p_history jsonb)
 RETURNS jsonb LANGUAGE plpgsql AS $$
@@ -2840,7 +2833,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION commit_sale(jsonb, jsonb) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION commit_sale(jsonb, jsonb, jsonb, jsonb) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION apply_stock_movements(jsonb) TO anon, authenticated, service_role;
 
 -- ── 8. ATOMIC DELETE + REFUND ──
@@ -3291,11 +3284,8 @@ CREATE OR REPLACE FUNCTION public.verify_action_token(
 DECLARE v_hash text; v_stored_role text; v_expected text;
 BEGIN
   IF p_user_id IS NULL THEN RETURN false; END IF;
-  IF p_sig IS NULL OR p_sig = '' THEN
-    SELECT action_hash, role INTO v_hash, v_stored_role FROM users WHERE id = p_user_id;
-    IF v_hash IS NULL THEN RETURN true; END IF;
-    RETURN false;
-  END IF;
+  -- Fail-closed: no signature => deny (no NULL-hash bypass).
+  IF p_sig IS NULL OR p_sig = '' THEN RETURN false; END IF;
   SELECT action_hash, role INTO v_hash, v_stored_role FROM users WHERE id = p_user_id;
   IF v_hash IS NULL OR v_stored_role IS NULL THEN RETURN false; END IF;
   IF v_stored_role <> p_role THEN RETURN false; END IF;
@@ -3353,11 +3343,20 @@ CREATE OR REPLACE FUNCTION public.delete_sale_atomic(
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
 DECLARE
   h jsonb;
+  v_status text;
+  v_notes text;
 BEGIN
-  PERFORM public.require_action(p_user_id, p_role, 'delete_sale', p_sig, VARIADIC array['admin', 'manager']);
-
-  IF NOT EXISTS (SELECT 1 FROM sales WHERE id = p_sale_id AND deleted_at IS NULL) THEN
+  SELECT status, COALESCE(notes, '') INTO v_status, v_notes FROM sales WHERE id = p_sale_id AND deleted_at IS NULL;
+  IF NOT FOUND THEN
     RETURN jsonb_build_object('success', true, 'id', p_sale_id, 'note', 'already_deleted');
+  END IF;
+
+  -- F13 DRAFT RULE: saved carts never touched stock/customer/revenue, so any
+  -- role may discard them. Everything else requires an ADMIN action token.
+  IF v_status = 'pending' AND v_notes LIKE '%DRAFT_SALE%' THEN
+    NULL;
+  ELSE
+    PERFORM public.require_action(p_user_id, p_role, 'delete_sale', p_sig, VARIADIC ARRAY['admin']::text[]);
   END IF;
 
   FOR h IN SELECT * FROM jsonb_array_elements(p_history) LOOP
@@ -3391,7 +3390,7 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'id', p_sale_id);
 END;
 $function$;
-GRANT EXECUTE ON FUNCTION delete_sale_atomic(uuid, jsonb, uuid, text, text) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION delete_sale_atomic(uuid, jsonb, uuid, text, text, jsonb, jsonb) TO anon, authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.refund_sale_atomic(
   p_sale_id uuid,
@@ -3410,6 +3409,7 @@ DECLARE
   _total numeric;
   _status text;
   _prior numeric;
+  _threshold numeric;
 BEGIN
   PERFORM public.require_action(p_user_id, p_role, 'refund_sale', p_sig, VARIADIC array['admin', 'manager', 'cashier']);
 
@@ -3434,6 +3434,15 @@ BEGIN
   END IF;
   IF _total IS NOT NULL AND p_refunded_amount > _total + 0.001 THEN
     RAISE EXCEPTION 'FORBIDDEN: refund amount exceeds sale total' USING ERRCODE = '42501';
+  END IF;
+
+  -- RBAC: refunds above the configured threshold need an ADMIN token
+  -- (manager/cashier must obtain supervisor override in the UI).
+  IF p_role IS DISTINCT FROM 'admin' THEN
+    SELECT refund_approval_threshold INTO _threshold FROM app_settings WHERE id = '00000000-0000-4000-8000-000000000001';
+    IF COALESCE(_threshold, 0) > 0 AND (p_refunded_amount - _prior) > _threshold THEN
+      RAISE EXCEPTION 'APPROVAL_REQUIRED: refund exceeds admin approval threshold' USING ERRCODE = '42501';
+    END IF;
   END IF;
 
   FOR h IN SELECT * FROM jsonb_array_elements(p_history) LOOP
@@ -3465,7 +3474,7 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'id', p_sale_id);
 END;
 $function$;
-GRANT EXECUTE ON FUNCTION refund_sale_atomic(uuid, jsonb, text, numeric, uuid, text, text) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION refund_sale_atomic(uuid, jsonb, text, numeric, uuid, text, text, jsonb, jsonb) TO anon, authenticated, service_role;
 
 -- Transient actor columns for the 3 admin-only tables (NOT products).
 ALTER TABLE public.app_settings ADD COLUMN IF NOT EXISTS _actor_id uuid, ADD COLUMN IF NOT EXISTS _actor_role text, ADD COLUMN IF NOT EXISTS _actor_sig text;
@@ -3673,11 +3682,16 @@ CREATE OR REPLACE FUNCTION stock_adjustment(
   p_cashier text,
   p_variant_id text DEFAULT NULL,
   p_variant_label text DEFAULT NULL,
-  p_adjustment_id uuid DEFAULT NULL
+  p_adjustment_id uuid DEFAULT NULL,
+  p_user_id uuid DEFAULT NULL,
+  p_role text DEFAULT NULL,
+  p_sig text DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public, extensions AS $$
 DECLARE
   v_id uuid := COALESCE(p_adjustment_id, gen_random_uuid());
 BEGIN
+  -- RBAC matrix: Inventory Adjustment = admin|manager only (signed actor proof).
+  PERFORM require_action(p_user_id, p_role, 'stock_adjustment', p_sig, VARIADIC ARRAY['admin','manager']::text[]);
   IF p_variant_id IS NOT NULL AND p_variant_id <> '' THEN
     INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, note, cashier_name, created_at, updated_at)
     VALUES (v_id, p_product_id, p_variant_id, COALESCE(p_variant_label, ''), p_change_qty, p_type, p_note, p_cashier, now(), now())
@@ -3690,6 +3704,8 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'id', v_id);
 END;
 $$;
+-- Drop legacy unguarded 8-param overload (superseded by guarded 11-param above).
+DROP FUNCTION IF EXISTS stock_adjustment(uuid, integer, text, text, text, text, text, uuid);
 
 -- 2. Broad grants (idempotent) — RLS still applies; guard tables stay guarded.
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon;
@@ -3815,79 +3831,6 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.revoke_user_sessions(uuid) TO anon, authenticated, service_role;
 
--- 5. commit_sale: add attribution columns to INSERT (2-arg signature unchanged)
-CREATE OR REPLACE FUNCTION public.commit_sale(p_sale jsonb, p_history jsonb)
- RETURNS jsonb
- LANGUAGE plpgsql
-AS $function$
-DECLARE
-  v_id uuid;
-  h jsonb;
-  cur numeric;
-BEGIN
-  IF p_sale->>'source_order_id' IS NOT NULL AND p_sale->>'source_order_id' <> '' THEN
-    IF EXISTS (SELECT 1 FROM sales WHERE source_order_id = (p_sale->>'source_order_id')::uuid) THEN
-      RETURN jsonb_build_object('success', true, 'id', (SELECT id FROM sales WHERE source_order_id = (p_sale->>'source_order_id')::uuid), 'already_fulfilled', true);
-    END IF;
-  END IF;
-  IF p_sale->>'idempotency_key' IS NOT NULL AND p_sale->>'idempotency_key' <> '' THEN
-    IF EXISTS (SELECT 1 FROM sales WHERE idempotency_key = (p_sale->>'idempotency_key')::uuid) THEN
-      RETURN jsonb_build_object('success', true, 'id', (SELECT id FROM sales WHERE idempotency_key = (p_sale->>'idempotency_key')::uuid), 'already_committed', true);
-    END IF;
-  END IF;
-  FOR h IN SELECT * FROM jsonb_array_elements(p_history)
-  LOOP
-    IF (h->>'change_qty')::int < 0 AND (h->>'variant_id' IS NULL OR (h->>'variant_id') = '') THEN
-      SELECT stock INTO cur FROM products WHERE id = (h->>'product_id')::uuid;
-      IF cur IS NOT NULL AND cur >= 0 AND (cur + (h->>'change_qty')::int) < 0 THEN
-        RAISE EXCEPTION 'OVERSELL: product % has stock % but this sale needs %', (h->>'product_id')::uuid, cur, abs((h->>'change_qty')::int) USING ERRCODE = 'P0003';
-      END IF;
-    END IF;
-  END LOOP;
-  INSERT INTO sales (
-    id, invoice_number, customer_id, customer_name, customer_phone,
-    items, subtotal, discount_amount, bill_discount_value, bill_discount_type,
-    tax_amount, total, received_amount, change_amount, payment_method,
-    card_details, status, cashier, cashier_role, receipt_number, notes,
-    applied_discounts, free_gifts, timestamp, sale_date, sale_type,
-    extra_charges, split_payments, refunded_amount, estore_status,
-    delivery_address, delivery_fee, delivery_location_lat, delivery_location_lng,
-    customer_notes, source_order_id, salesman_id, salesman_name,
-    device_id, user_id, sync_status, original_cashier, original_salesman_id,
-    original_salesman_name, action_performed_by, idempotency_key, created_at, updated_at
-  ) VALUES (
-    (p_sale->>'id')::uuid, p_sale->>'invoice_number',
-    NULLIF(p_sale->>'customer_id','')::uuid, p_sale->>'customer_name', p_sale->>'customer_phone',
-    COALESCE(p_sale->'items','[]'::jsonb), (p_sale->>'subtotal')::numeric,
-    (p_sale->>'discount_amount')::numeric, (p_sale->>'bill_discount_value')::numeric, p_sale->>'bill_discount_type',
-    (p_sale->>'tax_amount')::numeric, (p_sale->>'total')::numeric, (p_sale->>'received_amount')::numeric,
-    (p_sale->>'change_amount')::numeric, p_sale->>'payment_method', p_sale->'card_details',
-    p_sale->>'status', p_sale->>'cashier', p_sale->>'cashier_role', p_sale->>'receipt_number', p_sale->>'notes',
-    p_sale->'applied_discounts', p_sale->'free_gifts', (p_sale->>'timestamp')::timestamptz, (p_sale->>'sale_date')::date,
-    p_sale->>'sale_type', p_sale->'extra_charges', p_sale->'split_payments', (p_sale->>'refunded_amount')::numeric,
-    p_sale->>'estore_status', p_sale->>'delivery_address', (p_sale->>'delivery_fee')::numeric,
-    (p_sale->>'delivery_location_lat')::numeric, (p_sale->>'delivery_location_lng')::numeric, p_sale->>'customer_notes',
-    NULLIF(p_sale->>'source_order_id','')::uuid, NULLIF(p_sale->>'salesman_id','')::uuid, p_sale->>'salesman_name',
-    NULLIF(p_sale->>'device_id','')::text, NULLIF(p_sale->>'user_id','')::uuid, COALESCE(NULLIF(p_sale->>'sync_status',''),'synced')::text,
-    p_sale->>'original_cashier', NULLIF(p_sale->>'original_salesman_id','')::uuid, p_sale->>'original_salesman_name',
-    p_sale->>'action_performed_by', NULLIF(p_sale->>'idempotency_key','')::uuid,
-    COALESCE((p_sale->>'created_at')::timestamptz, now()), now()
-  ) ON CONFLICT (id) DO NOTHING RETURNING id INTO v_id;
-  IF v_id IS NULL THEN v_id := (p_sale->>'id')::uuid; END IF;
-  FOR h IN SELECT * FROM jsonb_array_elements(p_history)
-  LOOP
-    IF h->>'variant_id' IS NOT NULL AND h->>'variant_id' <> '' THEN
-      INSERT INTO variant_stock_history (id, product_id, variant_id, variant_label, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, h->>'variant_id', h->>'variant_label', (h->>'change_qty')::int, h->>'type', v_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
-    ELSE
-      INSERT INTO stock_history (id, product_id, change_qty, type, reference_id, note, cashier_name, created_at, updated_at)
-      VALUES (COALESCE((h->>'id')::uuid, gen_random_uuid()), (h->>'product_id')::uuid, (h->>'change_qty')::int, h->>'type', v_id, h->>'note', h->>'cashier_name', now(), now()) ON CONFLICT (id) DO NOTHING;
-    END IF;
-  END LOOP;
-  RETURN jsonb_build_object('success', true, 'id', v_id);
-END;
-$function$;
-GRANT EXECUTE ON FUNCTION public.commit_sale(jsonb, jsonb) TO anon, authenticated, service_role;
 
 -- 6. edit_sale_atomic: replace unguarded 4-arg overload with guarded 7-arg
 DROP FUNCTION IF EXISTS public.edit_sale_atomic(jsonb, jsonb, uuid, jsonb);
@@ -4059,4 +4002,22 @@ BEGIN
     DELETE FROM auth.users WHERE id = p_target_user_id;
 END;
 $$;
+
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    ALTER PUBLICATION supabase_realtime SET TABLE
+      app_settings, bundles, bundle_items, categories, customers,
+      customer_ledger, discounts, expenses, payments, product_addons,
+      products, purchase_order_items, purchase_orders, purchase_records,
+      sales, sales_tabs, stock_history, supplier_transactions, suppliers,
+      users, variant_stock_history, price_history, sessions;
+  END IF;
+END $$;
+
+-- ════════════════════════════════════════════════════════════════
+-- GLOBAL GRANTS (Safety Net)
+-- ════════════════════════════════════════════════════════════════
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 

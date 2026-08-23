@@ -1,4 +1,4 @@
-import { TrendingUp, Users, DollarSign, ShoppingBag, Star, UserPlus } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, ShoppingBag, Star } from 'lucide-react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line, ResponsiveContainer } from 'recharts';
 import { formatCurrency, getCurrencySymbol } from '../../../lib/currencies';
 import { formatAppDate } from '../../../lib/dateUtils';

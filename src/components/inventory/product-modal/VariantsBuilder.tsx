@@ -12,7 +12,7 @@ interface VariantsBuilderProps {
   setVariantData: React.Dispatch<React.SetStateAction<VariantData[]>>;
 }
 
-export function VariantsBuilder({ formData, setFormData, variants, setVariants, variantData, setVariantData }: VariantsBuilderProps) {
+export function VariantsBuilder({ formData, _setFormData, variants, setVariants, variantData, setVariantData }: VariantsBuilderProps) {
   return (
     <div className="space-y-3 p-4 bg-gray-50 dark:bg-surface rounded-2xl border border-gray-200 dark:border-white/5 animate-in fade-in zoom-in-95">
       <div className="flex items-center justify-between">

@@ -1,24 +1,11 @@
 import { useUsersStore } from '../../stores';
 import { useState, useEffect } from 'react';
-import { User, Lock, Shield, Crown, Loader2, Camera, Save, Tag, CreditCard, Package, Edit, Trash2, Database, ClipboardList, History, Wallet, Users, BarChart3 } from 'lucide-react';
-import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { User as UserType } from '../../types';
-import { useApp } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
 import { usersService } from '../../lib/services';
 import { supabase, adminUserAction } from '../../lib/supabase';
 import { sonner } from '../../lib/sonner';
 import { hashPasswordString } from '../../context/AuthContext';
-import { Modal } from '../../shared/ui/Modal';
-import { cn } from '../../lib/utils';
-import { MediaLibrary } from '../../shared/MediaLibrary';
-import { Button, ToggleSwitch } from '../../shared/ui';
-
-interface UserModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  user?: UserType | null;
-}
 
 export function useUserModalData(user: UserType | null | undefined, onClose: () => void) {
   const appCurrentUser = useUsersStore(s => s.currentUser);
@@ -42,7 +29,7 @@ const appUsers = useUsersStore(s => s.users);
     canManagePO: false,
     canViewRecords: false,
     canEditSale: false,
-    permissions: ['access_customers']
+    canEditProduct: false,
   });
   const [showMediaLibrary, setShowMediaLibrary] = useState(false);
 
@@ -64,7 +51,7 @@ const appUsers = useUsersStore(s => s.users);
         canManagePO: user.canManagePO,
         canViewRecords: user.canViewRecords,
         canEditSale: user.canEditSale ?? false,
-        permissions: user.permissions || []
+        canEditProduct: user.canEditProduct ?? false,
       });
     } else {
       setFormData({
@@ -83,7 +70,7 @@ const appUsers = useUsersStore(s => s.users);
         canManagePO: false,
         canViewRecords: false,
         canEditSale: false,
-        permissions: ['access_customers']
+        canEditProduct: false,
       });
     }
   }, [user]);
@@ -100,7 +87,6 @@ const appUsers = useUsersStore(s => s.users);
           canManagePO: true,
           canViewRecords: true,
           canEditSale: true,
-          permissions: ['access_payments', 'access_expenses', 'access_customers', 'access_reports', 'access_inventory']
         },
         cashier: {
           canEditPrice: false,
@@ -111,7 +97,6 @@ const appUsers = useUsersStore(s => s.users);
           canManagePO: false,
           canViewRecords: false,
           canEditSale: false,
-          permissions: ['access_customers']
         },
         admin: {
           canEditPrice: true,
@@ -122,7 +107,6 @@ const appUsers = useUsersStore(s => s.users);
           canManagePO: true,
           canViewRecords: true,
           canEditSale: true,
-          permissions: ['access_payments', 'access_expenses', 'access_customers', 'access_reports', 'access_inventory']
         }
       };
       
@@ -147,7 +131,7 @@ const appUsers = useUsersStore(s => s.users);
 
         if (formData.password && formData.password.length >= 6) {
           try {
-            if (false) throw new Error('Only admins can update user passwords');
+            // Server-side: admin-users edge function enforces admin-only access.
             const { error: authError } = await adminUserAction('updateUser', {
               id: user.id,
               updates: { password: formData.password },
@@ -180,7 +164,7 @@ const appUsers = useUsersStore(s => s.users);
           canManagePO: formData.canManagePO,
           canViewRecords: formData.canViewRecords,
           canEditSale: formData.canEditSale,
-          permissions: formData.permissions,
+          canEditProduct: formData.canEditProduct,
         };
 
         const updatedUser = await usersService.update(user.id, updatePayload);
@@ -199,9 +183,7 @@ const appUsers = useUsersStore(s => s.users);
           return;
         }
 
-        if (false) {
-          throw new Error('Permission denied — only admins can create users');
-        }
+        // Server-side: admin-users edge function enforces admin-only access.
 
         const normalizedUsername = formData.username.trim().toLowerCase();
         const resolvedEmail = formData.email.trim()
@@ -241,7 +223,6 @@ const appUsers = useUsersStore(s => s.users);
           role: formData.role,
           active: formData.active,
           username: formData.username,
-          permissions: formData.permissions,
           can_edit_price: formData.canEditPrice,
           can_give_discount: formData.canGiveDiscount,
           can_delete_sale: formData.canDeleteSale,
@@ -250,6 +231,7 @@ const appUsers = useUsersStore(s => s.users);
           can_manage_po: formData.canManagePO,
           can_view_records: formData.canViewRecords,
           can_edit_sale: formData.canEditSale,
+          can_edit_product: formData.canEditProduct,
           avatar: formData.avatar || null,
           action_hash: hash
         }, { onConflict: 'id' });
@@ -269,7 +251,6 @@ const appUsers = useUsersStore(s => s.users);
           name: formData.name,
           email: resolvedEmail,
           role: formData.role as 'cashier',
-          permissions: formData.permissions,
           canEditPrice: formData.canEditPrice,
           canGiveDiscount: formData.canGiveDiscount,
           canDeleteSale: formData.canDeleteSale,
@@ -305,15 +286,6 @@ const appUsers = useUsersStore(s => s.users);
     }));
   };
 
-  const toggleAccessPerm = (permStr: string, checked: boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      permissions: checked 
-        ? [...prev.permissions.filter(p => p !== permStr), permStr]
-        : prev.permissions.filter(p => p !== permStr)
-    }));
-  };
-
   const t = (key: string, fallback: string = key) => fallback;
 
   return {
@@ -327,7 +299,6 @@ const appUsers = useUsersStore(s => s.users);
     handleSubmit,
     handleChange,
     handleRoleChange,
-    toggleAccessPerm,
     t,
   };
 }

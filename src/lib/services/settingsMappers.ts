@@ -104,6 +104,9 @@ export const mapSettings = (item: any): AppSettings => {
     // §4.2 MASTER: negative stock control (default FALSE = spec compliant, oversell blocked)
     allowNegativeStock: s.allow_negative_stock ?? s.allowNegativeStock ?? false,
 
+    // RBAC: refund approval threshold (admin override above this amount)
+    refundApprovalThreshold: Number(s.refund_approval_threshold ?? s.refundApprovalThreshold ?? 5000),
+
     createdAt: s.created_at ? new Date(s.created_at) : (s.createdAt ? new Date(s.createdAt) : new Date()),
     updatedAt: s.updated_at ? new Date(s.updated_at) : (s.updatedAt ? new Date(s.updatedAt) : new Date())
   } as AppSettings;
@@ -201,6 +204,7 @@ export const toRemoteSettings = (s: Partial<AppSettings>) => {
   if ('enableKotPrinter' in s) { remote.enable_kot_printer = s.enableKotPrinter; }
   if ('autoSaveReceiptPng' in s) { remote.auto_save_receipt_png = s.autoSaveReceiptPng; }
   if ('allowNegativeStock' in s) { remote.allow_negative_stock = s.allowNegativeStock; }
+  if ('refundApprovalThreshold' in s) { remote.refund_approval_threshold = s.refundApprovalThreshold; }
 
   if ('updatedAt' in s) {
     remote.updated_at = s.updatedAt instanceof Date ? s.updatedAt.toISOString() : s.updatedAt;

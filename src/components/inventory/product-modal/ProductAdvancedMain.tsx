@@ -1,4 +1,3 @@
-import { Button } from '../../../shared/ui';
 import { HelpTooltip } from '../../../shared/ui/HelpTooltip';
 import type { ProductFormData } from './useProductForm';
 import type { Product, ProductVariant, VariantData, ProductAddon } from '../../../types';

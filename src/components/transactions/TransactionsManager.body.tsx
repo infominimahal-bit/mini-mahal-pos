@@ -9,7 +9,6 @@ import { getCurrencySymbol } from '../../lib/currencies';
 import { Sale } from '../../types';
 import { ReceiptPrint } from '../pos/ReceiptPrint';
 import { normalizePaymentMethod } from '../../lib/services';
-import { sonner } from '../../lib/sonner';
 import { TransactionDetailModal } from './TransactionDetailModal';
 import { ExportButton } from '../../shared/export';
 import { Button } from '../../shared/ui';
@@ -31,7 +30,8 @@ export function TransactionsManager() {
   const appCustomers = useCustomersStore(s => s.customers);
   const { loadMoreSales } = useApp();
   const { profile } = useAuth();
-  const isAdmin = true;
+  // admin/manager see cost+profit export columns; cashier limited (RBAC matrix)
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager';
   const timezone = getTimezone(appSettings.country);
   const { retailEnabled, wholesaleEnabled } = appSettings;
   const showRetail = retailEnabled !== false;
@@ -47,8 +47,8 @@ export function TransactionsManager() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'sales' | 'refunds'>('all');
   const [selectedCashier, setSelectedCashier] = useState('all');
   const [selectedSalesman, setSelectedSalesman] = useState('all');
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [_isLoadingMore, setIsLoadingMore] = useState(false);
+  const [refreshKey, _setRefreshKey] = useState(0);
 
   useEffect(() => {
     // Refresh triggered from other actions (e.g. cloud search) handles loading
@@ -68,7 +68,7 @@ export function TransactionsManager() {
     loadMoreSales,
   });
 
-  const handleLoadMore = async () => {
+  const _handleLoadMore = async () => {
     setIsLoadingMore(true);
     await loadMoreSales(appSales.length, 100);
     setIsLoadingMore(false);
@@ -187,6 +187,7 @@ export function TransactionsManager() {
             </p>
           </div>
         </div>
+        {isAdmin && (
         <ExportButton
           data={exportRows}
           columns={exportColumns}
@@ -195,6 +196,7 @@ export function TransactionsManager() {
           currencySymbol={getCurrencySymbol(appSettings.currency)}
           className="!px-8 !shadow-emerald-500/20"
         />
+        )}
       </div>
 
       <TransactionHeaderCards

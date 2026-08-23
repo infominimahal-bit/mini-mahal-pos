@@ -1,4 +1,4 @@
-import { supabase, adminUserAction } from '../supabase';
+import { supabase } from '../supabase';
 import {
   localDb,
   generateId,

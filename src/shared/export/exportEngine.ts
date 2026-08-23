@@ -311,7 +311,7 @@ export function printReport(config: ReportExportConfig) {
     <tbody>${body}</tbody>
   </table>
   <div class="footer">${escapeHtml(brand.name)} — ${escapeHtml(config.title)} — Generated ${escapeHtml(new Date().toLocaleString())}</div>
-  <script>window.onload = function(){ window.print(); }<\/script>
+  <script>window.onload = function(){ window.print(); }</script>
 </body>
 </html>`);
   win.document.close();

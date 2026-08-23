@@ -8,7 +8,7 @@ import { ProductIdentityDetails } from './ProductIdentityDetails';
 import type { ProductDetailController } from './useProductDetail';
 
 export function ProductOverview({ d }: { d: ProductDetailController }) {
-  const { totalRevenue, totalSoldUnits, totalCOGS, profitMargin, stockValueCost, stockValueSale, currency, isInfinite, isEditMode, setIsEditMode, product, formData, setFormData, setRestockData, setShowRestock, setShowAdjustment } = d;
+  const { totalRevenue, totalSoldUnits, totalCOGS, profitMargin, stockValueCost, stockValueSale, currency, isInfinite, isEditMode, product, formData, setFormData, setRestockData, setShowRestock, setShowAdjustment } = d;
 
   return (
     <>
@@ -41,7 +41,7 @@ export function ProductOverview({ d }: { d: ProductDetailController }) {
               <h4 className="text-[11px] font-black text-gray-700 dark:text-white uppercase tracking-wider">{"Quick Controls"}</h4>
             </div>
             <div className="flex flex-wrap gap-2">
-              {!isInfinite && (
+              {d.canManageStock && !isInfinite && (
                 <Button
                   variant="primary"
                   onClick={() => {
@@ -59,7 +59,7 @@ export function ProductOverview({ d }: { d: ProductDetailController }) {
                   {"RESTOCK"}
                 </Button>
               )}
-              {!isInfinite && (
+              {d.canManageStock && !isInfinite && (
                 <Button
                   variant="primary"
                   onClick={() => setShowAdjustment(true)}
@@ -85,7 +85,7 @@ export function ProductOverview({ d }: { d: ProductDetailController }) {
                           const saved = await productsService.update(product.id, { minStock: newMin });
                           useProductsStore.getState().updateProduct(saved);
                           sonner.success('Min stock alert updated');
-                        } catch (e) {
+                        } catch (_e) {
                           sonner.error('Failed to save min stock');
                         }
                       }}
@@ -133,7 +133,7 @@ export function ProductOverview({ d }: { d: ProductDetailController }) {
                               const saved = await productsService.update(product.id, { price: newPrice });
                               useProductsStore.getState().updateProduct(saved);
                               sonner.success('Sale price updated');
-                            } catch (e) {
+                            } catch (_e) {
                               sonner.error('Failed to save sale price');
                             }
                           }}
@@ -165,7 +165,7 @@ export function ProductOverview({ d }: { d: ProductDetailController }) {
                               const saved = await productsService.update(product.id, { cost: newCost });
                               useProductsStore.getState().updateProduct(saved);
                               sonner.success('Cost price updated');
-                            } catch (e) {
+                            } catch (_e) {
                               sonner.error('Failed to save cost price');
                             }
                           }}

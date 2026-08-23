@@ -1,4 +1,4 @@
-import { Sale, RefundRequest, VariantStockHistory, Payment } from '../../types';
+import { RefundRequest, VariantStockHistory, Payment } from '../../types';
 import { localDb, generateId } from '../localDb';
 import { cloudWrite } from '../cloudWrite';
 import { toRemoteProduct, toRemoteCustomer } from './mappers';
@@ -29,7 +29,7 @@ export function calculateRefundAmount(sale: any, items: Array<{ index: number; q
   return Math.round(total * (1 + taxRate) * 100) / 100;
 }
 
-export async function returnSale(id: string, request?: RefundRequest, currentCashierName?: string): Promise<void> {
+export async function returnSale(id: string, request?: RefundRequest, currentCashierName?: string, overrideToken?: { p_user_id: string; p_role: string; p_sig: string } | null): Promise<void> {
   if (activeReturns.has(id)) {
     console.warn(`[returnSale] Duplicate call for ${id} ignored (already in progress).`);
     return;
@@ -256,7 +256,7 @@ export async function returnSale(id: string, request?: RefundRequest, currentCas
     // 1b. Atomic cloud commit: reverse stock + update status in ONE tx (online).
     // Cloud-direct: no offline buffer. If the cloud commit fails we throw so the UI
     // shows a failure instead of silently keeping only the local optimistic state.
-    const returnsCommitted = await refundSaleAtomic(id, returnMovements, finalStatus, newRefundedAmount);
+    const returnsCommitted = await refundSaleAtomic(id, returnMovements, finalStatus, newRefundedAmount, [], null, overrideToken);
     if (!returnsCommitted) {
       throw new Error('Cloud refund failed. Please retry — stock was not reversed.');
     }

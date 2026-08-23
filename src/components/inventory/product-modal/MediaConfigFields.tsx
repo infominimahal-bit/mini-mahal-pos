@@ -1,6 +1,5 @@
 import { Camera } from 'lucide-react';
 import { Button } from '../../../shared/ui';
-import { HelpTooltip } from '../../../shared/ui/HelpTooltip';
 import type { ProductFormFieldsProps } from './ProductFormFieldsMain';
 
 export function MediaConfigFields(props: ProductFormFieldsProps) {

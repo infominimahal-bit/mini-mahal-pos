@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, Package, TrendingUp } from 'lucide-react';
+import { Package, TrendingUp } from 'lucide-react';
 import { formatCurrency } from '../../lib/currencies';
 import { formatAppDate } from '../../lib/dateUtils';
 import { useSettingsStore } from '../../stores';

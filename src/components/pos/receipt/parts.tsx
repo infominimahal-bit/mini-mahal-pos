@@ -1,5 +1,4 @@
 import React from 'react';
-import { QRCodeSVG } from 'qrcode.react';
 import { type ReceiptCtx } from './types';
 
 export const RECEIPT_WATERMARK = (

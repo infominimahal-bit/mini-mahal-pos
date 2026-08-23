@@ -2,10 +2,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   Wallet,
   TrendingUp,
-  Building2,
-  ShoppingBag,
-  Package,
-  AlertCircle,
   ArrowRight,
   Clock,
   Activity,
@@ -192,7 +188,7 @@ export function DashboardManager() {
                   <p className="text-[9px] font-black uppercase tracking-[0.4em] text-gray-400 dark:text-white/20">{"Standby"}</p>
                 </div>
               ) : (
-                recentActivity.map((sale, i) => (
+                recentActivity.map((sale, _i) => (
                   <div
                     key={sale.id}
                     onClick={() => navigate('/transactions')}

@@ -1,6 +1,5 @@
 import { useSettingsStore } from '../stores';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useApp } from '../context/SupabaseAppContext';
 import { TouchKeyboard } from '../shared/ui/TouchKeyboard';
 
 interface TouchKeyboardContextType {
@@ -62,7 +61,7 @@ export function TouchKeyboardProvider({ children }: { children: React.ReactNode 
     try {
       start = activeElement.selectionStart ?? activeElement.value.length;
       end = activeElement.selectionEnd ?? activeElement.value.length;
-    } catch (e) {
+    } catch (_e) {
       start = activeElement.value.length;
       end = activeElement.value.length;
     }
@@ -106,7 +105,7 @@ export function TouchKeyboardProvider({ children }: { children: React.ReactNode 
     try {
       start = activeElement.selectionStart ?? activeElement.value.length;
       end = activeElement.selectionEnd ?? activeElement.value.length;
-    } catch (e) {
+    } catch (_e) {
       start = activeElement.value.length;
       end = activeElement.value.length;
     }
@@ -209,9 +208,8 @@ export function TouchKeyboardProvider({ children }: { children: React.ReactNode 
       // Check if clicking a label for an input
       const isLabel = target.tagName === 'LABEL' || target.closest('label');
 
-      // If clicking a button, we assume it's an action (like 'Select Customer' or 'Checkout')
-      // Many of these buttons don't need the keyboard open.
-      const isButton = target.closest('button');
+      // Buttons are treated as actions (like 'Select Customer' or 'Checkout');
+      // many of these buttons don't need the keyboard open.
 
       // If clicking the keyboard itself, do nothing
       const isKeyboard = target.closest('.touch-keyboard-container');

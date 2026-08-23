@@ -23,7 +23,7 @@ export interface BarcodeOptions {
  */
 export function generateBarcodeValue(
   productNameOrId?: string | number,
-  fallbackId?: string | number
+  _fallbackId?: string | number
 ): string {
   let namePart = 'PR';
 

@@ -75,7 +75,13 @@ export function TransactionTable({
         await salesService.delete(tx.id, profile?.name || 'Admin');
         useSalesStore.getState().deleteSale(tx.id);
         sonner.success('Deleted.');
-      } catch { sonner.error('Error.'); }
+      } catch (err) {
+        if (/APPROVAL_REQUIRED|FORBIDDEN/i.test(String((err as any)?.message))) {
+          sonner.error('Admin approval required to delete a sale.');
+        } else {
+          sonner.error('Error.');
+        }
+      }
     }
   };
   return (

@@ -8,6 +8,7 @@ import {
   PlusCircle,
   AlertCircle,
   Layout,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button, ToggleSwitch, Select } from '../../../shared/ui';
 import type { SettingsTabProps } from './types';
@@ -198,6 +199,28 @@ export function GeneralModules({
               color="bg-amber-500"
               checked={formData.allowNegativeStock ?? false}
               onChange={(v) => handleInstantUpdate('allowNegativeStock', v)}
+            />
+          </label>
+
+          {/* RBAC: Refund Approval Threshold */}
+          <label className="flex items-center justify-between p-3 bg-white dark:bg-black/20 border border-gray-200 dark:border-white/5 rounded-xl group transition-all">
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="w-4 h-4 text-gray-500 group-hover:text-emerald-500 transition-colors" />
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-gray-700 dark:text-gray-300 block leading-none">{t("refund_approval_threshold", "Refund Approval Threshold")}</span>
+                <span className="text-[8px] text-gray-500 uppercase tracking-wider block mt-1">{t("refund_approval_threshold_subtitle", "Refunds above this need admin approval (0 = off)")}</span>
+              </div>
+            </div>
+            <input
+              type="number"
+              min={0}
+              value={formData.refundApprovalThreshold ?? 5000}
+              onChange={(e) => {
+                const val = Number(e.target.value) || 0;
+                setFormData((p: any) => ({ ...p, refundApprovalThreshold: val }));
+                handleInstantUpdate('refundApprovalThreshold', val);
+              }}
+              className="w-24 shrink-0 px-2 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-xs font-bold text-gray-900 dark:text-white text-right focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </label>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, RefreshCw, Keyboard, Tag } from 'lucide-react';
+import { Check, Keyboard } from 'lucide-react';
 import { Sale } from '../../../types';
 import { KOTPrint } from '../KOTPrint';
 import { ReceiptPrint } from '../ReceiptPrint';

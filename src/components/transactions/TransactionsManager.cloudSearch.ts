@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Sale } from '../../types';
 import { salesService } from '../../lib/services';
 import { sonner } from '../../lib/sonner';
@@ -34,7 +34,7 @@ export const useCloudSearch = ({
   endDateInput,
   timezone,
   refreshKey,
-  loadMoreSales,
+  loadMoreSales: _loadMoreSales,
 }: CloudSearchParams) => {
   const [isSearchingRemote, setIsSearchingRemote] = useState(false);
   const [cloudResults, setCloudResults] = useState<Sale[]>([]);

@@ -77,44 +77,12 @@
 
       var _bizName = (_settings.storeName || '').trim() || 'POS';
       var _storeLogo = _settings.storeLogo || '';
-      var _isStore = window.location.pathname.startsWith('/store');
 
       // ── DEFAULT values (POS/admin) — neutral, tenant-driven ──
       var _useName = 'POS - ' + _bizName;
       var _useShortName = _bizName.length > 12 ? _bizName.substring(0, 10) + '\u2026' : _bizName;
       var _useTitle = _bizName + ' - POS';
       var _useIcon = '/zaynahs-logo.svg';
-
-      // ── STORE overrides — use saved tenant settings ──
-      if (_isStore) {
-        _useName = _bizName;
-        _useShortName = _bizName.length > 12 ? _bizName.substring(0, 10) + '\u2026' : _bizName;
-        _useTitle = _bizName + ' - Online Store';
-
-        if (_storeLogo) {
-          var _isDataUrl = _storeLogo.indexOf('data:') === 0;
-          var _cacheBust = '';
-          if (!_isDataUrl && _settings.updatedAt) {
-            var _ts = new Date(_settings.updatedAt).getTime();
-            if (!isNaN(_ts)) _cacheBust = '?v=' + _ts;
-          }
-          if (_isDataUrl || _storeLogo.indexOf('//') > -1) {
-            _useIcon = _storeLogo + _cacheBust;
-          } else if (_storeLogo.indexOf('/') === 0) {
-            _useIcon = window.location.origin + _storeLogo + _cacheBust;
-          } else {
-            _useIcon = window.location.origin + '/' + _storeLogo + _cacheBust;
-          }
-        }
-
-        // Override favicon + apple-touch-icon for store
-        var _appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
-        if (_appleIcon) _appleIcon.setAttribute('href', _useIcon);
-        var _favicons = document.querySelectorAll('link[rel*="icon"]');
-        for (var _i = 0; _i < _favicons.length; _i++) {
-          _favicons[_i].setAttribute('href', _useIcon);
-        }
-      }
 
       // Apply title and meta tags
       document.title = _useTitle;
@@ -151,14 +119,14 @@
       var _manifest = {
         name: _useName,
         short_name: _useShortName,
-        description: _isStore ? 'Browse and order items online' : 'Fast, offline-first point-of-sale system',
-        start_url: _origin + (_isStore ? '/store' : '/pos'),
-        scope: _origin + (_isStore ? '/store' : '/'),
+        description: 'Fast point-of-sale system',
+        start_url: _origin + '/pos',
+        scope: _origin + '/',
         display: 'standalone',
-        orientation: _isStore ? 'portrait' : 'any',
-        background_color: _isStore ? '#f9fafb' : '#0a0a0a',
-        theme_color: _settings.estoreThemeColor || '#10b981',
-        categories: _isStore ? ['shopping', 'food', 'lifestyle'] : ['business', 'finance', 'productivity'],
+        orientation: 'any',
+        background_color: '#0a0a0a',
+        theme_color: '#0a0a0a',
+        categories: ['business', 'finance', 'productivity'],
         icons: [
           { src: _useIcon.indexOf('//') > -1 || _useIcon.indexOf('data:') === 0 ? _useIcon : _origin + _useIcon, sizes: '192x192', type: _iconType, purpose: 'any' },
           { src: _useIcon.indexOf('//') > -1 || _useIcon.indexOf('data:') === 0 ? _useIcon : _origin + _useIcon, sizes: '512x512', type: _iconType, purpose: 'maskable' }

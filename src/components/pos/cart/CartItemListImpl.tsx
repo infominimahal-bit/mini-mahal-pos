@@ -2,7 +2,7 @@ import { useCartStore, useAppStore, useProductsStore, useSettingsStore } from '.
 import { useAuth } from '../../../context/AuthContext';
 import { sonner } from '../../../lib/sonner';
 import { localDb } from '../../../lib/localDb';
-import { Bundle, CartItem } from '../../../types';
+import { Bundle } from '../../../types';
 import { CartItemListBody } from './CartItemListBody';
 
 interface CartItemListProps {
@@ -49,7 +49,6 @@ export function CartItemList({ activePromotions }: CartItemListProps) {
   };
 
   const updateBundleQuantity = async (bundleId: string, newBundleQty: number) => {
-    const originalBundleId = bundleId;
     const bundleItemsInCart = appCart.filter(i => (i.bundleId || i.bundle_id) === bundleId);
 
     if (bundleItemsInCart.length === 0) return;

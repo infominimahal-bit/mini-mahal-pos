@@ -1,6 +1,5 @@
 import { useUsersStore } from '../../stores';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useApp } from '../../context/SupabaseAppContext';
 import { AppIcons } from '../../lib/icons';
 import { Button } from '../../shared/ui';
 import { can } from '../../lib/permissions';

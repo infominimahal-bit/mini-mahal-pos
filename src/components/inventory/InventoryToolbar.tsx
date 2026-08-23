@@ -40,7 +40,7 @@ export function InventoryToolbar({
   onSortChange,
   canManageStock,
   selectedCount,
-  filteredCount,
+  _filteredCount,
   handleBulkDelete,
   onBulkEdit,
   onPrintBarcodes,

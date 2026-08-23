@@ -1,7 +1,6 @@
-import { BadgeInfo, Wand2, X, Camera, Tag } from 'lucide-react';
+import { BadgeInfo, Wand2, X, Camera } from 'lucide-react';
 import { Button, SearchableSelect, SegmentedControl } from '../../../shared/ui';
 import { BarcodePreview } from '../../../shared/ui/BarcodePreview';
-import { HelpTooltip } from '../../../shared/ui/HelpTooltip';
 import { ProductVariants } from './ProductVariants';
 import { ProductStatus } from './ProductStatus';
 import type { ProductDetailController } from './useProductDetail';

@@ -1,5 +1,5 @@
 import { Loader2, Save, PackagePlus, Package } from 'lucide-react';
-import { Modal, BottomSheet, SegmentedControl, SearchableSelect, ToggleSwitch, Button, Badge } from '../../../shared/ui';
+import { Modal, BottomSheet, SearchableSelect, ToggleSwitch, Button, Badge } from '../../../shared/ui';
 import { formatCurrency } from '../../../lib/currencies';
 import type { ProductDetailController } from './useProductDetail';
 

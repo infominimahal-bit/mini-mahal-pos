@@ -41,7 +41,7 @@ export function ResetPasswordPage() {
     try {
       await signOut();
       setIsRecoveringPassword(false);
-    } catch (e) {
+    } catch (_e) {
       setIsRecoveringPassword(false);
     }
   };

@@ -27,7 +27,7 @@ export const BundleCard = memo(
     onUpdateBundleQuantity,
     visibleProducts,
     minPrice,
-    maxPrice,
+    maxPrice: _maxPrice,
     displayName,
     isGroup
   }: BundleCardProps) {

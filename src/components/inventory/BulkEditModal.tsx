@@ -1,13 +1,11 @@
 import { useProductsStore } from '../../stores';
-import { useState, useRef } from 'react';
-import { X, DollarSign, Tag, User, Image as ImageIcon, CheckCircle2, Loader2, Upload, Layers } from 'lucide-react';
+import { useState } from 'react';
+import { DollarSign, Tag, User, Image as ImageIcon, CheckCircle2, Loader2 } from 'lucide-react';
 import { productsService } from '../../lib/services';
-import { useApp } from '../../context/SupabaseAppContext';
 import { Product } from '../../types';
 import { sonner } from '../../lib/sonner';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { MediaLibrary } from '../../shared/MediaLibrary';
-import { compressImage } from '../../shared/imageCompression';
 import { Modal } from '../../shared/ui/Modal';
 import { Button } from '../../shared/ui';
 
@@ -36,7 +34,6 @@ export function BulkEditModal({ isOpen, onClose, selectedIds, categories, suppli
     image: undefined,
     active: undefined,
     taxable: undefined,
-    isFeatured: undefined,
   });
 
   const handleApply = async () => {
@@ -208,7 +205,6 @@ export function BulkEditModal({ isOpen, onClose, selectedIds, categories, suppli
               {[
                 { label: "asset_activation", key: 'active' },
                 { label: "fiscal_taxation", key: 'taxable' },
-                { label: "priority_featuring", key: 'isFeatured' },
               ].map(({ label, key }) => (
                 <label key={key} className={`flex items-center justify-between p-5 rounded-[20px] border transition-all cursor-pointer ${(updates as any)[key] !== undefined ? 'bg-emerald-50 dark:bg-primary/10 border-emerald-200 dark:border-primary/20' : 'bg-[#f8f9fa] dark:bg-black/75 border-gray-200 dark:border-white/5'}`}>
                   <span className={`text-[11px] font-black uppercase tracking-widest ${(updates as any)[key] !== undefined ? 'text-primary dark:text-emerald-400' : 'text-gray-600 dark:text-gray-400'}`}>{label}</span>
@@ -220,7 +216,7 @@ export function BulkEditModal({ isOpen, onClose, selectedIds, categories, suppli
                       ref={el => {
                         if (el) el.indeterminate = (updates as any)[key] === undefined;
                       }}
-                      onChange={(e) => {
+                      onChange={(_e) => {
                         const current = (updates as any)[key];
                         let next: boolean | undefined;
                         if (current === undefined) next = true;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Lock, Shield, Crown, Loader2, Camera, Save, Tag, CreditCard, Package, Edit, Trash2, Database, ClipboardList, History, Wallet, Users, BarChart3, Eye, EyeOff } from 'lucide-react';
+import { User, Lock, Shield, Crown, Loader2, Camera, Save, Tag, CreditCard, Edit, Trash2, Database, ClipboardList, History, Eye, EyeOff } from 'lucide-react';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { User as UserType } from '../../types';
 import { Modal } from '../../shared/ui/Modal';
@@ -19,7 +19,7 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
   const {
     appCurrentUser, loading, formData, setFormData,
     showMediaLibrary, setShowMediaLibrary, handleSubmit, handleChange,
-    handleRoleChange, toggleAccessPerm, t
+    handleRoleChange, t
   } = useUserModalData(user, onClose);
 
   if (!isOpen) return null;
@@ -177,6 +177,7 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
               { key: 'canEditPrice', label: t('price_override', 'PRICE OVERRIDE'), icon: Tag },
+              { key: 'canEditProduct', label: t('manage_products', 'EDIT & DISABLE ITEMS'), icon: Edit, managerOnly: true },
               { key: 'canGiveDiscount', label: t('issue_discounts', 'ISSUE DISCOUNTS'), icon: CreditCard },
               { key: 'canEditSale', label: t('edit_sales', 'EDIT SALES'), icon: Edit },
               { key: 'canDeleteSale', label: t('delete_sales', 'DELETE SALES'), icon: Trash2 },
@@ -215,44 +216,7 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
             ))}
           </div>
 
-          <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3 pt-4">
-            <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-            {t('module_access_control', 'Module Access Control')}
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              { key: 'access_inventory', label: t('inventory_module', 'INVENTORY MODULE'), icon: Package },
-              { key: 'access_expenses', label: t('expenses_module', 'EXPENSES MODULE'), icon: Wallet },
-              { key: 'access_payments', label: t('payments_module', 'PAYMENTS MODULE'), icon: CreditCard },
-              { key: 'access_customers', label: t('customers_module', 'CUSTOMERS MODULE'), icon: Users },
-              { key: 'access_reports', label: t('reports_module', 'REPORTS MODULE'), icon: BarChart3 }
-            ].map((mod) => (
-              <div key={mod.key} className={cn(
-                "flex items-center justify-between p-4 rounded-[20px] border transition-all",
-                formData.role === 'admin' || formData.permissions.includes(mod.key)
-                  ? 'bg-blue-50 dark:bg-blue-500/5 border-blue-100 dark:border-blue-500/20'
-                  : 'bg-[#f8f9fa] dark:bg-black/20 border-gray-200 dark:border-white/5'
-              )}>
-                <div className="flex items-center gap-3">
-                  <mod.icon className={cn(
-                    "h-4 w-4",
-                    formData.role === 'admin' || formData.permissions.includes(mod.key) ? 'text-blue-500' : 'text-gray-600'
-                  )} />
-                  <span className={cn(
-                    "text-[10px] font-black uppercase tracking-widest",
-                    formData.role === 'admin' || formData.permissions.includes(mod.key) ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600'
-                  )}>{mod.label}</span>
-                </div>
-                <ToggleSwitch
-                  checked={formData.role === 'admin' || formData.permissions.includes(mod.key)}
-                  onChange={(checked) => toggleAccessPerm(mod.key, checked)}
-                  disabled={formData.role === 'admin'}
-                  size="sm"
-                  color="bg-blue-500"
-                />
-              </div>
-            ))}
-          </div>
+
         </div>
 
         {/* Access Protocol */}

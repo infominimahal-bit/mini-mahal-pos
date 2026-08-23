@@ -21,7 +21,6 @@ export function ReceiptPreview({ settings }: ReceiptPreviewProps) {
     return () => window.removeEventListener('resize', updateWidth);
   }, []);
 
-  const currency = settings.currency;
   const is58mm = settings.receiptPaperSize === '58mm';
   const isA4 = settings.receiptPaperSize === 'A4';
 
@@ -39,7 +38,6 @@ export function ReceiptPreview({ settings }: ReceiptPreviewProps) {
   const padBottom = settings.receiptPaddingBottom || (isA4 ? 15 : 10);
   const padLeft = settings.receiptPaddingLeft || (isA4 ? 24 : 2);
   const padRight = settings.receiptPaddingRight || (isA4 ? 24 : 2);
-  const offsetX = settings.receiptOffsetX || 0;
 
   const userScale = settings.receiptFontScale || 1;
   const scale = userScale * 1.0;
@@ -111,7 +109,7 @@ export function ReceiptPreview({ settings }: ReceiptPreviewProps) {
   };
 
   const blocks = createPreviewBlocks({ settings, fs, baseWeight, clamp, containerRef, paperWidthPx, fitScale, padTop, padBottom, fontFamily, is58mm, subtotal, discountAmount, taxAmount, taxLabel, bodyStyle });
-  const { TwoCol, previewWrap, renderLogo, itemRows, storeNameBlock, storeInfoBlock, deliveryBlock, metaBlock, totalsBlock, paymentBlock, notesBlock, footerBlock, defaultItemsTable, renderHeaderContent, renderMetaContent, renderDeliveryContent, renderItemsContent, renderTotalsContent, renderFooterContent, RECEIPT_WATERMARK } = blocks;
+  const { TwoCol, previewWrap, renderLogo, itemRows, storeNameBlock, storeInfoBlock, metaBlock, totalsBlock, paymentBlock, notesBlock, footerBlock, defaultItemsTable, renderHeaderContent, renderMetaContent, renderDeliveryContent, renderItemsContent, renderTotalsContent, renderFooterContent, RECEIPT_WATERMARK } = blocks;
 
   if (isNewLayout) {
     return renderReceiptLayout({

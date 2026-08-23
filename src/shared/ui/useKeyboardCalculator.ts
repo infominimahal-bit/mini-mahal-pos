@@ -84,6 +84,7 @@ export function useKeyboardCalculator({ onInput, play, setLayout }: UseKeyboardC
         setTimeout(() => calcInputRef.current?.focus(), 0);
         return;
       } else if (key === 'INSERT') {
+        return; // INSERT key: no calculator action (reserved)
       } else if (key !== 'C') {
         setCalcHistoryExpr('');
         setCalcExpr(key);

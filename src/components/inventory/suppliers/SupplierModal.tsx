@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Truck, Phone, Mail, MapPin, Briefcase, CreditCard, Tag, Save, RefreshCw } from 'lucide-react';
+import { Save, RefreshCw } from 'lucide-react';
 import { Supplier } from '../../../types';
 import { Modal } from '../../../shared/ui/Modal';
 import { Button, Select } from '../../../shared/ui';
-import { cn } from '../../../lib/utils';
 
 interface SupplierModalProps {
   isOpen: boolean;

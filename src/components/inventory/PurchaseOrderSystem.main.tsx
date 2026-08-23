@@ -30,9 +30,7 @@ export function PurchaseOrderSystem() {
     searchQuery,
     setSearchQuery,
     batchSupplier,
-    setBatchSupplier,
     batchCategory,
-    setBatchCategory,
     showScanner,
     setShowScanner,
     manualList,
@@ -42,7 +40,6 @@ export function PurchaseOrderSystem() {
     setRecordAsSupplierBill,
     exportColumns,
     exportRows,
-    handleFilterChange,
     handleGenerate,
     handleBulkAdmit,
     handleReset

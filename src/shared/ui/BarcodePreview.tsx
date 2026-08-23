@@ -61,7 +61,7 @@ export const BarcodePreview = React.memo(
     className,
     inline = false,
     height,
-    showValue
+    _showValue
   }: BarcodePreviewProps) => {
     if (!value) {
       return inline ? (

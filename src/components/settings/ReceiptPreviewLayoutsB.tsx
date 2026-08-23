@@ -4,7 +4,7 @@ import { BarcodePreview } from '../../shared/ui/BarcodePreview';
 import { RenderReceiptLayoutProps } from './ReceiptPreviewLayoutProps';
 
 export function renderOffsetLogo(props: RenderReceiptLayoutProps) {
-  const { settings, bodyStyle, RECEIPT_WATERMARK, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, footerBlock, storeNameBlock, storeInfoBlock, renderLogo, total, previewWrap, TwoCol, itemRows } = props;
+  const { settings, bodyStyle, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, footerBlock, storeNameBlock, storeInfoBlock, renderLogo, total, previewWrap, TwoCol } = props;
   return previewWrap(
     <div style={{ textAlign: 'right' }}>
       {renderLogo({ position: 'absolute', top: '15px', left: '15px', width: '50px', height: '50px', border: '2px solid #000', borderRadius: '8px' })}
@@ -29,7 +29,7 @@ export function renderOffsetLogo(props: RenderReceiptLayoutProps) {
 }
 
 export function renderBoxedSections(props: RenderReceiptLayoutProps) {
-  const { settings, bodyStyle, fs, is58mm, RECEIPT_WATERMARK, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, storeNameBlock, storeInfoBlock, renderLogo, total, previewWrap, TwoCol, itemRows } = props;
+  const { settings, bodyStyle, fs, is58mm, RECEIPT_WATERMARK, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, storeNameBlock, storeInfoBlock, renderLogo, total, previewWrap, TwoCol } = props;
   return previewWrap(
     <>
       <div style={{ border: '1px solid #000', padding: '10px', textAlign: 'center', marginBottom: '10px' }}>
@@ -66,7 +66,7 @@ export function renderBoxedSections(props: RenderReceiptLayoutProps) {
 }
 
 export function renderTearOff(props: RenderReceiptLayoutProps) {
-  const { settings, bodyStyle, RECEIPT_WATERMARK, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, footerBlock, storeNameBlock, storeInfoBlock, renderLogo, total, previewWrap, TwoCol, itemRows } = props;
+  const { settings, bodyStyle, RECEIPT_WATERMARK, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, footerBlock, storeNameBlock, renderLogo, total, previewWrap, TwoCol } = props;
   return previewWrap(
     <>
       <div style={{ textAlign: 'center' }}>
@@ -102,7 +102,7 @@ export function renderTearOff(props: RenderReceiptLayoutProps) {
 }
 
 export function renderVerticalLine(props: RenderReceiptLayoutProps) {
-  const { settings, bodyStyle, RECEIPT_WATERMARK, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, footerBlock, storeNameBlock, storeInfoBlock, renderLogo, total, previewWrap, TwoCol, itemRows } = props;
+  const { settings, bodyStyle, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, footerBlock, storeNameBlock, storeInfoBlock, renderLogo, total, previewWrap, TwoCol } = props;
   return previewWrap(
     <>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '15px' }}>
@@ -130,7 +130,7 @@ export function renderVerticalLine(props: RenderReceiptLayoutProps) {
 }
 
 export function renderEmphasizedTotal(props: RenderReceiptLayoutProps) {
-  const { settings, bodyStyle, RECEIPT_WATERMARK, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, footerBlock, storeNameBlock, storeInfoBlock, renderLogo, total, previewWrap, TwoCol, itemRows } = props;
+  const { settings, bodyStyle, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, footerBlock, storeNameBlock, storeInfoBlock, renderLogo, total, previewWrap } = props;
   return previewWrap(
     <>
       <div style={{ textAlign: 'center' }}>

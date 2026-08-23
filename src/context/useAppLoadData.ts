@@ -1,30 +1,12 @@
-import { useState, useCallback } from 'react';
 import { useCartStore, useSettingsStore, useUsersStore, useProductsStore, useInventoryStore, useCustomersStore, useSalesStore, useExpensesStore, useAppStore } from '../stores';
 import { localDb, SETTINGS_ID } from '../lib/localDb';
 import { supabase } from '../lib/supabase';
 import { sonner } from '../lib/sonner';
-import { fetchAllPages } from '../lib/services/utils';
 import {
-  productsService,
-  customersService,
-  salesService,
-  discountsService,
   usersService,
-  suppliersService,
-  expensesService,
-  purchaseRecordsService,
-  categoriesService,
-  settingsService,
-  salesTabsService,
-  purchaseOrdersService,
-  supplierTransactionsService,
-  paymentModesService,
-  bundlesService,
-  salesmenService,
   mapProduct,
   mapCustomer,
   mapSale,
-  mapUser,
   mapSettings,
   mapSalesman,
   mapExpense,
@@ -46,7 +28,7 @@ async function cloudFetch(table: string, mapper?: (r: any) => any, opts?: { orde
 }
 
 export function useAppLoadData(initialized: boolean, setInitialized: React.Dispatch<React.SetStateAction<boolean>>) {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
 
   const searchSales = async (term: string) => {
     try {
@@ -100,7 +82,7 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
     }
   };
 
-  const loadData = async (silent = false, forceCloudSync = false) => {
+  const loadData = async (silent = false, _forceCloudSync = false) => {
     if (!user) return;
     if (!silent) sonner.loading('Loading POS Data...', { id: 'load-data' });
 
@@ -122,7 +104,6 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         cloudPurchaseOrders,
         cloudSuppliers,
         cloudSupplierTx,
-        cloudSalesTabs,
         cloudCategories,
         cloudBundles,
         cloudSettings,
@@ -139,7 +120,6 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         cloudFetch('purchase_orders'),
         cloudFetch('suppliers'),
         cloudFetch('supplier_transactions'),
-        cloudFetch('sales_tabs'),
         cloudFetch('categories'),
         cloudFetch('bundles'),
         (async () => {
@@ -163,7 +143,6 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
       const purchaseOrders = ok(cloudPurchaseOrders) || [];
       const suppliers = ok(cloudSuppliers) || [];
       const supplierTx = ok(cloudSupplierTx) || [];
-      const salesTabs = ok(cloudSalesTabs) || [];
       const categories = ok(cloudCategories) || [];
       const bundles = ok(cloudBundles) || [];
       const settingsRow = ok(cloudSettings);
@@ -181,7 +160,6 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         localDb.purchaseOrders.clear().then(() => localDb.purchaseOrders.bulkPut(purchaseOrders)),
         localDb.suppliers.clear().then(() => localDb.suppliers.bulkPut(suppliers)),
         localDb.supplierTransactions.clear().then(() => localDb.supplierTransactions.bulkPut(supplierTx)),
-        localDb.salesTabs.clear().then(() => localDb.salesTabs.bulkPut(salesTabs)),
         localDb.categories.clear().then(() => localDb.categories.bulkPut(categories)),
         localDb.bundles.clear().then(() => localDb.bundles.bulkPut(bundles)),
         localDb.sales.clear().then(() => localDb.sales.bulkPut(sales)),
@@ -190,13 +168,24 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
       ]).catch(() => {});
 
       // Populate stores (cloud is source of truth)
-      if (settingsRow) useSettingsStore.getState().setSettings(mapSettings(settingsRow));
+      if (settingsRow) {
+        const dbSettings = mapSettings(settingsRow);
+        // Preserve local device UI preferences
+        try {
+          const localStr = localStorage.getItem('pos_settings');
+          if (localStr) {
+            const local = JSON.parse(localStr);
+            if (local.posGridColumns !== undefined) dbSettings.posGridColumns = local.posGridColumns;
+            if (local.theme !== undefined) dbSettings.theme = local.theme;
+          }
+        } catch (e) {}
+        useSettingsStore.getState().setSettings(dbSettings);
+      }
       useProductsStore.getState().setProducts(products);
       useCustomersStore.getState().setCustomers(customers);
       useUsersStore.getState().setUsers(users);
       useUsersStore.getState().setSalesmen(salesmen);
       useAppStore.getState().setDiscounts(discounts);
-      useCartStore.getState().setSalesTabs(salesTabs);
       useInventoryStore.getState().setCategories(categories);
       useSettingsStore.getState().setPaymentModes(paymentModes);
       useAppStore.getState().setBundles(bundles);

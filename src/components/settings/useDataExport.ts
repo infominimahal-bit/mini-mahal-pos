@@ -12,28 +12,6 @@ interface ImportSummary {
   duplicate: number;
 }
 
-const DISPATCH_MAP: Record<string, string> = {
-  products: 'SET_PRODUCTS',
-  customers: 'SET_CUSTOMERS',
-  sales: 'SET_SALES',
-  discounts: 'SET_DISCOUNTS',
-  users: 'SET_USERS',
-  salesTabs: 'SET_SALES_TABS',
-  expenses: 'SET_EXPENSES',
-  purchaseRecords: 'SET_PURCHASE_RECORDS',
-  categories: 'SET_CATEGORIES',
-  suppliers: 'SET_SUPPLIERS',
-  supplier_transactions: 'SET_SUPPLIER_TRANSACTIONS',
-  payments: 'SET_PAYMENTS',
-  purchase_orders: 'SET_PURCHASE_ORDERS',
-  purchase_order_items: 'SET_PURCHASE_ORDER_ITEMS',
-  stock_history: 'SET_STOCK_HISTORY',
-  variant_stock_history: 'SET_VARIANT_STOCK_HISTORY',
-  bundles: 'SET_BUNDLES',
-  toppings: 'SET_TOPPINGS',
-  productAddons: 'SET_PRODUCT_ADDONS',
-};
-
 export function useDataExport(selectedStores: Set<string>, canExportDb: boolean) {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -160,7 +138,7 @@ export function useDataExport(selectedStores: Set<string>, canExportDb: boolean)
               // restore would need per-table remote mappers — out of scope here.)
               useSettingsStore.getState().setSettings({ ...useSettingsStore.getState().settings, ...mergedSettings } as any);
               summaries.push({ table: 'SETTINGS', total: 1, imported: 1, skipped: 0, failed: 0, duplicate: 0 });
-            } catch (e) {
+            } catch (_e) {
               summaries.push({ table: 'SETTINGS', total: 1, imported: 0, skipped: 0, failed: 1, duplicate: 0 });
             }
           }
@@ -216,7 +194,7 @@ export function useDataExport(selectedStores: Set<string>, canExportDb: boolean)
                 
                 await table.add(record);
                 imported++;
-              } catch (e) {
+              } catch (_e) {
                 failed++;
               }
             }

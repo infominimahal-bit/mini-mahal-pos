@@ -2,7 +2,6 @@ import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, Line
 import { TrendingDown, BarChart3, Banknote, CreditCard, Smartphone, Package, Building2 } from 'lucide-react';
 import { formatCurrency, getCurrencySymbol } from '../../../lib/currencies';
 import { formatAppDate } from '../../../lib/dateUtils';
-import { EXPENSE_CATEGORIES } from '../../../types';
 import { Expense } from '../../../types';
 import { normalizePaymentMethod } from '../../../lib/services';
 import { Pagination, usePagination } from '../../../shared/ui';

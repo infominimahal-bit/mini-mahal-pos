@@ -25,7 +25,7 @@ export default function InventoryReportManager({
   const appStockHistory = useInventoryStore(s => s.stockHistory);
   const appSettings = useSettingsStore(s => s.settings);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'in' | 'low' | 'out'>('all');
+  const [statusFilter, _setStatusFilter] = useState<'all' | 'in' | 'low' | 'out'>('all');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [supplierFilter, setSupplierFilter] = useState('All');
   const [sortField, setSortField] = useState<SortField>('status');

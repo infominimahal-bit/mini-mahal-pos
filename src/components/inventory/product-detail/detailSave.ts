@@ -113,12 +113,12 @@ export async function performSave(ctx: DetailCtx) {
     if (Array.isArray((cloudProduct as any).variantData)) {
       (cloudProduct as any).variantData = (cloudProduct as any).variantData.map((v: any) => { const c = { ...v }; delete c.stock; return c; });
     }
-    const saved = await productsService.update(ctx.product.id, cloudProduct);
+    const _saved = await productsService.update(ctx.product.id, cloudProduct);
     await productToppingsService.setByProduct(ctx.product.id, (ctx as any).toppingIds || []);
     useProductsStore.getState().updateProduct(updatedProduct);
     sonner.success('Product updated successfully');
     ctx.setIsEditMode(false);
-  } catch (error) {
+  } catch (_error) {
     sonner.error('Failed to update product');
   } finally {
     ctx.setIsUpdating(false);

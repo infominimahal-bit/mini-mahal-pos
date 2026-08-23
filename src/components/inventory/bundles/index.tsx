@@ -2,8 +2,9 @@ import { useAppStore, useProductsStore, useSettingsStore } from '../../../stores
 import { useState } from 'react';
 import { Plus, Gift } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
-import { Bundle, Product } from '../../../types';
+import { Bundle } from '../../../types';
 import { sonner } from '../../../lib/sonner';
+import { can } from '../../../lib/permissions';
 import { bundlesService } from '../../../lib/services';
 import { Button, EmptyState } from '../../../shared/ui';
 import { BundleForm } from './BundleForm';
@@ -15,9 +16,8 @@ export function BundleManager() {
   const appBundles = useAppStore(s => s.bundles);
 
   const { profile } = useAuth();
-  const isAdmin = true; // Role logic removed — full access
-  const isManager = true;
-  const canManage = isAdmin || isManager;
+  // RBAC matrix: bundles manage = admin|manager (manage_products)
+  const canManage = can(profile?.role, 'manage_products');
 
   const [showForm, setShowForm] = useState(false);
   const [editingBundle, setEditingBundle] = useState<Bundle | null>(null);
@@ -61,7 +61,7 @@ export function BundleManager() {
       await bundlesService.update(bundle.id, { active: !bundle.active });
       useAppStore.getState().updateBundle({ ...bundle, active: !bundle.active, updatedAt: new Date() },);
       sonner.success(bundle.active ? "Bundle disabled" : "Bundle enabled");
-    } catch (err: any) {
+    } catch (_err: any) {
       sonner.error("Error updating status");
     }
   };

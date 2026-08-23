@@ -50,10 +50,13 @@ export function useProductDetail({ product, onBack, onEdit }: ProductDetailHubPr
     HISTORY_PER_PAGE: data.HISTORY_PER_PAGE,
   });
 
+  const canEditProduct = profile?.role === 'admin' || profile?.canEditProduct;
+  const canManageStock = profile?.role === 'admin' || profile?.role === 'manager' || profile?.canManageStock || profile?.canManagePO;
+
   const base: any = {
     product, onBack, onEdit,
     appProducts, appSuppliers, appSettings, appSales, appPurchaseRecords,
-    profile,
+    profile, canEditProduct, canManageStock,
     ...data,
     saleById,
     ...ledger,

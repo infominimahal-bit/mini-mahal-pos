@@ -17,7 +17,7 @@ interface Props {
 
 export function TransactionItemsTable({
   items, appBundles, appProducts, appSettings, showDiscount,
-  isAdmin, profile, transactionId, onNavigateToProduct
+  isAdmin: _isAdmin, profile: _profile, transactionId, onNavigateToProduct
 }: Props) {
   const groupItems = (items: any[]) => {
     const bundlesMap = new Map<string, any>();

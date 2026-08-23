@@ -1,7 +1,6 @@
 import { useAppStore, useSettingsStore } from '../../stores';
 import React, { useEffect, useRef } from 'react';
 import { Sale } from '../../types';
-import { useApp } from '../../context/SupabaseAppContext';
 import { formatAppDateTime } from '../../lib/dateUtils';
 import { useSoundFeedback } from '../../hooks/useSoundFeedback';
 
@@ -178,7 +177,7 @@ const appBundles = useAppStore(s => s.bundles);
               <div class="table-row-name" style="font-size: 14px;">${bIdx + 1}. 🎁 ${b.bundleQty > 1 ? `${b.bundleQty}x ` : ''}${b.bundleName}</div>
             </div>
           </div>`;
-          b.items.forEach((item: any, idx: number) => {
+          b.items.forEach((item: any, _idx: number) => {
             const baseItemQty = b.bundleQty > 0 ? Math.round(item.quantity / b.bundleQty) : item.quantity;
             html += `
             <div class="table-row" style="border-top: none; padding-top: 0;">
@@ -219,9 +218,9 @@ const appBundles = useAppStore(s => s.bundles);
 </body>
 </html>`;
 
-    // @ts-ignore
+    // @ts-ignore -- electronAPI is injected by the optional Electron shell only
     if (window.electronAPI && window.electronAPI.isElectron) {
-      // @ts-ignore
+      // @ts-ignore -- electronAPI is injected by the optional Electron shell only
       window.electronAPI.printHtml(printHTML);
     } else {
       const iframe = document.createElement('iframe');

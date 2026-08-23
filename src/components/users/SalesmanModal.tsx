@@ -2,7 +2,6 @@ import { useUsersStore } from '../../stores';
 import { useState, useEffect } from 'react';
 import { Loader2, Save, User as UserIcon, Phone } from 'lucide-react';
 import { Salesman } from '../../types';
-import { useApp } from '../../context/SupabaseAppContext';
 import { salesmenService } from '../../lib/services';
 import { sonner } from '../../lib/sonner';
 import { Modal } from '../../shared/ui/Modal';

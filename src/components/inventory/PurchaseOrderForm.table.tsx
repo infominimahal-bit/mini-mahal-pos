@@ -1,5 +1,5 @@
 import React from 'react';
-import { PackageOpen, TrendingDown, Trash2 } from 'lucide-react';
+import { PackageOpen, Trash2 } from 'lucide-react';
 import { EmptyState, Badge, Pagination, Button } from '../../shared/ui';
 import { formatCurrency, getCurrencySymbol } from '../../lib/currencies';
 import type { PurchaseOrderFormTableProps } from './PurchaseOrderForm.types';

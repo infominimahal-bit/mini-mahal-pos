@@ -13,7 +13,7 @@ export const migrateV13 = async (trans: any) => {
       }
       await trans.table('app_settings').clear();
     }
-  } catch (err) {}
+  } catch (_err) {}
 
   try {
     const legacyPurchases = await trans.table('purchase_records').toArray();
@@ -24,7 +24,7 @@ export const migrateV13 = async (trans: any) => {
       }
       await trans.table('purchase_records').clear();
     }
-  } catch (err) {}
+  } catch (_err) {}
 };
 
 export const migrateV4 = async (trans: any) => {

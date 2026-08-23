@@ -1,8 +1,7 @@
 import { useUsersStore } from '../../stores';
 import { useState } from 'react';
-import { Plus, Edit, Trash2, Users, Crown, CreditCard, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, CreditCard } from 'lucide-react';
 import { Salesman } from '../../types';
-import { useApp } from '../../context/SupabaseAppContext';
 import { SharedSearchBar } from '../../shared/modules/search-and-list';
 import { Badge, Button, EmptyState, Pagination, usePagination } from '../../shared/ui';
 import { salesmenService } from '../../lib/services';

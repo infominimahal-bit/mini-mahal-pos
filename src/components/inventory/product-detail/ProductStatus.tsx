@@ -1,4 +1,4 @@
-import { Tag, Globe } from 'lucide-react';
+import { Tag } from 'lucide-react';
 import { HelpTooltip } from '../../../shared/ui/HelpTooltip';
 import type { ProductDetailController } from './useProductDetail';
 
@@ -107,35 +107,6 @@ export function ProductStatus({ d }: { d: ProductDetailController }) {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-[#1C1C1C] p-6 sm:p-8 rounded-[3rem] border border-gray-200 dark:border-white/5 shadow-2xl flex flex-col h-fit">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-[1.5rem]"><Globe className="w-6 h-6" /></div>
-          <div>
-            <h3 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tight">Featured Product</h3>
-            <p className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">Highlight & Sorting</p>
-          </div>
-        </div>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/[0.03] rounded-[1.5rem] border border-gray-200 dark:border-white/5">
-            <div className="flex flex-col">
-              <span className="text-[11px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center">
-                {"Featured"}
-                <HelpTooltip content="Highlights the product with a gold star badge and sorts it to the top across inventory and POS." />
-              </span>
-              <span className="text-[9px] font-bold text-gray-600 uppercase">Star Product</span>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer scale-110">
-              <input
-                type="checkbox"
-                className="sr-only peer"
-                checked={formData.isFeatured}
-                onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
-              />
-              <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
-            </label>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

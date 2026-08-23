@@ -3,7 +3,7 @@ import { ChevronLeft, PieChart as PieIcon, RefreshCw, TrendingUp } from 'lucide-
 import { Button } from '../../../shared/ui';
 import { formatAppDate } from '../../../lib/dateUtils';
 import { useNavigate } from 'react-router-dom';
-
+import { can } from '../../../lib/permissions';
 interface Props {
   validStartDate: Date;
   validEndDate: Date;
@@ -62,11 +62,8 @@ export function ReportHeader({
         </div>
 
         <div className="chip-nav-container flex-1 lg:flex-none">
-          {TABS.filter(tab => {
-            const role = appCurrentUser?.role;
-            const perms = appCurrentUser?.permissions || [];
-            const hasFullAccess = role === 'admin' || role === 'manager' || perms.includes('access_reports');
-            return hasFullAccess;
+          {TABS.filter(_tab => {
+            return can(appCurrentUser?.role, 'view_reports');
           }).map(tab => {
             const isActive = reportType === tab.id;
             return (

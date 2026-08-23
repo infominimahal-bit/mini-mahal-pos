@@ -1,8 +1,7 @@
 import { useInventoryStore } from '../../stores';
 import { useState, useEffect } from 'react';
-import { X, User, Phone, Mail, MapPin, Hash, Plus, Trash2, ShieldCheck, Sparkles, ArrowRight, Save, RefreshCw } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { Customer } from '../../types';
-import { useApp } from '../../context/SupabaseAppContext';
 import { sonner } from '../../lib/sonner';
 import { Modal } from '../../shared/ui/Modal';
 import { cn } from '../../lib/utils';
@@ -99,7 +98,7 @@ export function CustomerModal({ isOpen, onClose, customer }: CustomerModalProps)
         sonner.success("Customer Added");
       }
       onClose();
-    } catch (error) {
+    } catch (_error) {
       sonner.error("Sync Failure");
     } finally {
       setIsSubmitting(false);

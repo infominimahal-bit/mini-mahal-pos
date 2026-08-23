@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Package, Star, Plus, Minus, Infinity } from 'lucide-react';
+import { Package, Plus, Minus, Infinity as InfinityIcon } from 'lucide-react';
 import { Product } from '../../../types';
 
 interface ProductCardProps {
@@ -44,12 +44,6 @@ export const ProductCard = memo(function ProductCard({ product, onAddToCart, onU
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Package className={`${isTouchMode ? 'h-8 w-8' : 'h-6 w-6'} text-gray-300`} />
-          </div>
-        )}
-
-        {product.isFeatured && (
-          <div className="absolute top-1 left-1 sm:top-2 sm:left-2 bg-yellow-400 text-white p-0.5 rounded-full shadow-lg z-10">
-            <Star className="h-2.5 w-2.5 sm:h-3 sm:w-3 fill-white" />
           </div>
         )}
 
@@ -100,7 +94,7 @@ export const ProductCard = memo(function ProductCard({ product, onAddToCart, onU
                 : 'bg-primary text-white'
           }`}>
           {isInfinite
-            ? <Infinity className="h-3 w-3" />
+            ? <InfinityIcon className="h-3 w-3" />
             : isNegativeStock
               ? "NO STOCK"
               : isNoStock
@@ -135,7 +129,6 @@ export const ProductCard = memo(function ProductCard({ product, onAddToCart, onU
     prev.product.stock === next.product.stock &&
     prev.product.image === next.product.image &&
     prev.product.active === next.product.active &&
-    prev.product.isFeatured === next.product.isFeatured &&
     prev.product.trackInventory === next.product.trackInventory &&
     prev.product.minStock === next.product.minStock
   )

@@ -49,11 +49,11 @@ export function usePurchaseHistory() {
   };
   const [itemsPerPage, setPageSize] = useState(25);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [_isSubmitting, setIsSubmitting] = useState(false);
 
   const [suggestions, setSuggestions] = useState<any[]>([]);
 
-  const handleProductSearch = (query: string) => {
+  const _handleProductSearch = (query: string) => {
     setFormData((prev: any) => ({ ...prev, productName: query }));
     if (query.length > 1) {
       const matches = appProducts.filter(p =>
@@ -67,7 +67,7 @@ export function usePurchaseHistory() {
     }
   };
 
-  const selectProduct = (p: Product) => {
+  const _selectProduct = (p: Product) => {
     setFormData((prev: any) => ({
       ...prev,
       productId: p.id,
@@ -82,7 +82,7 @@ export function usePurchaseHistory() {
     sonner.success(`${p.name} selected`, 1000);
   };
 
-  const handleSaveRecord = async (e: React.FormEvent) => {
+  const _handleSaveRecord = async (e: React.FormEvent) => {
     e.preventDefault();
     const productName = String(formData.productName || '').trim();
     const supplierName = String(formData.supplier || '').trim();

@@ -10,12 +10,10 @@ export function filterProducts(appProducts: any[], searchTerm: string, selectedC
 
     const matchesCategory = (searchTerm || '').trim() !== ''
       ? true
-      : (selectedCategory === 'All' || (selectedCategory === 'Featured' ? product.isFeatured : (selectedCategory === 'Pizzas' ? (product.category === 'Pizzas' || product.category === 'Special Pizzas') : product.category === selectedCategory)));
+      : (selectedCategory === 'All' || (selectedCategory === 'Pizzas' ? (product.category === 'Pizzas' || product.category === 'Special Pizzas') : product.category === selectedCategory));
 
     return matchesSearch && matchesCategory && product.active !== false && product.productType !== 'variation';
   }).sort((a, b) => {
-    if (a.isFeatured && !b.isFeatured) return -1;
-    if (!a.isFeatured && b.isFeatured) return 1;
     return a.name.localeCompare(b.name);
   });
 }

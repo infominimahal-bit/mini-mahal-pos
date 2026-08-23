@@ -3,7 +3,6 @@ import { Sale, RefundRequest } from '../../types';
 import { Modal } from '../../shared/ui/Modal';
 import { RotateCcw, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '../../lib/currencies';
-import { useApp } from '../../context/SupabaseAppContext';
 import { useSettingsStore } from '../../stores';
 import { Button, Select } from '../../shared/ui';
 import { paymentModesService } from '../../lib/services/paymentsService';

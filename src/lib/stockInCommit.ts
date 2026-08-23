@@ -1,4 +1,4 @@
-import { generateId, purchaseRecordsService, suppliersService } from './services';
+import { generateId, purchaseRecordsService } from './services';
 import { localDb } from './localDb';
 import { useInventoryStore } from '../stores/inventoryStore';
 import { useProductsStore } from '../stores/productsStore';

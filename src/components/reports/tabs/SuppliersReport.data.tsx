@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useInventoryStore } from '../../../stores';
 import { suppliersService } from '../../../lib/services';
 import { SupplierReportRow } from './SuppliersReport.utils';

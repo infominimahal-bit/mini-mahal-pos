@@ -42,6 +42,24 @@ export function useAppPersistence() {
         console.error('[Persistence] Failed to parse customer', e);
       }
     }
+
+    const savedSalesTabs = localStorage.getItem('pos_sales_tabs');
+    const savedActiveTab = localStorage.getItem('pos_active_sales_tab');
+
+    if (savedSalesTabs) {
+      try {
+        const parsedTabs = JSON.parse(savedSalesTabs);
+        if (parsedTabs && parsedTabs.length > 0) {
+          useCartStore.getState().setSalesTabs(parsedTabs);
+        }
+      } catch (e) {
+        console.error('[Persistence] Failed to parse sales tabs', e);
+      }
+    }
+
+    if (savedActiveTab) {
+      useCartStore.getState().setActiveSalesTab(savedActiveTab);
+    }
   }, []);
 
   // Save to localStorage on change
@@ -62,23 +80,14 @@ export function useAppPersistence() {
     
     if (appActiveSalesTab) {
       localStorage.setItem('pos_active_sales_tab', appActiveSalesTab);
-    } else {
-      localStorage.removeItem('pos_active_sales_tab');
     }
     
-    if (appSalesTabs.length > 0) {
+    if (appSalesTabs && appSalesTabs.length > 0) {
       localStorage.setItem('pos_sales_tabs', JSON.stringify(appSalesTabs));
-    } else {
-      localStorage.removeItem('pos_sales_tabs');
     }
   }, [appCart, appEditingSaleId, appSelectedCustomer, appActiveSalesTab, appSalesTabs]);
 
-  // Mirror theme to localStorage for zero-flash loading in index.html
-  useEffect(() => {
-    if (appSettings && Object.keys(appSettings).length > 0) {
-      localStorage.setItem('theme', appSettings.theme || 'dark');
-    }
-  }, [appSettings.theme]);
+  // Theme mirroring removed as it overwrites local Cashier preference with global DB state
 
   // Mirror settings to localStorage
   useEffect(() => {
@@ -87,21 +96,7 @@ export function useAppPersistence() {
     }
   }, [appSettings]);
 
-  // Validate active sales tab
-  useEffect(() => {
-    if (appSalesTabs.length > 0 && appActiveSalesTab) {
-      const tabExists = appSalesTabs.some(t => t.id === appActiveSalesTab);
-      if (!tabExists) {
-        const savedActiveTab = localStorage.getItem('pos_active_sales_tab');
-        const restoredId = savedActiveTab && appSalesTabs.some(t => t.id === savedActiveTab)
-          ? savedActiveTab
-          : appSalesTabs[0].id;
-        if (restoredId !== appActiveSalesTab) {
-          useCartStore.getState().setActiveSalesTab(restoredId);
-        }
-      }
-    }
-  }, [appSalesTabs, appActiveSalesTab]);
+  // Validate active sales tab removed to prevent false resets when data is loading
 
   // AUTO-PERSIST ACTIVE TAB TO DB
   useEffect(() => {

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Sale } from '../../../types';
-import { useProductsStore, useSalesStore, useCartStore, useSettingsStore, useUsersStore } from '../../../stores';
+import { useProductsStore, useSalesStore, useCartStore, useUsersStore } from '../../../stores';
 import { salesService, generateId, adjustPaymentBalances, buildSalePaymentMoves } from '../../../lib/services';
 import { localDb } from '../../../lib/localDb';
 import { sonner } from '../../../lib/sonner';

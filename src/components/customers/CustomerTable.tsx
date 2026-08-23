@@ -159,7 +159,7 @@ export function CustomerTable({
                     <div className="flex gap-1">
                       <Button
                         variant="ghost"
-                        onClick={(e) => { e.stopPropagation(); customer.phone && handleWhatsAppRedirect(customer.phone); }}
+                        onClick={(e) => { e.stopPropagation(); if (customer.phone) handleWhatsAppRedirect(customer.phone); }}
                         aria-label="Send WhatsApp message"
                         className="!min-h-0 !p-1.5 !rounded-lg !bg-emerald-50 dark:!bg-primary/10 !text-primary"
                       >

@@ -105,7 +105,6 @@ export function Header({
     useSettingsStore.getState().setSettings({ theme: newTheme });
     try {
       localStorage.setItem('theme', newTheme);
-      await settingsService.update({ theme: newTheme });
     } catch (err) {
       console.error('Failed to save theme:', err);
     }

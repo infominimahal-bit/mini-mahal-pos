@@ -48,4 +48,3 @@ export const useSalesStore = create<SalesState>((set) => ({
 }));
 
 import { useCustomersStore } from './customersStore';
-import { useProductsStore } from './productsStore';

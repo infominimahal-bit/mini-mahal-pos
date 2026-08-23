@@ -2,38 +2,24 @@ import { useCartStore, useProductsStore, useSettingsStore } from '../../stores';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { normalizeBarcodeValue } from '../../utils/barcode';
 import { useNavigate } from 'react-router-dom';
-import { ProductGrid } from './ProductGrid';
-import { Cart } from './Cart';
-import { CheckoutPage } from './CheckoutPage';
-import { SalesTabManager } from './SalesTabManager';
-import { GridDensityController } from './GridDensityController';
-import { DraftsModal } from './DraftsModal';
-
-import { ProductOptionsModal } from './ProductOptionsModal';
-import { ShortcutsModal } from './ShortcutsModal';
-import { Product, Sale, ProductModifier, CartItemTopping } from '../../types';
-import { useApp } from '../../context/SupabaseAppContext';
+import { Product } from '../../types';
 import { useAuth } from '../../context/AuthContext';
-import { salesService } from '../../lib/services';
 import { sonner } from '../../lib/sonner';
-import { ShoppingCart, Keyboard, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import { formatCurrency } from '../../lib/currencies';
 import { useHardwareScanner } from '../../hooks/useHardwareScanner';
 import { usePOSKeyboard } from '../../hooks/usePOSKeyboard';
 import { useSoundFeedback } from '../../hooks/useSoundFeedback';
-import { useCartCalculations } from '../../hooks/useCartCalculations';
 import { useCartActions } from './useCartActions';
 
 export function usePOSTerminalData() {
-  const navigate = useNavigate();
+  const _navigate = useNavigate();
 const appSettings = useSettingsStore(s => s.settings);
 const appCart = useCartStore(s => s.cart);
 const appProducts = useProductsStore(s => s.products);
 const appActiveSalesTab = useCartStore(s => s.activeSalesTab);
-const appSelectedCustomer = useCartStore(s => s.selectedCustomer);
+const _appSelectedCustomer = useCartStore(s => s.selectedCustomer);
   const appSalesTabs = useCartStore(s => s.salesTabs);
 
-  const { user } = useAuth();
+  const { _user } = useAuth();
   const [showCheckout, setShowCheckout] = useState(false);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [isDraftsModalOpen, setIsDraftsModalOpen] = useState(false);
@@ -51,16 +37,6 @@ const appSelectedCustomer = useCartStore(s => s.selectedCustomer);
   const tabsRef = useRef<HTMLDivElement>(null);
   const { play } = useSoundFeedback();
 
-  const scrollShortcuts = (direction: 'left' | 'right') => {
-    if (shortcutsRef.current) {
-      const scrollAmount = 140;
-      shortcutsRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
-      });
-    }
-  };
-
   const scrollTabs = (direction: 'left' | 'right') => {
     if (tabsRef.current) {
       const scrollAmount = 140;
@@ -73,8 +49,8 @@ const appSelectedCustomer = useCartStore(s => s.selectedCustomer);
 
   const [canScrollTabsLeft, setCanScrollTabsLeft] = useState(false);
   const [canScrollTabsRight, setCanScrollTabsRight] = useState(false);
-  const [canScrollShortcutsLeft, setCanScrollShortcutsLeft] = useState(false);
-  const [canScrollShortcutsRight, setCanScrollShortcutsRight] = useState(false);
+  const [_canScrollShortcutsLeft, setCanScrollShortcutsLeft] = useState(false);
+  const [_canScrollShortcutsRight, setCanScrollShortcutsRight] = useState(false);
 
   const checkTabsScroll = useCallback(() => {
     if (tabsRef.current) {

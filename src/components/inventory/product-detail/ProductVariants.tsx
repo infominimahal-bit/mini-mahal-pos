@@ -1,10 +1,10 @@
-import { PackageSearch, Wand2, Plus, Trash2, X, Database } from 'lucide-react';
-import { Button, SearchableSelect, Select } from '../../../shared/ui';
+import { PackageSearch, Wand2, X } from 'lucide-react';
+import { Button } from '../../../shared/ui';
 import type { ProductDetailController } from './useProductDetail';
 import { ProductExtras } from './ProductExtras';
 
 export function ProductVariants({ d }: { d: ProductDetailController }) {
-  const { formData, variants, setVariants, variantData, setVariantData, modifiers, setModifiers, productAddons, setProductAddons, appProducts, product } = d;
+  const { formData, variants, setVariants, variantData, setVariantData } = d;
 
   return (
     <div className="pt-6 mt-8 border-t border-gray-200 dark:border-white/5">

@@ -24,7 +24,6 @@ export async function signUpLogic(
       const userRole = isFirstUser ? 'admin' : 'cashier';
       const profilePayload: any = {
         id: data.user.id, username, name, email, role: userRole,
-        permissions: isFirstUser ? ['pos_access', 'view_reports', 'manage_inventory', 'manage_users', 'manage_settings'] : ['pos_access', 'view_reports'],
         can_edit_price: isFirstUser, can_give_discount: true, can_delete_sale: isFirstUser, can_view_profit: isFirstUser,
         can_manage_stock: false, can_manage_po: false, can_view_records: true, active: true,
       };
@@ -33,7 +32,7 @@ export async function signUpLogic(
       if (pData) {
         setProfile({
           id: pData.id, username: pData.username, name: pData.name, email: pData.email, role: pData.role as any,
-          permissions: pData.permissions || [], canEditPrice: can(pData.role, 'edit_price'), canGiveDiscount: can(pData.role, 'give_discount'),
+          canEditPrice: can(pData.role, 'edit_price'), canGiveDiscount: can(pData.role, 'give_discount'),
           canDeleteSale: can(pData.role, 'delete_sale'), canViewProfit: can(pData.role, 'view_profit'), canManageStock: can(pData.role, 'manage_stock'),
           canManagePO: can(pData.role, 'manage_po'), canViewRecords: can(pData.role, 'view_records'), active: pData.active ?? true,
           lastLogin: pData.last_login ? new Date(pData.last_login) : undefined, avatar: pData.avatar || undefined,

@@ -1,8 +1,8 @@
 import React from 'react';
-import { Trash2, Package, Hash, Tag, ShoppingCart, User as UserIcon } from 'lucide-react';
+import { Trash2, Hash, Tag } from 'lucide-react';
 import { PurchaseRecord, Product } from '../../types';
 import { useUiStore } from '../../stores';
-import { Badge, EmptyState } from '../../shared/ui';
+import { Badge } from '../../shared/ui';
 import { formatCurrency } from '../../lib/currencies';
 
 interface PurchaseHistoryCardProps {
@@ -141,7 +141,7 @@ export function PurchaseHistoryCard({ record, appProducts, currency, onDelete }:
   );
 }
 
-export function PurchaseHistoryMobileCard({ record, appProducts, currency }: Omit<PurchaseHistoryCardProps, 'onDelete'>) {
+export function PurchaseHistoryMobileCard({ record, _appProducts, currency }: Omit<PurchaseHistoryCardProps, 'onDelete'>) {
   return (
     <div
       key={record.id}

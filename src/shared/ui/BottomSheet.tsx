@@ -1,6 +1,5 @@
 import React from 'react';
 import { Modal } from './Modal';
-import { cn } from '../../lib/utils';
 
 /**
  * BottomSheet — mobile-native action-sheet wrapper around the unified Modal.
@@ -32,7 +31,7 @@ export function BottomSheet({
   maxWidth = 'md',
   footer,
   children,
-  snapPoints = true,
+  snapPoints: _snapPoints = true,
   className,
 }: BottomSheetProps) {
   return (

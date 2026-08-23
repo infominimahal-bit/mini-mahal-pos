@@ -1,6 +1,5 @@
 import { useSettingsStore } from '../stores';
 import { useCallback, useRef } from 'react';
-import { useApp } from '../context/SupabaseAppContext';
 
 export type SoundType =
   | 'success' | 'error' | 'warning' | 'info'
@@ -213,7 +212,7 @@ function vibrate(pattern: number[]) {
   if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
     try {
       navigator.vibrate(pattern);
-    } catch (e) {
+    } catch (_e) {
       // Ignored
     }
   }

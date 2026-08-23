@@ -19,7 +19,6 @@ export type ProductFormData = {
   taxable: boolean;
   active: boolean;
   trackInventory: boolean;
-  isFeatured: boolean;
   image: string;
   isService: boolean;
   requireSerial: boolean;
@@ -47,7 +46,6 @@ export function useProductForm(product: Product | null) {
     taxable: true,
     active: true,
     trackInventory: true,
-    isFeatured: false,
     image: '',
     isService: false,
     requireSerial: false,
@@ -75,7 +73,6 @@ export function useProductForm(product: Product | null) {
         description: product.description || '',
         taxable: product.taxable ?? true,
         active: product.active ?? true,
-        isFeatured: product.isFeatured ?? false,
         trackInventory: product.trackInventory ?? true,
         image: product.image || '',
         isService: product.isService ?? false,
@@ -101,7 +98,6 @@ export function useProductForm(product: Product | null) {
         description: '',
         taxable: true,
         active: true,
-        isFeatured: false,
         trackInventory: true,
         image: '',
         isService: false,

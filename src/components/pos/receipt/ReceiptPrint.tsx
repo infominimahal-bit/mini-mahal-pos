@@ -1,11 +1,11 @@
 import { type Sale } from '../../../types';
-import { MessageCircle, Printer, X, ShieldAlert, Check, Share2 } from 'lucide-react';
+import { MessageCircle, Printer, ShieldAlert, Check, Share2 } from 'lucide-react';
 import { Modal } from '../../../shared/ui/Modal';
 import { useReceiptActions } from './useReceiptActions';
 import { renderNewLayout } from './ReceiptLayouts';
 import { renderMonospaceBody } from './ReceiptMonospace';
 import { ReceiptScaler } from './ReceiptScaler';
-import { buildReceiptCtx } from './buildReceiptCtx';
+import { useReceiptCtx } from './buildReceiptCtx';
 
 export interface ReceiptPrintProps {
   sale: Sale;
@@ -13,7 +13,7 @@ export interface ReceiptPrintProps {
 }
 
 export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
-  const ctx = buildReceiptCtx(sale);
+  const ctx = useReceiptCtx(sale);
   const isAutoPrint = ctx.settings.receiptPrinter;
   const isNewLayout = ctx.isNewLayout;
   const paperWidthPx = ctx.paperWidthPx;

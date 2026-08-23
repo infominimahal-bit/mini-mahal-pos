@@ -9,31 +9,6 @@ export function PricingStockFields(props: ProductFormFieldsProps) {
       <div className="space-y-4">
         <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
           <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
-          Featured Product
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label className="flex items-start gap-3 cursor-pointer group p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-500/20 transition-all hover:bg-amber-100 dark:hover:bg-amber-900/20">
-            <input
-              type="checkbox"
-              name="isFeatured"
-              checked={formData.isFeatured}
-              onChange={onFieldChange}
-              className="w-5 h-5 mt-0.5 rounded border-gray-300 text-amber-600"
-            />
-            <div>
-              <div className="text-xs font-black text-amber-900 dark:text-amber-200 uppercase tracking-wide flex items-center">
-                {"Featured"}
-              </div>
-              <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mt-0.5">Sorts to top & highlights</div>
-            </div>
-          </label>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <h3 className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-widest flex items-center gap-3">
-          <span className="w-8 h-px bg-gray-200 dark:bg-white/10"></span>
           {"financials_inventory"}
         </h3>
 

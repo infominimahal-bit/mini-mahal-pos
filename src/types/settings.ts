@@ -93,6 +93,8 @@ export interface AppSettings {
   enableExtraCharges: boolean;
   /** §4.2 MASTER: if false, checkout blocks a sale when stock would go negative (server-enforced) */
   allowNegativeStock?: boolean;
+  /** RBAC: refunds above this amount require admin approval (0 = no threshold). Server-enforced in refund_sale_atomic. */
+  refundApprovalThreshold?: number;
 }
 
 export interface Expense {

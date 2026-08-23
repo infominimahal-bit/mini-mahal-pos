@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Product } from '../../../types';
 import { localDb } from '../../../lib/localDb';
@@ -54,7 +54,6 @@ export function useProductDetailData(
     description: product.description || '',
     active: product.active ?? true,
     trackInventory: product.trackInventory !== false && product.stock < 990000,
-    isFeatured: product.isFeatured || false,
     image: product.image || '',
     isService: product.isService || false,
     requireSerial: product.requireSerial || false,
@@ -83,7 +82,6 @@ export function useProductDetailData(
       description: product.description || '',
       active: product.active ?? true,
       trackInventory: product.trackInventory !== false && product.stock < 990000,
-      isFeatured: product.isFeatured || false,
       image: product.image || '',
       isService: product.isService || false,
       requireSerial: product.requireSerial || false,

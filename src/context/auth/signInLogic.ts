@@ -7,8 +7,8 @@ export async function signInLogic(
   identifier: string,
   password: string,
   setLoading: (l: boolean) => void,
-  setProfile: (p: User | null) => void,
-  setUser: (u: any) => void
+  _setProfile: (p: User | null) => void,
+  _setUser: (u: any) => void
 ) {
   setLoading(true);
   try {
@@ -20,7 +20,6 @@ export async function signInLogic(
 
     const rawIdentifier = String(identifier || '').trim();
     let loginEmail = rawIdentifier;
-    const normalizedIdentifier = rawIdentifier.toLowerCase();
 
     if (!rawIdentifier.includes('@')) {
       const { data: rpcEmail, error: rpcError } = await supabase.rpc('resolve_login_email', { p_username: rawIdentifier });

@@ -68,6 +68,36 @@ export async function signAction(action: string): Promise<{
   return { p_user_id: actor.id, p_role: actor.role, p_sig: sig };
 }
 
+/**
+ * SUPERVISOR OVERRIDE (RBAC): build an action token signed AS an admin, proven
+ * by the admin's email+password (supervisor PIN dialog). Used when a
+ * manager/cashier needs approval for a restricted op (delete sale / refund
+ * above threshold). The server recomputes the digest from the stored
+ * action_hash, so a wrong password simply fails verification server-side.
+ */
+export async function signWithSupervisor(
+  action: string,
+  email: string,
+  password: string
+): Promise<{ p_user_id: string; p_role: string; p_sig: string } | null> {
+  try {
+    const { supabase } = await import('./supabase');
+    const { data } = await supabase
+      .from('users')
+      .select('id, role, active')
+      .eq('email', String(email || '').toLowerCase().trim())
+      .maybeSingle();
+    if (!data || data.active === false) return null;
+    if (data.role !== 'admin') return null; // approvals are ADMIN-only (RBAC matrix)
+    const hash = await sha256Hex(password);
+    const message = `${hash}|${data.id}|${data.role}|${action}`;
+    const sig = await sha256Hex(message);
+    return { p_user_id: data.id as string, p_role: data.role as string, p_sig: sig };
+  } catch {
+    return null;
+  }
+}
+
 // Tables whose DIRECT writes must carry a signed actor proof (MASTER §2.1.4).
 // NOTE: `products` is intentionally EXCLUDED. Cashiers push product.stock
 // updates through this table on every sale; requiring admin/manager there would

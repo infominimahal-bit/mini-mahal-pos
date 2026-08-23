@@ -46,7 +46,7 @@ export function BarcodeCard({
     product,
     labelId,
     isThermal,
-    paperSize,
+    _paperSize,
     labelBorder,
     currency,
     pad,
@@ -72,7 +72,7 @@ export function BarcodeCard({
     marginY,
 }: BarcodeCardProps) {
     const valRaw = product.barcodeValue || product.barcode || product.sku || '';
-    const val = valRaw.toUpperCase().replace(/[^A-Z0-9\-\.\ \$\/\+\%]/g, '');
+    const val = valRaw.toUpperCase().replace(/[^A-Z0-9. $/+%]/g, '');
 
     const innerContent = (
         <div style={{
@@ -231,7 +231,6 @@ export function BarcodeCard({
     );
 
     if (isThermal) {
-        const [w, h] = paperSize.split('-')[1].split('x');
         return (
             <div key={labelId} data-capture-id={labelId}
                 className="label-to-print print:break-after-page shadow-md print:shadow-none bg-white border border-gray-200 dark:border-white/5 print:border-none"

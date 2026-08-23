@@ -5,7 +5,7 @@ import { InventoryTable } from '../InventoryTable';
 import { BulkEditModal } from '../BulkEditModal';
 import { BarcodeGenerator, clearPersistedBarcodeState } from '../BarcodeGenerator';
 import { sonner } from '../../../lib/sonner';
-import { useProductsStore, useSettingsStore } from '../../../stores';
+import { useSettingsStore } from '../../../stores';
 import { useBarcodeScanner } from '../../../hooks/useBarcodeScanner';
 import { normalizeBarcodeValue } from '../../../utils/barcode';
 import { formatCurrency } from '../../../lib/currencies';
@@ -19,6 +19,7 @@ interface Props {
   suppliers: string[];
   isAdmin: boolean;
   canManageStock: boolean;
+  canEditProduct: boolean;
   profile: any;
   setEditingProduct: (p: Product | null) => void;
   setShowProductModal: (val: boolean) => void;
@@ -28,7 +29,7 @@ interface Props {
 }
 
 export function ProductsList({
-  appProducts, categories, suppliers, isAdmin, canManageStock, profile,
+  appProducts, categories, suppliers, isAdmin, canManageStock, canEditProduct, profile,
   setEditingProduct, setShowProductModal, handleEditProduct,
   setShowBarcodeGenerator, showBarcodeGenerator
 }: Props) {
@@ -38,7 +39,7 @@ export function ProductsList({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedType, setSelectedType] = useState('All');
-  const [selectedSupplier, setSelectedSupplier] = useState('All');
+  const [selectedSupplier, _setSelectedSupplier] = useState('All');
   const [sortBy, setSortBy] = useState<'name' | 'stock' | 'price'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -53,7 +54,7 @@ export function ProductsList({
 
   const [barcodeProducts, setBarcodeProducts] = useState<Product[]>([]);
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
-  const [showScannerInInventory, setShowScannerInInventory] = useState(false);
+  const [_showScannerInInventory, setShowScannerInInventory] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [ITEMS_PER_PAGE, setPageSize] = useState(25);
 
@@ -219,7 +220,7 @@ export function ProductsList({
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSortChange={(by, order) => { setSortBy(by); setSortOrder(order); }}
-        canManageStock={true}
+        canManageStock={canEditProduct}
         selectedCount={selectedProductIds.length}
         handleBulkDelete={handleBulkDelete}
         onBulkEdit={() => setShowBulkEditModal(true)}

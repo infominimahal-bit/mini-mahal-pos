@@ -4,7 +4,6 @@ import { supabase, enableFullAuthInit } from '../lib/supabase'
 import { User } from '../types'
 import { usersService } from '../lib/services'
 import { sonner } from '../lib/sonner'
-import { hashPasswordString } from '../lib/authUtils'
 import { signInLogic, signUpLogic, signOutLogic, loadProfileLogic } from './authOperations'
 
 interface AuthContextType {
@@ -58,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const forceLogout = async (reason: string) => {
       localStorage.removeItem('pos_actor_profile');
       localStorage.removeItem('pos_session_start');
-      try { await supabase.auth.signOut(); } catch (e) { /* ignore */ }
+      try { await supabase.auth.signOut(); } catch (_e) { /* ignore */ }
       setProfile(null);
       setUser(null);
       setSession(null);
@@ -79,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!error && prof && (prof.active === false || prof.deleted_at != null)) {
           forceLogout('Your account has been deactivated. You have been logged out.');
         }
-      } catch (e) { /* network error: never sign out on network failure (GEMINI rule) */ }
+      } catch (_e) { /* network error: never sign out on network failure (GEMINI rule) */ }
     };
 
     const activeTimer = setInterval(verifyActiveStatus, 30_000);
@@ -102,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setLoading(false);
         }
-      } catch (err) {
+      } catch (_err) {
         setLoading(false);
       }
     };
@@ -177,12 +176,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function updateProfile(updates: Partial<User>) {
     if (!user) throw new Error('No user logged in')
 
-    try {
-      const updatedProfile = await usersService.update(user.id, updates)
-      setProfile(updatedProfile)
-    } catch (error) {
-      throw error
-    }
+    const updatedProfile = await usersService.update(user.id, updates)
+    setProfile(updatedProfile)
   }
 
   async function updatePassword(password: string) {

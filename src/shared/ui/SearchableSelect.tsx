@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, ChevronDown, X, Plus } from 'lucide-react';
+import { Search, ChevronDown, Plus } from 'lucide-react';
 
 interface Option {
   id: string;

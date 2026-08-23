@@ -1,5 +1,4 @@
-import { useSalesStore, useSettingsStore, useCartStore, useExpensesStore, useInventoryStore, useProductsStore, useUsersStore } from '../stores';
-import { useAppStore } from '../stores';
+import { useSalesStore, useSettingsStore } from '../stores';
 import { localDb } from '../lib/localDb';
 import { supabase } from '../lib/supabase';
 import { generateNextInvoiceNumber, getNextInvoiceNumber } from '../lib/services';
@@ -60,11 +59,11 @@ export function useInvoiceGeneration() {
   };
 }
 
-export function resetInvoiceCounter(dispatch: any, newCounter: number = 0) {
+export function resetInvoiceCounter(_dispatch: any, newCounter: number = 0) {
   useSettingsStore.getState().incrementInvoiceCounter(newCounter);
 }
 
-export function setInvoicePrefix(dispatch: any, prefix: string) {
+export function setInvoicePrefix(_dispatch: any, prefix: string) {
   useSettingsStore.getState().setSettings({ invoicePrefix: prefix });
 }
 

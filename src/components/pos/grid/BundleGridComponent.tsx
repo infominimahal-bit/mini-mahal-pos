@@ -18,7 +18,7 @@ interface BundleGridProps {
   appCart: any[];
 }
 
-export function BundleGrid({ onAddToCart, currency, isTouchMode, isReturnMode, gridCols = 4, appBundles, appProducts, appCart }: BundleGridProps) {
+export function BundleGrid({ onAddToCart: _onAddToCart, currency, isTouchMode, isReturnMode, gridCols = 4, appBundles, appProducts, appCart }: BundleGridProps) {
   const rawBundles = (appBundles || []).filter(b => b.active !== false);
 
   const [activeGroup, setActiveGroup] = useState<any>(null);

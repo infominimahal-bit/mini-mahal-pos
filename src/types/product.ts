@@ -1,5 +1,3 @@
-import { BundleItem } from './bundle';
-
 export interface ProductVariant {
   name: string;      // e.g. "Size", "Color"
   options: string[]; // e.g. ["S", "M", "L"], ["Red", "Blue"]
@@ -47,7 +45,6 @@ export interface Product {
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
-  isFeatured?: boolean;
   menuNumber?: number;
   highlightTag?: 'sunday' | 'crown';
   // New fields for advanced features

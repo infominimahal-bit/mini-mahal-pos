@@ -19,8 +19,9 @@ export function useSupplierManagerLogic() {
   const appSettings = useSettingsStore(s => s.settings);
 
   const { profile } = useAuth();
-  const isAdmin = true;
-  const canManage = isAdmin || profile?.canManagePO;
+  // RBAC matrix: supplier manage/payment = admin|manager
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager';
+  const canManage = isAdmin || !!profile?.canManagePO;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('all');

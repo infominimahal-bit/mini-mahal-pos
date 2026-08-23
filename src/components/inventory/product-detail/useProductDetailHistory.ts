@@ -6,9 +6,9 @@ import { sonner } from '../../../lib/sonner';
 export function useProductDetailHistory({
   productStockHistory,
   filterType,
-  setFilterType,
+  setFilterType: _setFilterType,
   historyPage,
-  setHistoryPage,
+  setHistoryPage: _setHistoryPage,
   setClickedRowId,
   setSelectedSale,
   HISTORY_PER_PAGE,

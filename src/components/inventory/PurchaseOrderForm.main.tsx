@@ -26,8 +26,8 @@ export function PurchaseOrderForm({
   appProducts,
   searchQuery,
   setSearchQuery,
-  batchSupplier,
-  batchCategory,
+  _batchSupplier,
+  _batchCategory,
   showScanner,
   setShowScanner,
   manualList,
@@ -37,7 +37,6 @@ export function PurchaseOrderForm({
   exportColumns,
   exportRows,
 }: PurchaseOrderFormProps) {
-  const ITEMS_PER_PAGE = 25;
   const searchResults = React.useMemo(() => {
     if (!searchQuery.trim()) return [];
     let base = appProducts.filter(p => p.active);
@@ -74,7 +73,6 @@ export function PurchaseOrderForm({
 
   const {
     updateItem,
-    applyBatchDetails,
     addAllToManual,
     addToManualList,
     removeFromManualList,

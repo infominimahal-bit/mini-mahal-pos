@@ -10,7 +10,6 @@ export const mapProduct = (item: any): Product => ({
   isWeightBased: item.is_weight_based ?? item.isWeightBased,
   pricePerUnit: item.price_per_unit ?? item.pricePerUnit,
   trackInventory: item.track_inventory ?? item.trackInventory,
-  isFeatured: item.is_featured ?? item.isFeatured,
   minStock: item.min_stock ?? item.minStock,
   targetStock: item.target_stock ?? item.targetStock,
   cost: item.cost ? Number(item.cost) : 0,
@@ -51,7 +50,6 @@ export const toRemoteProduct = (p: Partial<Product>) => {
   if ('isWeightBased' in p) { remote.is_weight_based = p.isWeightBased; delete remote.isWeightBased; }
   if ('pricePerUnit' in p) { remote.price_per_unit = p.pricePerUnit; delete remote.pricePerUnit; }
   if ('trackInventory' in p) { remote.track_inventory = p.trackInventory; delete remote.trackInventory; }
-  if ('isFeatured' in p) { remote.is_featured = p.isFeatured; delete remote.isFeatured; }
   if ('minStock' in p) { remote.min_stock = p.minStock; delete remote.minStock; }
   if ('targetStock' in p) { remote.target_stock = p.targetStock; delete remote.targetStock; }
   if ('parentCategoryId' in p) { remote.parent_category_id = p.parentCategoryId; delete remote.parentCategoryId; }

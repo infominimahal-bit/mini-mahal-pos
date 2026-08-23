@@ -2,9 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sale, RefundRequest } from '../../types';
 import { salesService } from '../../lib/services';
+import { ApprovalRequiredError } from '../../lib/services/atomicOps';
+import { signWithSupervisor } from '../../lib/actionToken';
 import { sonner } from '../../lib/sonner';
 import { formatCurrency } from '../../lib/currencies';
 import { useSalesStore, useCustomersStore, useCartStore } from '../../stores';
+
+type SupervisorGate = { action: 'delete' } | { action: 'refund'; request: RefundRequest } | null;
 
 interface TransactionDetailActionsParams {
   transaction: Sale;
@@ -21,7 +25,7 @@ interface TransactionDetailActionsParams {
 export function useTransactionDetailActions({
   transaction,
   appCustomers,
-  appSales,
+  appSales: _appSales,
   onClose,
   onNavigate,
   detailNavigate,
@@ -30,6 +34,8 @@ export function useTransactionDetailActions({
   currency,
 }: TransactionDetailActionsParams) {
   const [isProcessingAction, setIsProcessing] = useState(false);
+  const [supervisorGate, setSupervisorGate] = useState<SupervisorGate>(null);
+  const [isVerifyingSupervisor, setIsVerifyingSupervisor] = useState(false);
 
   const handleEditSale = async () => {
     const result = await sonner.confirm('Edit Sale?', 'Load items and notes to cart for editing?', 'Yes');
@@ -56,10 +62,10 @@ export function useTransactionDetailActions({
     }
   };
 
-  const executeRefund = async (request: RefundRequest) => {
+  const executeRefund = async (request: RefundRequest, overrideToken?: { p_user_id: string; p_role: string; p_sig: string } | null) => {
     setIsProcessing(true);
     try {
-      await salesService.returnSale(transaction.id, request, profile?.name || 'Cashier');
+      await salesService.returnSale(transaction.id, request, profile?.name || 'Cashier', overrideToken);
 
       const updatedTx: Sale = {
         ...transaction,
@@ -84,6 +90,13 @@ export function useTransactionDetailActions({
       setIsRefundModalOpen(false);
     } catch (error) {
       console.error('[RefundError]', error);
+      // RBAC: refund above admin threshold → offer supervisor (admin PIN) override
+      if (error instanceof ApprovalRequiredError || /APPROVAL_REQUIRED|FORBIDDEN/i.test(String((error as any)?.message))) {
+        setSupervisorGate({ action: 'refund', request });
+        setIsRefundModalOpen(false);
+        sonner.info('Admin approval required for this refund.');
+        return;
+      }
       sonner.error('Error refunding sale.');
     } finally {
       setIsProcessing(false);
@@ -116,11 +129,50 @@ export function useTransactionDetailActions({
       onClose();
     } catch (err) {
       console.error('[DeleteError]', err);
+      // RBAC: sale reverse/delete is admin-only → offer supervisor override
+      if (err instanceof ApprovalRequiredError || /APPROVAL_REQUIRED|FORBIDDEN/i.test(String((err as any)?.message))) {
+        setSupervisorGate({ action: 'delete' });
+        sonner.info('Admin approval required to delete a sale.');
+        return;
+      }
       sonner.error('Error deleting sale.');
     } finally {
       setIsProcessing(false);
     }
   };
+
+  /**
+   * RBAC SUPERVISOR OVERRIDE: verify admin credentials (server-side signed
+   * token) then retry the gated operation with the admin proof. Returns true
+   * when the gate is satisfied (modal may close).
+   */
+  const retryWithSupervisor = async (email: string, password: string): Promise<boolean> => {
+    if (!supervisorGate) return true;
+    setIsVerifyingSupervisor(true);
+    try {
+      const action = supervisorGate.action === 'delete' ? 'delete_sale' : 'refund_sale';
+      const token = await signWithSupervisor(action, email, password);
+      if (!token) return false;
+      if (supervisorGate.action === 'delete') {
+        await salesService.delete(transaction.id, profile?.name || 'Admin', undefined, token);
+        useSalesStore.getState().deleteSale(transaction.id);
+        sonner.success('Admin approved. Sale permanently deleted.');
+        onClose();
+      } else {
+        await executeRefund(supervisorGate.request, token);
+        setSupervisorGate(null);
+      }
+      return true;
+    } catch (error) {
+      console.error('[SupervisorOverride]', error);
+      sonner.error('Override failed. Check admin credentials and retry.');
+      return false;
+    } finally {
+      setIsVerifyingSupervisor(false);
+    }
+  };
+
+  const clearSupervisorGate = () => setSupervisorGate(null);
 
   const getSaleTypeTag = () => {
     const type = transaction.saleType || 'retail';
@@ -141,5 +193,9 @@ export function useTransactionDetailActions({
     handleWhatsAppShare,
     handleDeleteSale,
     sourceTag,
+    supervisorGate,
+    isVerifyingSupervisor,
+    retryWithSupervisor,
+    clearSupervisorGate,
   };
 }

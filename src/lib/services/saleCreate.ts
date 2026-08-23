@@ -1,12 +1,11 @@
-import { Sale, StockHistory, VariantStockHistory } from '../../types';
+import { Sale } from '../../types';
 import { localDb, generateId } from '../localDb';
 import { cloudWrite } from '../cloudWrite';
 import { getDeviceId } from '../deviceId';
 import { getActor } from '../actionToken';
-import { mapSale, toRemoteVariantStockHistory, toRemoteProduct, toRemoteCustomer, toRemoteSale, toRemoteStockHistory } from './mappers';
+import { toRemoteCustomer, toRemoteSale } from './mappers';
 import { derivePaymentStatus } from './utils';
 import { revertLocalSaleStock } from './atomicOps';
-import { recordCustomerLedger } from './customersService';
 import { collectSaleMovements } from './saleCreate.stock';
 import { buildSalePaymentMoves } from './paymentsService';
 import { logAuditEvent } from './auditLogService';
@@ -95,7 +94,7 @@ export async function createSale(sale: Omit<Sale, 'id'>): Promise<Sale> {
 
   try {
     await cloudWrite('sales', 'create', id, megaPayload, { batchId: id });
-  } catch (e) {
+  } catch (_e) {
     // ALL-OR-NOTHING ROLLBACK: undo the optimistic local writes so nothing is left half-applied.
     if (!skipStockEffects) {
       await revertLocalSaleStock(newSale.id, movements);

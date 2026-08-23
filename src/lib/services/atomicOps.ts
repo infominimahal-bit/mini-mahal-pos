@@ -1,33 +1,15 @@
-import { supabase, adminUserAction } from '../supabase';
-import {
-  Product,
-  Customer,
-  Sale,
-  Discount,
-  User,
-  AppSettings,
-  SalesTab,
-  Expense,
-  Category,
-  Supplier,
-  PurchaseRecord,
-  SupplierTransaction,
-  StockHistory,
-  Payment,
-  PurchaseOrder,
-  Bundle,
-  BundleItem,
-  CartItem,
-  RefundRequest,
-  Topping,
-  VariantStockHistory,
-  ProductAddon,
-} from '../../types';
-import { localDb, generateId, SETTINGS_ID } from '../localDb';
-import { generateBarcodeValue } from '../../utils/barcode';
-import { signAction, withActor } from '../actionToken';
+import { supabase } from '../supabase';
+import { localDb } from '../localDb';
+import { signAction } from '../actionToken';
 
 export const activeReturns = new Set<string>();
+
+/**
+ * RBAC: thrown when the server rejects a privileged op with FORBIDDEN /
+ * APPROVAL_REQUIRED so the UI can offer the supervisor (admin PIN) override
+ * instead of showing a generic failure.
+ */
+export class ApprovalRequiredError extends Error {}
 
 /**
  * Standard Utility for ID generation
@@ -49,7 +31,7 @@ export async function commitSaleAuthoritative(
   customerLedger: any = null,
   maxTries = 2
 ): Promise<any> {
-  let lastErr: any = null;
+  let _lastErr: any = null;
   for (let attempt = 0; attempt < maxTries; attempt++) {
     try {
       if (typeof navigator !== 'undefined' && !navigator.onLine) return null;
@@ -68,14 +50,14 @@ export async function commitSaleAuthoritative(
         timeoutPromise
       ]);
       if (error) {
-        lastErr = error;
+        _lastErr = error;
         if (attempt < maxTries - 1) { await new Promise((r) => setTimeout(r, 400)); continue; }
         console.error('[commit_sale] RPC error:', error.message);
         return null;
       }
       return data;
     } catch (e: any) {
-      lastErr = e;
+      _lastErr = e;
       if (attempt < maxTries - 1) { await new Promise((r) => setTimeout(r, 400)); continue; }
       console.error('[commit_sale] exception:', e?.message || e);
       return null;
@@ -138,16 +120,20 @@ export async function applyStockMovementsRemote(movements: any[]): Promise<boole
  * hard-delete the sale in ONE cloud transaction. Idempotent via RPC.
  * p_history may be [] for sales that need no stock reversal (e.g. drafts).
  */
-export async function deleteSaleAtomic(saleId: string, movements: any[], paymentMoves: any[] = [], customerLedger: any = null): Promise<boolean> {
+export async function deleteSaleAtomic(saleId: string, movements: any[], paymentMoves: any[] = [], customerLedger: any = null, overrideToken?: { p_user_id: string; p_role: string; p_sig: string } | null): Promise<boolean> {
   try {
     if (typeof navigator !== 'undefined' && !navigator.onLine) return false;
-    const token = await signAction('delete_sale');
+    const token = overrideToken ?? await signAction('delete_sale');
     const base: any = { p_sale_id: saleId, p_history: movements, p_payment_moves: paymentMoves, p_customer_ledger: customerLedger };
     if (token) { base.p_user_id = token.p_user_id; base.p_role = token.p_role; base.p_sig = token.p_sig; }
     const { error } = await (supabase as any).rpc('delete_sale_atomic', base);
-    if (error) { console.error('[delete_sale_atomic] RPC error:', error.message); return false; }
+    if (error) {
+      if (/FORBIDDEN|APPROVAL_REQUIRED/i.test(error.message || '')) throw new ApprovalRequiredError(error.message);
+      console.error('[delete_sale_atomic] RPC error:', error.message); return false;
+    }
     return true;
   } catch (e: any) {
+    if (e instanceof ApprovalRequiredError) throw e;
     console.error('[delete_sale_atomic] exception:', e?.message || e);
     return false;
   }
@@ -157,10 +143,10 @@ export async function deleteSaleAtomic(saleId: string, movements: any[], payment
  * Atomic refund: reverse stock AND update sale status/refunded_amount in ONE
  * cloud transaction. p_refunded_amount is the ABSOLUTE new total (idempotent on retry).
  */
-export async function refundSaleAtomic(saleId: string, movements: any[], status: string, refundedAmount: number, paymentMoves: any[] = [], customerLedger: any = null): Promise<boolean> {
+export async function refundSaleAtomic(saleId: string, movements: any[], status: string, refundedAmount: number, paymentMoves: any[] = [], customerLedger: any = null, overrideToken?: { p_user_id: string; p_role: string; p_sig: string } | null): Promise<boolean> {
   try {
     if (typeof navigator !== 'undefined' && !navigator.onLine) return false;
-    const token = await signAction('refund_sale');
+    const token = overrideToken ?? await signAction('refund_sale');
     const base: any = {
       p_sale_id: saleId,
       p_history: movements,
@@ -171,9 +157,13 @@ export async function refundSaleAtomic(saleId: string, movements: any[], status:
     };
     if (token) { base.p_user_id = token.p_user_id; base.p_role = token.p_role; base.p_sig = token.p_sig; }
     const { error } = await (supabase as any).rpc('refund_sale_atomic', base);
-    if (error) { console.error('[refund_sale_atomic] RPC error:', error.message); return false; }
+    if (error) {
+      if (/FORBIDDEN|APPROVAL_REQUIRED/i.test(error.message || '')) throw new ApprovalRequiredError(error.message);
+      console.error('[refund_sale_atomic] RPC error:', error.message); return false;
+    }
     return true;
   } catch (e: any) {
+    if (e instanceof ApprovalRequiredError) throw e;
     console.error('[refund_sale_atomic] exception:', e?.message || e);
     return false;
   }

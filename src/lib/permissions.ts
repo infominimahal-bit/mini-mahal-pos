@@ -101,16 +101,16 @@ export const PERMISSIONS: Record<Role, Record<Permission, boolean>> = {
     manage_discounts: true,
     view_customers: true,
     manage_customers: true,
-    view_settings: true,
-    manage_settings: true,
-    view_users: true,
-    manage_users: true,
+    view_settings: false, // System Settings = admin only (RBAC matrix)
+    manage_settings: false,
+    view_users: false, // User management = admin only (RBAC matrix)
+    manage_users: false,
     edit_price: true,
     edit_sale: true,
     give_discount: true,
-    delete_sale: true,
+    delete_sale: true, // UI allowed; server requires ADMIN token → supervisor override
     refund_sale: true,
-    refund_unlimited: true,
+    refund_unlimited: false, // refunds above threshold need admin approval
     void_sale: true,
     export_database: false, // DB export/backup is owner (admin) only
     view_profit: true,
@@ -118,31 +118,31 @@ export const PERMISSIONS: Record<Role, Record<Permission, boolean>> = {
   },
   cashier: {
     view_pos: true,
-    view_dashboard: true,
-    view_transactions: true,
-    view_reports: true,
-    view_inventory: true, // read-only browse
+    view_dashboard: false, // financial overview banned
+    view_transactions: true, // needed to find past sales for returns/refunds
+    view_reports: false, // financial/profit reports banned
+    view_inventory: true, // READ-ONLY browse (no manage actions; matrix ⚠️ View)
     manage_products: false,
     manage_stock: false,
-    view_suppliers: true,
+    view_suppliers: false,
     manage_suppliers: false,
-    view_purchase_orders: true,
+    view_purchase_orders: false,
     manage_po: false,
-    view_expenses: true,
+    view_expenses: false, // expenses = admin/manager only
     manage_expenses: false,
     view_discounts: true,
     manage_discounts: false,
-    view_customers: true,
+    view_customers: true, // customers + customer payments allowed
     manage_customers: false,
-    view_settings: false, // cannot open Settings page
+    view_settings: false,
     manage_settings: false,
-    view_users: false, // cannot open Users page
+    view_users: false,
     manage_users: false,
     edit_price: false,
     edit_sale: false,
     give_discount: true,
-    delete_sale: false, // server-guarded: only admin/manager
-    refund_sale: true, // limited (refund_unlimited = false)
+    delete_sale: false, // server-guarded: ADMIN only (supervisor override in UI)
+    refund_sale: true, // limited: server rejects refunds above approval threshold
     refund_unlimited: false,
     void_sale: false,
     export_database: false,
@@ -193,20 +193,6 @@ export function can(role: string | undefined | null, action: Permission): boolea
   if (!(r in PERMISSIONS)) return false;
   return PERMISSIONS[r][action] === true;
 }
-
-/**
- * Server-side mirror of `can()` for SQL RPCs / RLS (same matrix, same semantics).
- * Kept as a plain object so it can be serialized into migrations if needed.
- */
-export const SERVER_ROLE_GUARD = {
-  // Roles allowed to perform irreversible stock-affecting deletes:
-  canDeleteSale: ['admin', 'manager'] as Role[],
-  // Roles allowed to issue refunds (salesman excluded):
-  canRefundSale: ['admin', 'manager', 'cashier'] as Role[],
-  // Roles allowed to write settings / manage users (server-side RLS):
-  canManageSettings: ['admin', 'manager'] as Role[],
-  canManageUsers: ['admin', 'manager'] as Role[],
-};
 
 export function isRole(value: any): value is Role {
   return typeof value === 'string' && (ROLES as string[]).includes(value);

@@ -20,8 +20,8 @@ const AppContext = createContext<{
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const { user, profile } = useAuth();
   const [initialized, setInitialized] = useState(false);
-  const [reconnectTrigger, setReconnectTrigger] = useState(0);
-  const subscriptionsInitialized = useRef(false);
+  const [_reconnectTrigger, _setReconnectTrigger] = useState(0);
+  const _subscriptionsInitialized = useRef(false);
 
   const appUsers = useUsersStore(s => s.users);
   const appProducts = useProductsStore(s => s.products);

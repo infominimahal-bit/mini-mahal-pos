@@ -1,15 +1,10 @@
-import { useSettingsStore } from '../../../stores';
 import { useBarcodeSettings } from './useBarcodeSettings';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useReactToPrint } from 'react-to-print';
-import { Printer, Minus, Plus, Save, X, ZoomIn, ZoomOut, Maximize2, Layout } from 'lucide-react';
-import { SearchableSelect } from '../../../shared/ui/SearchableSelect';
-import { sonner } from '../../../lib/sonner';
-import { settingsService } from '../../../lib/services';
-import { Product, AppSettings } from '../../../types';
-import { useApp } from '../../../context/SupabaseAppContext';
-import { Button, Badge, EmptyState } from '../../../shared/ui';
-import { BarcodeCard, type PaperSize } from './BarcodeCard';
+import { Printer, Minus, Plus, X, Maximize2 } from 'lucide-react';
+import { Product } from '../../../types';
+import { Button, Badge } from '../../../shared/ui';
+import { BarcodeCard } from './BarcodeCard';
 import { BarcodeSidebar } from './BarcodeSidebar';
 
 interface BarcodeGeneratorProps {

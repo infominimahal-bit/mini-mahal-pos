@@ -1,9 +1,8 @@
 import { useSalesStore, useSettingsStore } from '../../stores';
-import { FileText, Trash2, X, ShoppingCart } from 'lucide-react';
+import { FileText, Trash2, ShoppingCart } from 'lucide-react';
 import { Sale } from '../../types';
 import { formatCurrency } from '../../lib/currencies';
 import { salesService } from '../../lib/services';
-import { useApp } from '../../context/SupabaseAppContext';
 import { Modal } from '../../shared/ui/Modal';
 
 interface DraftsModalProps {

@@ -56,7 +56,6 @@ supabase/
   schema/SUPER_MASTER_SCHEMA.sql   # SINGLE SOURCE OF TRUTH (full DDL, idempotent)
   migrations/*.sql                 # incremental changes
 docs/  setup.md, UI_RULES.md, MODULES.md, SYSTEM_FUNCTIONS_GUIDE.md, TESTS_GUIDE.md
-env_backups/   # per-shop .env files
 AGENTS.md   # how to work  |  GEMINI.md  # master rules (SCHEMA CHANGE LOG + F-rules)
 ```
 
@@ -132,8 +131,8 @@ GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_
 3. First admin must be bootstrapped via API + direct `public.users` insert with `role='admin'`.
 4. Cached profile in localStorage for offline display; `onAuthStateChange` restores session.
 5. **No RLS on most tables** (single-tenant, anon GRANT ALL). 3 ledger tables (`stock_history`, `variant_stock_history`, `row_tombstones`) may carry append-only RLS.
-6. **Roles**: `admin` | `manager` | `cashier` | `salesman`. Financial RPC guards via `require_action()` inside `delete_sale_atomic` (admin|manager), `refund_sale_atomic` (admin|manager|cashier), `edit_sale_atomic` (admin|manager). `commit_sale`/`apply_payment_movements` = anon.
-7. Block/delete → `revoke_user_sessions(p_user_id)` invalidates sessions.
+6. **Roles**: `admin` | `manager` | `cashier` | `salesman`. Matrix (`src/lib/permissions.ts` = single source of truth): Users management + System Settings + DB export = **admin only**; daily ops (products/stock/PO/expenses/suppliers/reports) = admin|manager; cashier = POS sales + customers + returns + limited refunds (no dashboard/reports/expenses/suppliers). Financial RPC guards via `require_action()` inside `delete_sale_atomic` (**admin only**; drafts exempt), `refund_sale_atomic` (admin|manager|cashier + threshold: refunds above `refund_approval_threshold` raise APPROVAL_REQUIRED), `edit_sale_atomic` (admin|manager), `stock_adjustment` (admin|manager). Supervisor override = admin email+password → signed token (`SupervisorPinModal`). `commit_sale`/`apply_payment_movements` = anon. Action tokens fail-closed (no NULL-hash bypass).
+7. Block/delete → `revoke_user_sessions(p_user_id)` invalidates sessions. Edge function `admin-users` verifies caller is **admin** server-side.
 
 ---
 
@@ -157,6 +156,7 @@ GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_
 | `enableSplitPayment` | boolean | false | Payment |
 | `enableExtraCharges` | boolean | false | Payment |
 | `allowCreditOverLimit` | boolean | true | Payment |
+| `refundApprovalThreshold` | number | 5000 | RBAC: refunds above need admin approval (0=off) |
 | `enableKotPrinter` | boolean | false | Kitchen |
 | `autoSaveReceiptPng` | boolean | false | Auto-save receipt PNG |
 | `posGridColumns` | number | 4 | POS |
@@ -221,8 +221,6 @@ curl -s -X POST "https://api.supabase.com/v1/projects/$SUPABASE_REF/database/que
   -d '{"query":"INSERT INTO public.users (id,username,name,email,role,permissions,active,created_at,updated_at) VALUES ('\''<auth_id>'\'','\''admin@gmail.com'\'','\''admin'\'','\''admin@gmail.com'\'','\''admin'\'','\''{}\''',true,now(),now()) ON CONFLICT (id) DO UPDATE SET role='\''admin'\'', active=true;"}'
 ```
 
-### Step 10: Save `.env` backup → `env_backups/`.
-
 ---
 
 ## 7. Existing Project Sync
@@ -282,6 +280,8 @@ Expected: `guard_stale_write` + `record_tombstone` on `sales`, `stock_history`, 
 ### Migration Log (recent)
 | Date | Migration | Purpose |
 |------|-----------|---------|
+| 2026-08-23 | `20260823040000_rbac_final.sql` | RBAC final: `delete_sale_atomic` admin-only (drafts exempt) + refund approval threshold (`refund_approval_threshold`, default 5000) |
+| 2026-08-23 | `20260823030000_rbac_harden.sql` | RBAC: fail-closed action tokens + guarded `stock_adjustment` (admin\|manager), legacy overload dropped |
 | 2026-08-23 | `20260823010000_drop_estore.sql` | Remove e-store (`store_orders` + 7 functions) |
 | 2026-08-23 | `20260823020000_stock_adjustment_idempotent.sql` | Idempotent `stock_adjustment`; single stock-write path |
 | 2026-08-23 | `20260823000000_drop_dead_offline_columns.sql` | Drop `auto_sync`/`offline_mode`/`stock_mismatches` |
@@ -381,6 +381,7 @@ curl -s "https://api.supabase.com/v1/projects/$SUPABASE_REF/api-keys?reveal=true
 ---
 
 ## 13. Agent Rules
+- **Setup Realtime Rule (CRITICAL):** During fresh project setup, the agent MUST explicitly ask the user whether to turn ON or OFF realtime (providing a list of supported tables). Do not assume the default; strictly follow the user's instruction.
 - Schema/code/migration change → update `setup.md` + `SUPER_MASTER_SCHEMA.sql` together. Failure = violation.
 - **Policy updates (2026-08):** Shift system removed (F7). e-store fully removed (stock never reserved on online order). Cloud-Direct (no offline/sync engine).
 - **DB mechanics:** no Prisma/`DATABASE_URL`; Management API only (`sbp_` token); master schema idempotent.

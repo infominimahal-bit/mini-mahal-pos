@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useApp } from '../../context/SupabaseAppContext';
 import { useProductsStore, useSettingsStore, useUiStore } from '../../stores';
 import { Package, ChevronLeft, History, ClipboardList, Gift, Layers, Camera } from 'lucide-react';
 import { Product } from '../../types';
@@ -18,7 +17,6 @@ import { BundleManager } from './BundleManager';
 import { SupplierManager } from './suppliers/SupplierManager';
 import { ProductsList } from './tabs/ProductsList';
 import { CategoriesList } from './tabs/CategoriesList';
-import { clearPersistedBarcodeState } from './BarcodeGenerator';
 
 type TabType = 'inventory' | 'purchase_orders' | 'groups' | 'media' | 'purchases' | 'bundles' | 'store_sort' | 'suppliers';
 
@@ -34,10 +32,12 @@ export function InventoryManager() {
   const { profile } = useAuth();
 
   const products = appProducts ?? [];
-  const isAdmin = true;
+  // RBAC matrix: product add/edit/delete + stock = admin|manager; cashier view-only
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager';
   const canManageStock = isAdmin || profile?.canManageStock || profile?.canManagePO;
   const canManagePO = isAdmin || profile?.canManagePO;
   const canViewRecords = isAdmin || profile?.canViewRecords;
+  const canEditProduct = profile?.role === 'admin' || profile?.canEditProduct;
 
   const SUB_TAB_SEGMENT_TO_INTERNAL: Record<string, TabType> = {
     products: 'inventory',
@@ -187,7 +187,7 @@ export function InventoryManager() {
 
           {activeTab === 'inventory' ? (
             <ProductsList 
-              appProducts={products} categories={categories} suppliers={suppliers} isAdmin={isAdmin} canManageStock={canManageStock} profile={profile}
+              appProducts={products} categories={categories} suppliers={suppliers} isAdmin={isAdmin} canManageStock={canManageStock} canEditProduct={canEditProduct} profile={profile}
               setEditingProduct={setEditingProduct} setShowProductModal={setShowProductModal} handleEditProduct={(p) => setDetailProduct(p)}
               setShowBarcodeGenerator={setShowBarcodeGenerator} showBarcodeGenerator={showBarcodeGenerator}
             />
@@ -198,7 +198,7 @@ export function InventoryManager() {
           ) : activeTab === 'bundles' ? (
             <BundleManager />
           ) : activeTab === 'groups' ? (
-            <CategoriesList categories={categories} appProducts={products} appSettings={appSettings} setSelectedCategory={(c) => {}} />
+            <CategoriesList categories={categories} appProducts={products} appSettings={appSettings} setSelectedCategory={(_c) => {}} />
           ) : activeTab === 'suppliers' ? (
             <SupplierManager />
           ) : (
@@ -210,7 +210,7 @@ export function InventoryManager() {
       )}
       {showBarcodeGenerator && (
         <ProductsList 
-          appProducts={products} categories={categories} suppliers={suppliers} isAdmin={isAdmin} canManageStock={canManageStock} profile={profile}
+          appProducts={products} categories={categories} suppliers={suppliers} isAdmin={isAdmin} canManageStock={canManageStock} canEditProduct={canEditProduct} profile={profile}
           setEditingProduct={setEditingProduct} setShowProductModal={setShowProductModal} handleEditProduct={(p) => setDetailProduct(p)}
           setShowBarcodeGenerator={setShowBarcodeGenerator} showBarcodeGenerator={showBarcodeGenerator}
         />

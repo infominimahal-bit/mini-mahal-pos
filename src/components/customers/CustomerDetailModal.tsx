@@ -1,8 +1,7 @@
 import { useCustomersStore, useSalesStore, useSettingsStore } from '../../stores';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Phone, CreditCard, ShoppingBag, Receipt, MessageCircle, ChevronRight, User } from 'lucide-react';
 import { Customer, Sale } from '../../types';
-import { useApp } from '../../context/SupabaseAppContext';
 import { formatCurrency } from '../../lib/currencies';
 import { formatAppDateTime } from '../../lib/dateUtils';
 import { Modal } from '../../shared/ui/Modal';

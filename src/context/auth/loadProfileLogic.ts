@@ -17,7 +17,7 @@ export async function loadProfileLogic(userId: string, setProfile: any, setUser:
       const pData = data as any;
       const profileData: User = {
         id: pData.id, username: pData.username, name: pData.name, email: pData.email,
-        role: pData.role as any, permissions: pData.permissions || [],
+        role: pData.role as any,
         canEditPrice: can(pData.role, 'edit_price'), canGiveDiscount: can(pData.role, 'give_discount'),
         canDeleteSale: can(pData.role, 'delete_sale'), canViewProfit: can(pData.role, 'view_profit'),
         canManageStock: can(pData.role, 'manage_stock'), canManagePO: can(pData.role, 'manage_po'),

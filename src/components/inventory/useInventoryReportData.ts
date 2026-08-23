@@ -1,7 +1,5 @@
 import { useMemo } from 'react';
 import { getItemCOGS, getItemRevenue, netItemQty } from '../reports/useReportsData';
-import { formatCurrency, getCurrencySymbol } from '../../lib/currencies';
-import { formatAppDate } from '../../lib/dateUtils';
 import type { InventoryReportRow, SortField, SortDir } from './inventoryReportManager.types';
 
 interface UseInventoryReportDataArgs {
@@ -99,7 +97,7 @@ export function useInventoryReportData({
       // (not clamped to a wrong positive value).
       const revenue = item ? Math.abs(Number(item.subtotal) || 0) * scale : 0;
       const cogs = (productCostById.get(h.productId) || 0) * qty;
-      let cur = kpiByProduct.get(h.productId) || { sold: 0, revenue: 0, cogs: 0 };
+      const cur = kpiByProduct.get(h.productId) || { sold: 0, revenue: 0, cogs: 0 };
 
       // Retroactive fix for old data where deleted POS returns were saved as 'return' type instead of 'sale'.
       let effectiveType = h.type;

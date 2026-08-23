@@ -4,7 +4,7 @@ import { BarcodePreview } from '../../shared/ui/BarcodePreview';
 import { RenderReceiptLayoutProps } from './ReceiptPreviewLayoutProps';
 
 export function renderHorizontalHeader(props: RenderReceiptLayoutProps) {
-  const { settings, bodyStyle, fs, RECEIPT_WATERMARK, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, footerBlock, storeNameBlock, storeInfoBlock, renderLogo, total, is58mm, previewWrap, TwoCol, itemRows } = props;
+  const { settings, bodyStyle, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, footerBlock, storeNameBlock, storeInfoBlock, renderLogo, total, previewWrap, TwoCol } = props;
   return previewWrap(
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '2px solid #000', paddingBottom: '10px', marginBottom: '10px' }}>
@@ -32,7 +32,7 @@ export function renderHorizontalHeader(props: RenderReceiptLayoutProps) {
 }
 
 export function renderCenteredFlow(props: RenderReceiptLayoutProps) {
-  const { settings, bodyStyle, is58mm, fs, RECEIPT_WATERMARK, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, storeNameBlock, storeInfoBlock, renderLogo, total, subtotal, discountAmount, taxAmount, taxLabel, previewWrap, TwoCol, itemRows } = props;
+  const { settings, bodyStyle, is58mm, fs, RECEIPT_WATERMARK, metaBlock, paymentBlock, notesBlock, storeNameBlock, storeInfoBlock, renderLogo, total, subtotal, discountAmount, taxAmount, taxLabel, previewWrap, itemRows } = props;
   return previewWrap(
     <div style={{ textAlign: 'center' }}>
       {settings.receiptShowBarcode !== false && (
@@ -78,7 +78,7 @@ export function renderCenteredFlow(props: RenderReceiptLayoutProps) {
 }
 
 export function renderLeftGrid(props: RenderReceiptLayoutProps) {
-  const { settings, bodyStyle, fs, RECEIPT_WATERMARK, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, storeNameBlock, storeInfoBlock, renderLogo, total, is58mm, previewWrap, TwoCol, itemRows } = props;
+  const { settings, bodyStyle, fs, RECEIPT_WATERMARK, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, storeInfoBlock, total, is58mm, previewWrap, TwoCol } = props;
   return previewWrap(
     <>
       <div style={{ marginBottom: '15px' }}>
@@ -113,7 +113,7 @@ export function renderLeftGrid(props: RenderReceiptLayoutProps) {
 }
 
 export function renderSplitColumns(props: RenderReceiptLayoutProps) {
-  const { settings, bodyStyle, RECEIPT_WATERMARK, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, footerBlock, storeNameBlock, storeInfoBlock, renderLogo, total, previewWrap, TwoCol, itemRows } = props;
+  const { settings, bodyStyle, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, footerBlock, storeNameBlock, renderLogo, total, previewWrap, TwoCol } = props;
   return previewWrap(
     <>
       <div style={{ textAlign: 'center', borderBottom: '1px dotted #000', paddingBottom: '10px', marginBottom: '10px' }}>
@@ -144,7 +144,7 @@ export function renderSplitColumns(props: RenderReceiptLayoutProps) {
 }
 
 export function renderFloatingTotals(props: RenderReceiptLayoutProps) {
-  const { settings, fs, bodyStyle, RECEIPT_WATERMARK, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, footerBlock, storeNameBlock, storeInfoBlock, renderLogo, total, previewWrap, TwoCol, itemRows } = props;
+  const { settings, fs, bodyStyle, metaBlock, defaultItemsTable, totalsBlock, paymentBlock, notesBlock, footerBlock, storeInfoBlock, total, previewWrap } = props;
   return previewWrap(
     <>
       {settings.receiptShowStoreName && (

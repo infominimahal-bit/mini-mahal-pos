@@ -1,6 +1,6 @@
 import Dexie, { Table } from 'dexie';
 import {
-  Product, Customer, Sale, Discount, User, AppSettings, SalesTab, Expense, Category, Supplier, StockHistory, Payment, Topping, VariantStockHistory, ProductAddon
+  Product, Customer, Sale, Discount, User, SalesTab, Expense, Category, Supplier, Topping, VariantStockHistory, ProductAddon
 } from '../types';
 import {
   SCHEMA_V19, SCHEMA_V20, SCHEMA_V21, SCHEMA_V18, SCHEMA_V16, SCHEMA_V15,
@@ -148,6 +148,7 @@ export class PosDB extends Dexie {
     // the full ledger sum. This makes product.stock ledger-derived (single source
     // of truth) and self-heals any desync, regardless of which code path wrote
     // the movement. Bulk/cloud writes are suspended via stockReconcileSuspended.
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- Dexie writing-hooks lose `this`; a stable self reference is required
     const self = this;
     this.stockHistory.hook('creating', function(_primKey, obj: any) {
       if (stockReconcileSuspended) return;

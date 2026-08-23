@@ -10,7 +10,7 @@ interface UseQrScannerArgs {
 export function useQrScanner({ onScan, onClose, isContinuous: initialContinuous = false }: UseQrScannerArgs) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [errorType, setErrorType] = useState<'permission' | 'hardware' | 'general' | null>(null);
+  const [_errorType, setErrorType] = useState<'permission' | 'hardware' | 'general' | null>(null);
   const [isTorchOn, setIsTorchOn] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
   const [continuousMode, setContinuousMode] = useState(initialContinuous);
@@ -142,6 +142,7 @@ export function useQrScanner({ onScan, onClose, isContinuous: initialContinuous 
         const onScanSuccess = (decodedText: string) => {
           console.log("RAW SCAN:", decodedText);
           if (!isMountedRef.current) return;
+          // eslint-disable-next-line no-control-regex -- intentionally strips ASCII control chars from scanner input
           const cleanText = decodedText.replace(/[\u0000-\u001F\u007F-\u009F]/g, "").trim();
 
           const now = Date.now();
@@ -199,7 +200,7 @@ export function useQrScanner({ onScan, onClose, isContinuous: initialContinuous 
               const capabilities = track.getCapabilities?.();
               setHasTorch(!!capabilities?.torch);
             }
-          } catch (e) { }
+          } catch (_e) { }
         }
       } catch (err: any) {
         if (!isMountedRef.current) return;
@@ -241,7 +242,7 @@ export function useQrScanner({ onScan, onClose, isContinuous: initialContinuous 
       const newState = !isTorchOn;
       await (scannerRef.current as any).applyVideoConstraints({ advanced: [{ torch: newState }] });
       setIsTorchOn(newState);
-    } catch (e) { }
+    } catch (_e) { }
   }, [hasTorch, isTorchOn]);
 
   return {

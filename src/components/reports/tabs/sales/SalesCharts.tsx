@@ -60,7 +60,7 @@ export function SalesCharts({ salesData, featureAnalytics, categoryData, currenc
                 { name: "Physical Products", value: featureAnalytics.productRevenue },
                 { name: "Services", value: featureAnalytics.serviceRevenue },
                 { name: "Modifiers & Add-ons", value: featureAnalytics.modifiersRevenue }
-              ].filter(d => d.value > 0).map((entry, index) => (
+              ].filter(d => d.value > 0).map((_entry, index) => (
                 <Cell key={`cell-${index}`} fill={['#3B82F6', '#8B5CF6', '#EC4899'][index % 3]} />
               ))}
             </Pie>

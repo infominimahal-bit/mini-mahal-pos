@@ -54,6 +54,7 @@ export function buildInitialFormData(appSettings: any) {
     interfaceMode: (appSettings as any)?.interfaceMode || 'touch',
     enableExtraCharges: appSettings?.enableExtraCharges ?? false,
     allowNegativeStock: appSettings?.allowNegativeStock ?? false,
+    refundApprovalThreshold: appSettings?.refundApprovalThreshold ?? 5000,
     defaultSaleType: appSettings?.defaultSaleType || 'retail',
     barcodeBarWidth: appSettings?.barcodeBarWidth ?? 0.8
   };
@@ -114,6 +115,7 @@ export function syncFormDataFromSettings(appSettings: any) {
     enableSplitPayment: appSettings?.enableSplitPayment ?? false,
     enableExtraCharges: appSettings?.enableExtraCharges ?? false,
     allowNegativeStock: appSettings?.allowNegativeStock ?? false,
+    refundApprovalThreshold: appSettings?.refundApprovalThreshold ?? 5000,
     defaultSaleType: appSettings?.defaultSaleType || 'retail',
     barcodeBarWidth: appSettings?.barcodeBarWidth ?? 0.8
   };

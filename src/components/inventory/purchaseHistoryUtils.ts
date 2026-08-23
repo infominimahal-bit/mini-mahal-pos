@@ -56,7 +56,7 @@ export function computeDateBoundaries(
       start = getStartOfDayInTimezone(last30, timezone);
       end = getEndOfDayInTimezone(now, timezone);
     }
-  } catch (e) {
+  } catch (_e) {
     const last30 = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000);
     start = getStartOfDayInTimezone(last30, timezone);
     end = getEndOfDayInTimezone(now, timezone);

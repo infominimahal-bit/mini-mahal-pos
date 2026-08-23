@@ -1,7 +1,6 @@
 import { useCartStore } from '../../stores';
 import { useEffect, useRef } from 'react';
 import { Plus, X } from 'lucide-react';
-import { useApp } from '../../context/SupabaseAppContext';
 import { SalesTab } from '../../types';
 import { salesTabsService } from '../../lib/services';
 import { useAuth } from '../../context/AuthContext';
@@ -147,7 +146,7 @@ const appSelectedCustomer = useCartStore(s => s.selectedCustomer);
     { active: 'bg-teal-600 shadow-teal-500/50', light: 'bg-teal-50 content-teal-600', text: 'text-teal-100' },
   ];
 
-  const getTabColor = (index: number) => TAB_COLORS[index % TAB_COLORS.length];
+  const _getTabColor = (index: number) => TAB_COLORS[index % TAB_COLORS.length];
 
   return (
     <div className="flex items-center gap-0.5 lg:gap-1.5 py-0.5">

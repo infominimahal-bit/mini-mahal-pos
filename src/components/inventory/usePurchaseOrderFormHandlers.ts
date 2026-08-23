@@ -15,7 +15,7 @@ export function usePurchaseOrderFormHandlers({
   setManualList,
   setAutoOverrides,
   setIsGenerated,
-  appProducts
+  appProducts: _appProducts
 }: UsePurchaseOrderFormHandlersArgs) {
   const updateItem = (id: string, field: string, value: any) => {
     if (poMode === 'manual') {

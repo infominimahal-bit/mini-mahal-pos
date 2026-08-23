@@ -1,4 +1,4 @@
-import { ArrowLeft, Package, Camera, Star, BadgeInfo, ShieldAlert, Edit3, X } from 'lucide-react';
+import { ArrowLeft, Package, Camera, BadgeInfo, ShieldAlert, Edit3, X } from 'lucide-react';
 import { Button, Badge } from '../../../shared/ui';
 import type { ProductDetailController } from './useProductDetail';
 
@@ -41,19 +41,17 @@ export function ProductDetailHeader({ d }: { d: ProductDetailController }) {
             >
               {isInfinite ? 'Infinity Mode' : isOut ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock'}
             </Badge>
-            {product.isFeatured && (
-              <div className="p-1.5 bg-yellow-400 text-white rounded-lg shadow-lg shadow-yellow-400/20">
-                <Star className="w-3 h-3 fill-current" />
-              </div>
-            )}
+
             
-            <Button
-              variant={isEditMode ? 'danger' : 'secondary'}
-              onClick={() => setIsEditMode(!isEditMode)}
-              className={`!p-1.5 !px-3 !rounded-xl !text-[10px] !font-black !shadow-sm ml-auto sm:ml-2 ${isEditMode ? '!bg-rose-500 !text-white !shadow-rose-500/20' : '!bg-white dark:!bg-white/5 !border-gray-200 dark:!border-white/10 !text-gray-700 dark:!text-gray-300'}`}
-            >
-              {isEditMode ? <><X className="h-3 w-3 mr-1" /> {"Cancel Edit"}</> : <><Edit3 className="h-3 w-3 mr-1" /> {"Edit"}</>}
-            </Button>
+            {d.canEditProduct && (
+              <Button
+                variant={isEditMode ? 'danger' : 'secondary'}
+                onClick={() => setIsEditMode(!isEditMode)}
+                className={`!p-1.5 !px-3 !rounded-xl !text-[10px] !font-black !shadow-sm ml-auto sm:ml-2 ${isEditMode ? '!bg-rose-500 !text-white !shadow-rose-500/20' : '!bg-white dark:!bg-white/5 !border-gray-200 dark:!border-white/10 !text-gray-700 dark:!text-gray-300'}`}
+              >
+                {isEditMode ? <><X className="h-3 w-3 mr-1" /> {"Cancel Edit"}</> : <><Edit3 className="h-3 w-3 mr-1" /> {"Edit"}</>}
+              </Button>
+            )}
           </div>
 
           <div className="flex flex-col gap-1 w-full max-w-xs sm:max-w-none">

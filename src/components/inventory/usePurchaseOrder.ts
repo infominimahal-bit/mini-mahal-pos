@@ -13,7 +13,8 @@ export function usePurchaseOrder() {
   const appCategories = useInventoryStore(s => s.categories);
 
   const { profile } = useAuth();
-  const isAdmin = true;
+  // RBAC matrix: restock / PO ops = admin|manager
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager';
 
   const [selectedSupplier, setSelectedSupplier] = useState<string>('All');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');

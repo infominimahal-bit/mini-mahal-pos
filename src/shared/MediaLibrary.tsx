@@ -1,7 +1,6 @@
 import { useAppStore, useProductsStore, useSettingsStore } from '../stores';
 import { useMemo, useRef } from 'react';
-import { X, Image as ImageIcon, MousePointer2, Package, Trash2, Plus, Upload } from 'lucide-react';
-import { useApp } from '../context/SupabaseAppContext';
+import { Image as ImageIcon, MousePointer2, Trash2, Plus } from 'lucide-react';
 import { productsService } from '../lib/services';
 import { sonner } from '../lib/sonner';
 import { Modal } from './ui/Modal';

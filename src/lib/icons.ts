@@ -28,7 +28,6 @@ import {
   RefreshCw,
   Gift,
   HelpCircle,
-  Globe,
   Store,
   ChevronLeft,
   ChevronRight,

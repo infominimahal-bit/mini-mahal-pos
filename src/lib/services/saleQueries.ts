@@ -1,6 +1,6 @@
 import { supabase } from '../supabase';
 import { Sale } from '../../types';
-import { localDb, generateId } from '../localDb';
+import { localDb } from '../localDb';
 import { cloudWrite } from '../cloudWrite';
 import { mapSale, toRemoteSale } from './mappers';
 import { fetchAllPages } from './utils';
@@ -133,7 +133,7 @@ export async function getReportSales(startDate: Date, endDate: Date): Promise<Sa
 
     if (!all || all.length === 0) return [];
     return (all as any[]).map(mapSale);
-  } catch (e) {
+  } catch (_e) {
     console.warn('getReportSales: fallback to localDb'); // fallback to localDb
     return await localDb.sales
       .filter(s =>
@@ -170,7 +170,7 @@ export async function getReportRefunds(startDate: Date, endDate: Date): Promise<
 
     if (!all || all.length === 0) return [];
     return (all as any[]).map(mapSale);
-  } catch (e) {
+  } catch (_e) {
     console.warn('getReportRefunds: fallback to localDb'); // fallback to localDb
     return await localDb.sales
       .filter(s =>

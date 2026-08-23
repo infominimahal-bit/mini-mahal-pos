@@ -34,14 +34,18 @@ Deno.serve(async (req) => {
         headers: corsHeaders,
       })
     }
-    const { data: callerProfile } = await admin
+    const { data: callerProfile, error: fetchError } = await admin
       .from('users')
       .select('role, active')
       .eq('id', caller.user.id)
       .maybeSingle()
     const callerRole = callerProfile?.role
-    if (!callerProfile || callerProfile.active === false || !['admin', 'manager'].includes(callerRole)) {
-      return new Response(JSON.stringify({ error: 'FORBIDDEN: user management requires admin or manager' }), {
+    // RBAC matrix: user management (create/edit/disable/delete) = ADMIN ONLY
+    if (!callerProfile || callerProfile.active === false || callerRole !== 'admin') {
+      return new Response(JSON.stringify({ 
+        error: 'FORBIDDEN: user management requires admin',
+        debug: { callerUserId: caller.user.id, callerProfile, callerRole, fetchError }
+      }), {
         status: 403,
         headers: corsHeaders,
       })
