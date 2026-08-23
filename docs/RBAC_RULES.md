@@ -12,6 +12,26 @@ FINAL PRODUCTION RBAC + TRANSACTION INTEGRITY IMPLEMENTATION
 >
 > Any references to "APPROVAL", "PENDING_APPROVAL", or "Limits" in the document below should be ignored. The system uses strict Role-Based (Admin/Manager/Cashier) binary permissions instead of complex threshold-based async queues.
 
+> **📡 CLOUD DATA SYNC RULES (All Devices Same)**
+>
+> **ALL data must be fetched from Supabase cloud on startup** (`useAppLoadData.ts`) so every device shows identical data on refresh. These are the tables that MUST be cloud-fetched on startup:
+> - `products`, `customers`, `users`, `salesmen`, `discounts`, `payment_modes`
+> - `expenses`, `purchase_records`, `purchase_orders`, `suppliers`, `supplier_transactions`
+> - `categories`, `bundles`, `app_settings`, `sales`
+> - `stock_history` — for Movement History in product detail
+> - `variant_stock_history` — for variant product stock history
+> - `payments` — for payment mode reports and transaction details
+> - `sales_tabs` — for POS cart tabs (user-specific, per `user_id`)
+>
+> **Device-Local ONLY (NOT cloud-synced):**
+> - `theme` (dark/light) — stored in `localStorage.pos_local_prefs.theme`
+> - `posGridColumns` (1-8) — stored in `localStorage.pos_local_prefs.posGridColumns`
+> - `pos_active_sales_tab` — which tab is selected on this device
+>
+> **DO NOT** save theme or posGridColumns to Supabase `app_settings` table. They are device UI preferences.
+> **DO NOT** use `localStorage` as the source of truth for any financial or business data.
+>
+
 ============================================================
 IMPORTANT:
 Do NOT just patch the UI.

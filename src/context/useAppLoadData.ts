@@ -1,4 +1,4 @@
-import { useCartStore, useSettingsStore, useUsersStore, useProductsStore, useInventoryStore, useCustomersStore, useSalesStore, useExpensesStore, useAppStore } from '../stores';
+import { useCartStore, useSettingsStore, useUsersStore, useProductsStore, useInventoryStore, useCustomersStore, useSalesStore, useExpensesStore, useAppStore, usePaymentsStore } from '../stores';
 import { localDb, SETTINGS_ID } from '../lib/localDb';
 import { supabase } from '../lib/supabase';
 import { sonner } from '../lib/sonner';
@@ -15,7 +15,7 @@ import {
   mapPaymentMode,
   salesTabsService
 } from '../lib/services';
-import { mapStockHistory } from '../lib/services/stockMappers';
+import { mapStockHistory, mapVariantStockHistory } from '../lib/services/stockMappers';
 import { useAuth } from './AuthContext';
 
 /** Fetch a table from Supabase cloud and map each row. */
@@ -111,7 +111,9 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         cloudSettings,
         cloudSales,
         cloudStockHistory,
-        cloudSalesTabs
+        cloudSalesTabs,
+        cloudPayments,
+        cloudVariantStockHistory,
       ] = await Promise.allSettled([
         cloudFetch('products', mapProduct),
         cloudFetch('customers', mapCustomer),
@@ -134,6 +136,8 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         cloudFetch('sales', mapSale, { order: 'created_at', limit: 500 }),
         cloudFetch('stock_history', mapStockHistory, { order: 'created_at', limit: 2000 }),
         user ? salesTabsService.getByUserId(user.id).catch(() => []) : Promise.resolve([]),
+        cloudFetch('payments', (r: any) => r, { order: 'created_at', limit: 1000 }),
+        cloudFetch('variant_stock_history', mapVariantStockHistory, { order: 'created_at', limit: 2000 }),
       ]);
 
       const ok = (r: PromiseSettledResult<any>) => (r.status === 'fulfilled' ? r.value : null);
@@ -155,6 +159,8 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
       const sales = ok(cloudSales) || [];
       const stockHistory = ok(cloudStockHistory) || [];
       const salesTabs: any[] = ok(cloudSalesTabs) || [];
+      const payments = ok(cloudPayments) || [];
+      const variantStockHistory = ok(cloudVariantStockHistory) || [];
 
       // Persist into local display cache so search/loadMore keep working offline-of-cache.
       await Promise.allSettled([
@@ -172,6 +178,8 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         localDb.bundles.clear().then(() => localDb.bundles.bulkPut(bundles)),
         localDb.sales.clear().then(() => localDb.sales.bulkPut(sales)),
         localDb.stockHistory.clear().then(() => stockHistory.length ? localDb.stockHistory.bulkPut(stockHistory) : Promise.resolve()),
+        localDb.payments.clear().then(() => payments.length ? localDb.payments.bulkPut(payments) : Promise.resolve()),
+        localDb.variantStockHistory.clear().then(() => variantStockHistory.length ? localDb.variantStockHistory.bulkPut(variantStockHistory) : Promise.resolve()),
         localDb.appSettings.clear().then(() => settingsRow ? localDb.appSettings.put({ ...settingsRow }) : Promise.resolve()),
         localDb.users.clear().then(() => users.length ? localDb.users.bulkPut(users) : Promise.resolve()),
       ]).catch(() => {});
@@ -204,6 +212,7 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
       useInventoryStore.getState().setPurchaseOrders(purchaseOrders);
       useInventoryStore.getState().setSuppliers(suppliers);
       useInventoryStore.getState().setSupplierTransactions(supplierTx);
+      if (payments.length > 0) usePaymentsStore.getState().setPayments(payments);
 
       // Load sales tabs from cloud into cartStore
       if (salesTabs.length > 0) {
