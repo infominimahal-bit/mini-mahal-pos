@@ -9,6 +9,7 @@ import {
   AlertCircle,
   Layout,
   ShieldCheck,
+  CreditCard,
 } from 'lucide-react';
 import { Button, ToggleSwitch, Select } from '../../../shared/ui';
 import type { SettingsTabProps } from './types';
@@ -223,6 +224,41 @@ export function GeneralModules({
               className="w-24 shrink-0 px-2 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-xs font-bold text-gray-900 dark:text-white text-right focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </label>
+
+          {/* Credit Sales System */}
+          <label className="flex items-center justify-between p-3 bg-white dark:bg-black/20 border border-gray-200 dark:border-white/5 rounded-xl group transition-all cursor-pointer">
+            <div className="flex items-center gap-3">
+              <CreditCard className="w-4 h-4 text-gray-500 group-hover:text-indigo-500 transition-colors" />
+              <div>
+                <span className="text-xs font-bold text-gray-700 dark:text-gray-300 block leading-none">Enable Credit Sales</span>
+                <span className="text-[8px] text-gray-500 uppercase tracking-wider block mt-1">Allow udhar / credit sales globally</span>
+              </div>
+            </div>
+            <ToggleSwitch
+              size="sm"
+              color="bg-indigo-500"
+              checked={formData.enableCreditSales ?? true}
+              onChange={(v) => handleInstantUpdate('enableCreditSales', v)}
+            />
+          </label>
+
+          {(formData.enableCreditSales ?? true) && (
+            <label className="flex items-center justify-between p-3 bg-white dark:bg-black/20 border border-gray-200 dark:border-white/5 rounded-xl group transition-all cursor-pointer">
+              <div className="flex items-center gap-3">
+                <CreditCard className="w-4 h-4 text-gray-500 group-hover:text-amber-500 transition-colors" />
+                <div>
+                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300 block leading-none">Cashier Can Give Credit</span>
+                  <span className="text-[8px] text-gray-500 uppercase tracking-wider block mt-1">If off, only Admin/Manager can create credit sales</span>
+                </div>
+              </div>
+              <ToggleSwitch
+                size="sm"
+                color="bg-amber-500"
+                checked={formData.cashierCanCredit ?? true}
+                onChange={(v) => handleInstantUpdate('cashierCanCredit', v)}
+              />
+            </label>
+          )}
 
         </div>
       </div>

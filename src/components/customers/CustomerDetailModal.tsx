@@ -1,6 +1,6 @@
 import { useCustomersStore, useSalesStore, useSettingsStore } from '../../stores';
 import { useState, useMemo } from 'react';
-import { Phone, CreditCard, ShoppingBag, Receipt, MessageCircle, ChevronRight, User } from 'lucide-react';
+import { Phone, CreditCard, ShoppingBag, Receipt, MessageCircle, ChevronRight, User, TrendingUp } from 'lucide-react';
 import { Customer, Sale } from '../../types';
 import { formatCurrency } from '../../lib/currencies';
 import { formatAppDateTime } from '../../lib/dateUtils';
@@ -9,6 +9,10 @@ import { cn } from '../../lib/utils';
 import { TransactionDetailModal } from '../transactions/TransactionDetailModal';
 import { Badge, Button, EmptyState, Pagination, usePagination } from '../../shared/ui';
 import { getEffectiveTotal } from '../reports/useReportsData';
+import { CustomerLedgerTab } from './CustomerLedgerTab';
+import { ReceivePaymentModal } from './ReceivePaymentModal';
+import { can } from '../../lib/permissions';
+import { useUsersStore } from '../../stores';
 
 interface CustomerDetailModalProps {
   customer: Customer;
@@ -17,10 +21,13 @@ interface CustomerDetailModalProps {
 
 export function CustomerDetailModal({ customer: initialCustomer, onClose }: CustomerDetailModalProps) {
   const appCustomers = useCustomersStore(s => s.customers);
-const appSales = useSalesStore(s => s.sales);
-const appSettings = useSettingsStore(s => s.settings);
-  const [activeTab, setActiveTab] = useState<'details' | 'transactions'>('details');
+  const appSales = useSalesStore(s => s.sales);
+  const appSettings = useSettingsStore(s => s.settings);
+  const currentUser = useUsersStore(s => s.currentUser);
+  const userRole = currentUser?.role || 'cashier';
+  const [activeTab, setActiveTab] = useState<'details' | 'transactions' | 'ledger'>('details');
   const [viewingTransaction, setViewingTransaction] = useState<Sale | null>(null);
+  const [showReceivePayment, setShowReceivePayment] = useState(false);
 
   // Always read fresh customer from state
   const customer = useMemo(() =>
@@ -40,20 +47,30 @@ const appSettings = useSettingsStore(s => s.settings);
   const { page: paidPage, totalPages: paidTotalPages, pageItems: paidPageItems, goToPage: goToPaidPage, pageSize: paidPageSize, setPageSize: setPaidPageSize } = usePagination(customerTransactions, 10);
 
   const footer = (
-    <div className="flex items-center justify-end gap-2 sm:gap-3 w-full">
+    <div className="flex items-center gap-2 sm:gap-3 w-full">
+      {can(userRole, 'receive_payment') && (customer.balance || 0) > 0 && (
+        <Button
+          variant="primary"
+          onClick={() => setShowReceivePayment(true)}
+          className="!min-h-0 !px-4 sm:!px-6 !py-2.5 !text-[9px] sm:!text-[11px] !font-black !rounded-2xl sm:!rounded-full"
+        >
+          <CreditCard className="h-3.5 w-3.5 mr-1" /> Receive Payment
+        </Button>
+      )}
       <Button
         variant="secondary"
         onClick={onClose}
         className="!min-h-0 !ml-auto !px-4 sm:!px-8 !py-2.5 sm:!py-3 !text-[9px] sm:!text-[11px] !font-black !rounded-2xl sm:!rounded-full !border-gray-200 dark:!border-white/10 !shrink-0"
       >
-        {"close"}
+        close
       </Button>
     </div>
   );
 
   const tabs = [
-    { id: 'details', label: "details", icon: User },
+    { id: 'details', label: 'details', icon: User },
     { id: 'transactions', label: `Sales (${totalTransactions})`, icon: Receipt },
+    { id: 'ledger', label: `Ledger`, icon: TrendingUp },
   ];
 
   return (
@@ -206,6 +223,11 @@ const appSettings = useSettingsStore(s => s.settings);
               )}
             </div>
           )}
+
+          {/* Ledger Tab */}
+          {activeTab === 'ledger' && (
+            <CustomerLedgerTab customer={customer} />
+          )}
         </div>
       </Modal>
 
@@ -219,6 +241,14 @@ const appSettings = useSettingsStore(s => s.settings);
           onBack={() => setViewingTransaction(null)}
         />
       )}
+
+      {showReceivePayment && (
+        <ReceivePaymentModal
+          customer={customer}
+          onClose={() => setShowReceivePayment(false)}
+        />
+      )}
     </>
   );
+
 }
