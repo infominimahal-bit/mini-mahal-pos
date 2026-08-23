@@ -117,6 +117,8 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         cloudToppings,
         cloudBundleItems,
         cloudPurchaseOrderItems,
+        cloudProductAddons,
+        cloudProductToppings,
       ] = await Promise.allSettled([
         cloudFetch('products', mapProduct),
         cloudFetch('customers', mapCustomer),
@@ -144,6 +146,8 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         cloudFetch('toppings'),
         cloudFetch('bundle_items'),
         cloudFetch('purchase_order_items'),
+        cloudFetch('product_addons'),
+        cloudFetch('product_toppings'),
       ]);
 
       const ok = (r: PromiseSettledResult<any>) => (r.status === 'fulfilled' ? r.value : null);
@@ -170,6 +174,8 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
       const toppings = ok(cloudToppings) || [];
       const bundleItems = ok(cloudBundleItems) || [];
       const purchaseOrderItems = ok(cloudPurchaseOrderItems) || [];
+      const productAddons = ok(cloudProductAddons) || [];
+      const productToppings = ok(cloudProductToppings) || [];
 
       // Persist into local display cache so search/loadMore keep working offline-of-cache.
       await Promise.allSettled([
@@ -192,6 +198,7 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         localDb.toppings.clear().then(() => toppings.length ? localDb.toppings.bulkPut(toppings) : Promise.resolve()),
         localDb.bundleItems.clear().then(() => bundleItems.length ? localDb.bundleItems.bulkPut(bundleItems) : Promise.resolve()),
         localDb.purchaseOrderItems.clear().then(() => purchaseOrderItems.length ? localDb.purchaseOrderItems.bulkPut(purchaseOrderItems) : Promise.resolve()),
+        localDb.productAddons.clear().then(() => productAddons.length ? localDb.productAddons.bulkPut(productAddons) : Promise.resolve()),
         localDb.appSettings.clear().then(() => settingsRow ? localDb.appSettings.put({ ...settingsRow }) : Promise.resolve()),
         localDb.users.clear().then(() => users.length ? localDb.users.bulkPut(users) : Promise.resolve()),
       ]).catch(() => {});

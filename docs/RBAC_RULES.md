@@ -10,82 +10,83 @@ FINAL PRODUCTION RBAC + TRANSACTION INTEGRITY IMPLEMENTATION
 > 5. Expense Reversal Approval workflows
 > 6. Sensitive Customer-Credit adjustment gating
 >
-> Any references to "APPROVAL", "PENDING_APPROVAL", or "Limits" in the document below should be ignored. The system uses strict Role-Based (Admin/Manager/Cashier) binary permissions instead of complex threshold-based async queues.
-
-> **📡 CLOUD DATA SYNC RULES — ALL DEVICES SAME (MANDATORY)**
+> Any references to "APPROVAL", "PENDING_APPROVAL", or "Limits" in the document below should be ignored. The system uses strict Role-Based (Admin/Manager/Cashier) binary permissions instead of complex threshold-based async queues> **📡 CLOUD DATA SYNC RULES — ALL DEVICES SAME (MANDATORY)**
 >
-> ## Core Principle
+> ### Core Principle
 > **Supabase cloud = ONLY source of truth.** Every device must show identical data on every refresh.
 > `localStorage` / IndexedDB (Dexie) = display cache ONLY. NEVER used as source of truth.
 >
-> ## Startup Load: ALL Tables from Cloud (`useAppLoadData.ts`)
+> ---
 >
-> On every app startup + refresh, ALL the following tables MUST be fetched from Supabase
-> and written to local IndexedDB cache AND Zustand stores:
+> ### ✅ Tables fetched from cloud on EVERY startup (`useAppLoadData.ts`)
 >
-> | Table | Zustand Store | Purpose |
-> |-------|--------------|---------|
-> | `products` | `useProductsStore` | Inventory catalog |
-> | `customers` | `useCustomersStore` | Customer directory |
-> | `users` | `useUsersStore` | Staff/login accounts |
-> | `salesmen` | `useUsersStore` | Salesman assignments |
-> | `discounts` | `useAppStore` | Discount rules |
-> | `payment_modes` | `useSettingsStore` | Cash/Card/Online wallets |
-> | `payments` | `usePaymentsStore` | Payment ledger (for reports) |
-> | `expenses` | `useExpensesStore` | Expense entries |
-> | `purchase_records` | `useInventoryStore` | Stock purchase records |
-> | `purchase_orders` | `useInventoryStore` | Pending restock orders |
-> | `suppliers` | `useInventoryStore` | Supplier directory |
-> | `supplier_transactions` | `useInventoryStore` | Supplier payment ledger |
-> | `categories` | `useInventoryStore` | Product groups |
-> | `bundles` | `useAppStore` | Bundle/deal products |
-> | `app_settings` | `useSettingsStore` | Business configuration |
-> | `sales` | `useSalesStore` | Transaction history (latest 500) |
-> | `stock_history` | localDb only | Product movement history |
-> | `variant_stock_history` | localDb only | Variant-level movements |
-> | `sales_tabs` | `useCartStore` | POS cart tabs (per `user_id`) |
-> | `payments` | `usePaymentsStore` | Payment ledger (for reports) |
-> | `toppings` | localDb only | Restaurant/addon toppings |
-> | `bundle_items` | localDb only | Bundle product line items |
-> | `purchase_order_items` | localDb only | PO line items |
+> All 24 tables below are loaded fresh from Supabase on every app start + refresh,
+> written to localDb cache AND Zustand store.
 >
-> ## Tables NOT fetched on startup (internal/system use only)
+> | # | Table | localDb key | Zustand Store | Purpose |
+> |---|-------|-------------|--------------|---------|
+> | 1 | `products` | `products` | `useProductsStore` | Inventory catalog |
+> | 2 | `customers` | `customers` | `useCustomersStore` | Customer directory |
+> | 3 | `users` | `users` | `useUsersStore` | Staff/login accounts |
+> | 4 | `salesmen` | `salesmen` | `useUsersStore` | Salesman list |
+> | 5 | `categories` | `categories` | `useInventoryStore` | Product groups |
+> | 6 | `discounts` | `discounts` | `useAppStore` | Discount rules |
+> | 7 | `payment_modes` | `paymentModes` | `useSettingsStore` | Cash/Card/Online wallets |
+> | 8 | `payments` | `payments` | `usePaymentsStore` | Payment ledger (for reports) |
+> | 9 | `expenses` | `expenses` | `useExpensesStore` | Expense entries |
+> | 10 | `suppliers` | `suppliers` | `useInventoryStore` | Supplier directory |
+> | 11 | `supplier_transactions` | `supplierTransactions` | `useInventoryStore` | Supplier payment ledger |
+> | 12 | `purchase_records` | `purchaseRecords` | `useInventoryStore` | Stock purchase records |
+> | 13 | `purchase_orders` | `purchaseOrders` | `useInventoryStore` | Pending restock orders |
+> | 14 | `purchase_order_items` | `purchaseOrderItems` | localDb only | PO line items |
+> | 15 | `bundles` | `bundles` | `useAppStore` | Bundle/deal products |
+> | 16 | `bundle_items` | `bundleItems` | localDb only | Bundle product detail |
+> | 17 | `toppings` | `toppings` | localDb only | Restaurant addon toppings |
+> | 18 | `product_addons` | `productAddons` | localDb only | Product cross-sell addons |
+> | 19 | `product_toppings` | _(no localDb table)_ | localDb only (via toppings) | Topping-product mapping |
+> | 20 | `sales` | `sales` | `useSalesStore` | Transaction history (latest 500) |
+> | 21 | `stock_history` | `stockHistory` | localDb only | Product movement history |
+> | 22 | `variant_stock_history` | `variantStockHistory` | localDb only | Variant-level movements |
+> | 23 | `sales_tabs` | `salesTabs` | `useCartStore` | POS cart tabs (per `user_id`) |
+> | 24 | `app_settings` | `appSettings` | `useSettingsStore` | Business configuration |
+>
+> ---
+>
+> ### ❌ Tables NOT fetched at startup (deliberate exclusions)
 >
 > | Table | Reason |
 > |-------|--------|
-> | `row_tombstones` | Internal delete tracking only |
-> | `sale_audit_log` | Backend audit only |
-> | `stock_mismatches` | Backend reconciliation only |
-> | `sessions` | Backend session tracking only |
-> | `price_history` | Not yet used in frontend |
-> | `payment_movements` | Written via RPC only; read via `payments` |
-> | `customer_ledger` | Derived from `sales`; not needed at startup |
-> | `product_addons` | Loaded on demand per product |
-> | `product_toppings` | Join table, loaded with product on demand |
-> | `sessions` | Backend session tracking only |
-> | `row_tombstones` | Internal delete tracking only |
-> | `sale_audit_log` | Backend audit only |
-> | `stock_mismatches` | Backend reconciliation only |
+> | `customer_ledger` | Append-only ledger; balance derived from `sales` at query time |
+> | `payment_movements` | Written via `apply_payment_movements` RPC only; read via `payments` |
+> | `row_tombstones` | Internal delete-guard tracking; backend only |
+> | `sale_audit_log` | Backend audit trail only; never shown directly in UI |
+> | `stock_mismatches` | Backend reconciliation table; no UI component |
+> | `price_history` | Not yet exposed in frontend UI |
+> | `sessions` | Backend auth session tracking; no frontend use |
 >
-> ## Device-Local ONLY (NEVER synced to cloud)
+> ---
+>
+> ### 🖥️ Device-Local ONLY (NEVER written to cloud)
 >
 > | Key | Storage | Purpose |
 > |-----|---------|---------|
-> | `pos_local_prefs.theme` | `localStorage` | Dark/Light per device |
-> | `pos_local_prefs.posGridColumns` | `localStorage` | Grid density (1-8) per device |
-> | `pos_active_sales_tab` | `localStorage` | Which tab active on this device |
+> | `pos_local_prefs.theme` | `localStorage` | Dark/Light mode per device |
+> | `pos_local_prefs.posGridColumns` | `localStorage` | POS grid density (1–8) per device |
+> | `pos_active_sales_tab` | `localStorage` | Which POS tab is active on this device |
 >
-> ## Hard Rules for Developers
+> ---
 >
-> 1. **NEVER** read business data (sales, products, stock) from `localStorage` — always from Zustand store (loaded from cloud).
-> 2. **NEVER** save `theme` or `posGridColumns` to Supabase `app_settings`. These are device-only UI prefs.
-> 3. **NEVER** add a new table without also adding it to `useAppLoadData.ts` startup fetch and `localDb` cache write.
-> 4. **ALWAYS** use `localDb.TABLE.clear().then(() => localDb.TABLE.bulkPut(...))` to prevent stale ghost data.
-> 5. **ALWAYS** set the corresponding Zustand store after fetching from cloud.
-> 6. **Realtime handlers** (`handlers-*.ts`) must update BOTH localDb AND Zustand store on INSERT/UPDATE/DELETE.
-> 7. `stock_history` and `variant_stock_history` are append-only — NEVER delete from frontend; only DB triggers write to them.
-> 8. `sales_tabs` are user-specific (filter by `user_id`) — NEVER share tabs across users.
-
+> ### 🔒 Hard Rules for Developers
+>
+> 1. **NEVER** read business data (sales, products, stock) from `localStorage` — always from Zustand store (populated from cloud).
+> 2. **NEVER** save `theme` or `posGridColumns` to Supabase `app_settings`. Device-only prefs.
+> 3. **NEVER** add a new table without ALSO adding it to `useAppLoadData.ts` AND `localDb` cache write.
+> 4. **ALWAYS** `localDb.TABLE.clear()` then `bulkPut()` on startup — prevents stale ghost data from old sessions.
+> 5. **ALWAYS** populate the corresponding Zustand store after fetching from cloud.
+> 6. **Realtime handlers** (`src/context/realtime/handlers-*.ts`) must update BOTH localDb AND Zustand on INSERT/UPDATE/DELETE.
+> 7. `stock_history` and `variant_stock_history` — append-only; never delete from frontend. Only DB triggers write `products.stock`.
+> 8. `sales_tabs` — always filter by `user_id`; never share across users.
+> 9. **New table checklist**: Schema SQL → Migration file → `localDb.ts` table → `useAppLoadData.ts` fetch → localDb persist → Zustand store set → Realtime handler.
 
 
 ============================================================
