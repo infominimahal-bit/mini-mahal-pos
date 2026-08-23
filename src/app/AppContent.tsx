@@ -29,10 +29,6 @@ export function AppContent() {
 
   useAppGlobalEffects();
 
-  if (loading || (user && !appCurrentUser && appLoading)) {
-    return <SkeletonLoader type="list" count={8} />;
-  }
-
   return (
     <>
       <Toaster
@@ -83,8 +79,12 @@ export function AppContent() {
           },
         }}
       />
-      <div dir="ltr" className="fixed inset-0 w-full bg-gray-50 dark:bg-app flex flex-col overflow-hidden">
-        {isRecoveringPassword ? (
+      
+      {loading || (user && !appCurrentUser && appLoading) ? (
+        <SkeletonLoader type="list" count={8} />
+      ) : (
+        <div dir="ltr" className="fixed inset-0 w-full bg-gray-50 dark:bg-app flex flex-col overflow-hidden">
+          {isRecoveringPassword ? (
         <ResetPasswordPage />
       ) : !user || !appCurrentUser || !appCurrentUser.active ? (
         <LoginPage />
@@ -131,6 +131,7 @@ export function AppContent() {
         </>
       )}
       </div>
+      )}
     </>
   );
 }
