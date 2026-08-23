@@ -114,6 +114,9 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         cloudSalesTabs,
         cloudPayments,
         cloudVariantStockHistory,
+        cloudToppings,
+        cloudBundleItems,
+        cloudPurchaseOrderItems,
       ] = await Promise.allSettled([
         cloudFetch('products', mapProduct),
         cloudFetch('customers', mapCustomer),
@@ -138,6 +141,9 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         user ? salesTabsService.getByUserId(user.id).catch(() => []) : Promise.resolve([]),
         cloudFetch('payments', (r: any) => r, { order: 'created_at', limit: 1000 }),
         cloudFetch('variant_stock_history', mapVariantStockHistory, { order: 'created_at', limit: 2000 }),
+        cloudFetch('toppings'),
+        cloudFetch('bundle_items'),
+        cloudFetch('purchase_order_items'),
       ]);
 
       const ok = (r: PromiseSettledResult<any>) => (r.status === 'fulfilled' ? r.value : null);
@@ -161,6 +167,9 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
       const salesTabs: any[] = ok(cloudSalesTabs) || [];
       const payments = ok(cloudPayments) || [];
       const variantStockHistory = ok(cloudVariantStockHistory) || [];
+      const toppings = ok(cloudToppings) || [];
+      const bundleItems = ok(cloudBundleItems) || [];
+      const purchaseOrderItems = ok(cloudPurchaseOrderItems) || [];
 
       // Persist into local display cache so search/loadMore keep working offline-of-cache.
       await Promise.allSettled([
@@ -180,6 +189,9 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         localDb.stockHistory.clear().then(() => stockHistory.length ? localDb.stockHistory.bulkPut(stockHistory) : Promise.resolve()),
         localDb.payments.clear().then(() => payments.length ? localDb.payments.bulkPut(payments) : Promise.resolve()),
         localDb.variantStockHistory.clear().then(() => variantStockHistory.length ? localDb.variantStockHistory.bulkPut(variantStockHistory) : Promise.resolve()),
+        localDb.toppings.clear().then(() => toppings.length ? localDb.toppings.bulkPut(toppings) : Promise.resolve()),
+        localDb.bundleItems.clear().then(() => bundleItems.length ? localDb.bundleItems.bulkPut(bundleItems) : Promise.resolve()),
+        localDb.purchaseOrderItems.clear().then(() => purchaseOrderItems.length ? localDb.purchaseOrderItems.bulkPut(purchaseOrderItems) : Promise.resolve()),
         localDb.appSettings.clear().then(() => settingsRow ? localDb.appSettings.put({ ...settingsRow }) : Promise.resolve()),
         localDb.users.clear().then(() => users.length ? localDb.users.bulkPut(users) : Promise.resolve()),
       ]).catch(() => {});

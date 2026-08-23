@@ -44,6 +44,10 @@ FINAL PRODUCTION RBAC + TRANSACTION INTEGRITY IMPLEMENTATION
 > | `stock_history` | localDb only | Product movement history |
 > | `variant_stock_history` | localDb only | Variant-level movements |
 > | `sales_tabs` | `useCartStore` | POS cart tabs (per `user_id`) |
+> | `payments` | `usePaymentsStore` | Payment ledger (for reports) |
+> | `toppings` | localDb only | Restaurant/addon toppings |
+> | `bundle_items` | localDb only | Bundle product line items |
+> | `purchase_order_items` | localDb only | PO line items |
 >
 > ## Tables NOT fetched on startup (internal/system use only)
 >
@@ -57,9 +61,11 @@ FINAL PRODUCTION RBAC + TRANSACTION INTEGRITY IMPLEMENTATION
 > | `payment_movements` | Written via RPC only; read via `payments` |
 > | `customer_ledger` | Derived from `sales`; not needed at startup |
 > | `product_addons` | Loaded on demand per product |
-> | `toppings` / `product_toppings` | Loaded on demand per product |
-> | `purchase_order_items` | Loaded on demand per purchase order |
-> | `bundle_items` | Embedded in `bundles` fetch |
+> | `product_toppings` | Join table, loaded with product on demand |
+> | `sessions` | Backend session tracking only |
+> | `row_tombstones` | Internal delete tracking only |
+> | `sale_audit_log` | Backend audit only |
+> | `stock_mismatches` | Backend reconciliation only |
 >
 > ## Device-Local ONLY (NEVER synced to cloud)
 >
