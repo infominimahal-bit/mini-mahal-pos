@@ -16,6 +16,7 @@ import {
   salesTabsService
 } from '../lib/services';
 import { mapStockHistory, mapVariantStockHistory } from '../lib/services/stockMappers';
+import { mapCustomerLedger } from '../lib/services/customerLedgerService';
 import { useAuth } from './AuthContext';
 
 /** Fetch a table from Supabase cloud and map each row. */
@@ -119,6 +120,7 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         cloudPurchaseOrderItems,
         cloudProductAddons,
         cloudProductToppings,
+        cloudCustomerLedger,
       ] = await Promise.allSettled([
         cloudFetch('products', mapProduct),
         cloudFetch('customers', mapCustomer),
@@ -148,6 +150,7 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         cloudFetch('purchase_order_items'),
         cloudFetch('product_addons'),
         cloudFetch('product_toppings'),
+        cloudFetch('customer_ledger', mapCustomerLedger),
       ]);
 
       const ok = (r: PromiseSettledResult<any>) => (r.status === 'fulfilled' ? r.value : null);
@@ -176,6 +179,7 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
       const purchaseOrderItems = ok(cloudPurchaseOrderItems) || [];
       const productAddons = ok(cloudProductAddons) || [];
       const productToppings = ok(cloudProductToppings) || [];
+      const customerLedger = ok(cloudCustomerLedger) || [];
 
       // Persist into local display cache so search/loadMore keep working offline-of-cache.
       await Promise.allSettled([
@@ -199,6 +203,7 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         localDb.bundleItems.clear().then(() => bundleItems.length ? localDb.bundleItems.bulkPut(bundleItems) : Promise.resolve()),
         localDb.purchaseOrderItems.clear().then(() => purchaseOrderItems.length ? localDb.purchaseOrderItems.bulkPut(purchaseOrderItems) : Promise.resolve()),
         localDb.productAddons.clear().then(() => productAddons.length ? localDb.productAddons.bulkPut(productAddons) : Promise.resolve()),
+        localDb.customerLedger.clear().then(() => customerLedger.length ? localDb.customerLedger.bulkPut(customerLedger) : Promise.resolve()),
         localDb.appSettings.clear().then(() => settingsRow ? localDb.appSettings.put({ ...settingsRow }) : Promise.resolve()),
         localDb.users.clear().then(() => users.length ? localDb.users.bulkPut(users) : Promise.resolve()),
       ]).catch(() => {});

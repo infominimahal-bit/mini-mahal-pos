@@ -6,22 +6,25 @@ export interface Customer {
   address: string;
   priceTier: 'retail' | 'wholesale' | 'premium';
   totalPurchases: number;
-  balance?: number; // Running customer balance (owed by customer). Derived from customer_ledger.
+  balance?: number;       // Running balance (positive = customer owes us)
+  creditLimit?: number;  // Max credit allowed (0 = no limit)
+  creditUsed?: number;   // How much credit currently used
+  allowCredit?: boolean; // Per-customer credit enable/disable
   lastPurchase?: Date;
   createdAt: Date;
   updatedAt?: Date;
-  preferredCategories?: string[]; // CRM: Track what they buy most
-  notes?: string; // CRM: Special instructions, birthday, etc.
+  preferredCategories?: string[];
+  notes?: string;
 }
 
 export interface CustomerLedger {
   id: string;
   customerId: string;
   saleId?: string;
-  type: 'sale' | 'payment' | 'refund' | 'adjustment' | 'credit' | 'opening';
-  debit: number;   // money customer OWES (sale)
-  credit: number;  // money customer PAYS / is refunded (payment, refund)
-  balanceAfter: number;
+  type: 'sale' | 'payment_received' | 'refund' | 'adjustment' | 'credit' | 'opening' | 'sale_credit';
+  debit: number;        // money customer OWES (sale on credit)
+  credit: number;       // money customer PAYS / refund
+  balanceAfter: number; // running balance after this entry
   reference?: string;
   note?: string;
   createdBy?: string;

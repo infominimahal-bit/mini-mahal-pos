@@ -49,6 +49,7 @@ FINAL PRODUCTION RBAC + TRANSACTION INTEGRITY IMPLEMENTATION
 > | 22 | `variant_stock_history` | `variantStockHistory` | localDb only | Variant-level movements |
 > | 23 | `sales_tabs` | `salesTabs` | `useCartStore` | POS cart tabs (per `user_id`) |
 > | 24 | `app_settings` | `appSettings` | `useSettingsStore` | Business configuration |
+> | 25 | `customer_ledger` | `customerLedger` | localDb only | Per-customer debit/credit history |
 >
 > ---
 >

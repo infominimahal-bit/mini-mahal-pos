@@ -95,6 +95,10 @@ export interface AppSettings {
   allowNegativeStock?: boolean;
   /** RBAC: refunds above this amount require admin approval (0 = no threshold). Server-enforced in refund_sale_atomic. */
   refundApprovalThreshold?: number;
+  /** Credit Sales system: enable/disable credit sales globally */
+  enableCreditSales?: boolean;
+  /** RBAC: allow cashier role to create credit sales */
+  cashierCanCredit?: boolean;
 }
 
 export interface Expense {

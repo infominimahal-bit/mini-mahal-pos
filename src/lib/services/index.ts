@@ -4,6 +4,7 @@ export * from './atomicOps';
 export * from './salesService';
 export * from './productsService';
 export * from './customersService';
+export * from './customerLedgerService';
 export * from './inventoryService';
 export * from './suppliersService';
 export * from './expensesService';

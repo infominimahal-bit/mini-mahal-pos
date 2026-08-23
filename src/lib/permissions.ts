@@ -46,7 +46,12 @@ export type Permission =
   | 'void_sale'
   | 'export_database'
   | 'view_profit'
-  | 'view_records';
+  | 'view_records'
+  | 'credit_sale'         // create a credit/udhar sale
+  | 'receive_payment'     // receive customer payment against balance
+  | 'view_customer_ledger'// view full ledger history per customer
+  | 'adjust_ledger'       // manual ledger adjustment (Admin/Manager only)
+  | 'view_credit_report'; // outstanding customers report
 
 // Role -> action -> allowed. `true` everywhere for admin.
 export const PERMISSIONS: Record<Role, Record<Permission, boolean>> = {
@@ -82,6 +87,11 @@ export const PERMISSIONS: Record<Role, Record<Permission, boolean>> = {
     export_database: true,
     view_profit: true,
     view_records: true,
+    credit_sale: true,
+    receive_payment: true,
+    view_customer_ledger: true,
+    adjust_ledger: true,
+    view_credit_report: true,
   },
   manager: {
     view_pos: true,
@@ -115,6 +125,11 @@ export const PERMISSIONS: Record<Role, Record<Permission, boolean>> = {
     export_database: false, // DB export/backup is owner (admin) only
     view_profit: true,
     view_records: true,
+    credit_sale: true,
+    receive_payment: true,
+    view_customer_ledger: true,
+    adjust_ledger: true,   // managers can adjust
+    view_credit_report: true,
   },
   cashier: {
     view_pos: true,
@@ -148,6 +163,11 @@ export const PERMISSIONS: Record<Role, Record<Permission, boolean>> = {
     export_database: false,
     view_profit: false,
     view_records: true,
+    credit_sale: true,     // controlled by app_settings.cashierCanCredit at runtime
+    receive_payment: true, // cashier CAN receive payment
+    view_customer_ledger: true,
+    adjust_ledger: false,  // adjustment = admin/manager only
+    view_credit_report: false,
   },
   salesman: {
     view_pos: true,
@@ -181,6 +201,11 @@ export const PERMISSIONS: Record<Role, Record<Permission, boolean>> = {
     export_database: false,
     view_profit: false,
     view_records: false,
+    credit_sale: false,
+    receive_payment: false,
+    view_customer_ledger: false,
+    adjust_ledger: false,
+    view_credit_report: false,
   },
 };
 
