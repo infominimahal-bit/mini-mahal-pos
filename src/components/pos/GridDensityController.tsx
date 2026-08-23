@@ -9,9 +9,11 @@ export function GridDensityController() {
 
   const handleColumnChange = (cols: number) => {
     useSettingsStore.getState().setSettings({ posGridColumns: cols });
-
-    // Removed DB sync since grid columns are a local device UI preference
-
+    // Save as device-local pref only (not to cloud)
+    try {
+      const existing = JSON.parse(localStorage.getItem('pos_local_prefs') || '{}');
+      localStorage.setItem('pos_local_prefs', JSON.stringify({ ...existing, posGridColumns: cols }));
+    } catch (e) {}
     sonner.success(`Grid density set to ${cols} columns`);
   };
 

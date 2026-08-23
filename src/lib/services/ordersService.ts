@@ -1,6 +1,7 @@
 import { SalesTab } from '../../types';
 import { localDb, generateId } from '../localDb';
 import { cloudWrite } from '../cloudWrite';
+import { supabase } from '../supabase';
 
 
 
@@ -35,7 +36,32 @@ export const toRemoteSalesTab = (tab: Partial<SalesTab>) => {
  */
 export const salesTabsService = {
   async getByUserId(userId: string): Promise<SalesTab[]> {
-    return await localDb.salesTabs.where('userId').equals(userId).toArray();
+    try {
+      const { data, error } = await supabase
+        .from('sales_tabs')
+        .select('*')
+        .eq('user_id', userId);
+      if (error) throw error;
+      const tabs = (data || []).map((row: any): SalesTab => ({
+        id: row.id,
+        name: row.name || 'Sale 1',
+        userId: row.user_id,
+        cart: Array.isArray(row.cart) ? row.cart : [],
+        selectedCustomer: null, // reconstructed separately if needed
+        billDiscountValue: row.bill_discount_value ?? 0,
+        billDiscountType: row.bill_discount_type ?? 'percentage',
+        notes: row.notes || '',
+        editingSaleId: row.editing_sale_id ?? null,
+        createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+      }));
+      // Sync to local cache
+      await localDb.salesTabs.where('userId').equals(userId).delete();
+      if (tabs.length > 0) await localDb.salesTabs.bulkPut(tabs);
+      return tabs;
+    } catch {
+      // Fallback to local cache
+      return await localDb.salesTabs.where('userId').equals(userId).toArray();
+    }
   },
   async create(userId: string, tab: Omit<SalesTab, 'id' | 'createdAt'>): Promise<SalesTab> {
     const id = generateId();

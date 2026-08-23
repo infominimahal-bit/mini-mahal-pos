@@ -15,90 +15,25 @@ export function useAppPersistence() {
   const appBillDiscountValue = useCartStore(s => s.billDiscountValue);
   const appBillDiscountType = useCartStore(s => s.billDiscountType);
 
-  // Load from localStorage on mount
+  // On mount: only restore things that are device-local (cart in active tab, editing ID)
+  // Sales Tabs are loaded from cloud in useAppLoadData — do NOT load from localStorage here
   useEffect(() => {
-    const savedCart = localStorage.getItem('pos_cart');
-    const savedEditId = localStorage.getItem('pos_editing_id');
-    const savedCustomer = localStorage.getItem('pos_selected_customer');
-
-    if (savedCart) {
-      try {
-        const parsedCart = JSON.parse(savedCart);
-        if (parsedCart.length > 0) useCartStore.getState().setCart(parsedCart);
-      } catch (e) {
-        console.error('[Persistence] Failed to parse cart', e);
-      }
-    }
-
-    if (savedEditId) {
-      useCartStore.getState().setEditingSaleId(savedEditId);
-    }
-
-    if (savedCustomer) {
-      try {
-        const parsedCustomer = JSON.parse(savedCustomer);
-        useCartStore.getState().setSelectedCustomer(parsedCustomer);
-      } catch (e) {
-        console.error('[Persistence] Failed to parse customer', e);
-      }
-    }
-
-    const savedSalesTabs = localStorage.getItem('pos_sales_tabs');
+    // Restore active tab selection (device-local preference only)
     const savedActiveTab = localStorage.getItem('pos_active_sales_tab');
-
-    if (savedSalesTabs) {
-      try {
-        const parsedTabs = JSON.parse(savedSalesTabs);
-        if (parsedTabs && parsedTabs.length > 0) {
-          useCartStore.getState().setSalesTabs(parsedTabs);
-        }
-      } catch (e) {
-        console.error('[Persistence] Failed to parse sales tabs', e);
-      }
-    }
-
     if (savedActiveTab) {
-      useCartStore.getState().setActiveSalesTab(savedActiveTab);
+      // Will be used after salesTabs load from cloud in useAppLoadData
+      // No need to call setActiveSalesTab here; useAppLoadData handles it
     }
   }, []);
 
-  // Save to localStorage on change
+  // Save active tab selection to localStorage (device-local only)
   useEffect(() => {
-    localStorage.setItem('pos_cart', JSON.stringify(appCart));
-    
-    if (appEditingSaleId) {
-      localStorage.setItem('pos_editing_id', appEditingSaleId);
-    } else {
-      localStorage.removeItem('pos_editing_id');
-    }
-    
-    if (appSelectedCustomer) {
-      localStorage.setItem('pos_selected_customer', JSON.stringify(appSelectedCustomer));
-    } else {
-      localStorage.removeItem('pos_selected_customer');
-    }
-    
     if (appActiveSalesTab) {
       localStorage.setItem('pos_active_sales_tab', appActiveSalesTab);
     }
-    
-    if (appSalesTabs && appSalesTabs.length > 0) {
-      localStorage.setItem('pos_sales_tabs', JSON.stringify(appSalesTabs));
-    }
-  }, [appCart, appEditingSaleId, appSelectedCustomer, appActiveSalesTab, appSalesTabs]);
+  }, [appActiveSalesTab]);
 
-  // Theme mirroring removed as it overwrites local Cashier preference with global DB state
-
-  // Mirror settings to localStorage
-  useEffect(() => {
-    if (appSettings && Object.keys(appSettings).length > 0) {
-      localStorage.setItem('pos_settings', JSON.stringify(appSettings));
-    }
-  }, [appSettings]);
-
-  // Validate active sales tab removed to prevent false resets when data is loading
-
-  // AUTO-PERSIST ACTIVE TAB TO DB
+  // AUTO-PERSIST CART + TAB STATE TO CLOUD (Supabase)
   useEffect(() => {
     const activeTab = appSalesTabs.find(t => t.id === appActiveSalesTab);
     if (activeTab && user) {
@@ -107,4 +42,16 @@ export function useAppPersistence() {
       });
     }
   }, [appCart, appSelectedCustomer, appBillDiscountValue, appBillDiscountType, appActiveSalesTab, user, appSalesTabs]);
+
+  // Mirror settings to localStorage (only for offline/initial load fallback)
+  useEffect(() => {
+    if (appSettings && Object.keys(appSettings).length > 0) {
+      // Only store device-local preferences (theme, grid columns)
+      const localPrefs = {
+        theme: appSettings.theme,
+        posGridColumns: appSettings.posGridColumns,
+      };
+      localStorage.setItem('pos_local_prefs', JSON.stringify(localPrefs));
+    }
+  }, [appSettings?.theme, appSettings?.posGridColumns]);
 }

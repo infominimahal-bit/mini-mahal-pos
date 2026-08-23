@@ -104,7 +104,9 @@ export function Header({
     const newTheme = (appSettings.theme || 'dark') === 'dark' ? 'light' : 'dark';
     useSettingsStore.getState().setSettings({ theme: newTheme });
     try {
-      localStorage.setItem('theme', newTheme);
+      // Save as device-local pref only (not to cloud)
+      const existing = JSON.parse(localStorage.getItem('pos_local_prefs') || '{}');
+      localStorage.setItem('pos_local_prefs', JSON.stringify({ ...existing, theme: newTheme }));
     } catch (err) {
       console.error('Failed to save theme:', err);
     }

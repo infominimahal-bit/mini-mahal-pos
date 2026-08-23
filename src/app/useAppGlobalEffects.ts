@@ -89,7 +89,8 @@ export function useAppGlobalEffects() {
   }, []);
 
   useEffect(() => {
-    const fallbackTheme = localStorage.getItem('theme');
+    const localPrefs = JSON.parse(localStorage.getItem('pos_local_prefs') || '{}');
+    const fallbackTheme = localPrefs.theme || localStorage.getItem('theme');
     const theme = fallbackTheme || appSettings?.theme || 'dark';
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 

@@ -12,7 +12,8 @@ import {
   mapExpense,
   mapDiscount,
   mapPurchaseRecord,
-  mapPaymentMode
+  mapPaymentMode,
+  salesTabsService
 } from '../lib/services';
 import { mapStockHistory } from '../lib/services/stockMappers';
 import { useAuth } from './AuthContext';
@@ -109,7 +110,8 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         cloudBundles,
         cloudSettings,
         cloudSales,
-        cloudStockHistory
+        cloudStockHistory,
+        cloudSalesTabs
       ] = await Promise.allSettled([
         cloudFetch('products', mapProduct),
         cloudFetch('customers', mapCustomer),
@@ -131,6 +133,7 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         })(),
         cloudFetch('sales', mapSale, { order: 'created_at', limit: 500 }),
         cloudFetch('stock_history', mapStockHistory, { order: 'created_at', limit: 2000 }),
+        user ? salesTabsService.getByUserId(user.id).catch(() => []) : Promise.resolve([]),
       ]);
 
       const ok = (r: PromiseSettledResult<any>) => (r.status === 'fulfilled' ? r.value : null);
@@ -151,6 +154,7 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
       const settingsRow = ok(cloudSettings);
       const sales = ok(cloudSales) || [];
       const stockHistory = ok(cloudStockHistory) || [];
+      const salesTabs: any[] = ok(cloudSalesTabs) || [];
 
       // Persist into local display cache so search/loadMore keep working offline-of-cache.
       await Promise.allSettled([
@@ -175,9 +179,9 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
       // Populate stores (cloud is source of truth)
       if (settingsRow) {
         const dbSettings = mapSettings(settingsRow);
-        // Preserve local device UI preferences
+        // Preserve local device UI preferences (theme, grid columns only)
         try {
-          const localStr = localStorage.getItem('pos_settings');
+          const localStr = localStorage.getItem('pos_local_prefs');
           if (localStr) {
             const local = JSON.parse(localStr);
             if (local.posGridColumns !== undefined) dbSettings.posGridColumns = local.posGridColumns;
@@ -200,6 +204,17 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
       useInventoryStore.getState().setPurchaseOrders(purchaseOrders);
       useInventoryStore.getState().setSuppliers(suppliers);
       useInventoryStore.getState().setSupplierTransactions(supplierTx);
+
+      // Load sales tabs from cloud into cartStore
+      if (salesTabs.length > 0) {
+        useCartStore.getState().setSalesTabs(salesTabs);
+        // Restore active tab: prefer localStorage (current device selection), else first tab
+        const savedActiveTab = localStorage.getItem('pos_active_sales_tab');
+        const activeTabId = (savedActiveTab && salesTabs.find((t: any) => t.id === savedActiveTab))
+          ? savedActiveTab
+          : salesTabs[0].id;
+        useCartStore.getState().setActiveSalesTab(activeTabId);
+      }
 
       if (!initialized) setInitialized(true);
       if (!silent) sonner.success('Data loaded successfully', { id: 'load-data' });
