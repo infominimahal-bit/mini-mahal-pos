@@ -55,6 +55,7 @@ export const productsService = {
   async create(product: Omit<Product, 'id'>): Promise<Product> {
     // DUPLICATE PREVENTION (RULE F1) — check Supabase before any local write
     let existing = null;
+    let checkedCloud = false;
     if (navigator.onLine) {
       try {
         const { data } = await supabase
@@ -63,12 +64,13 @@ export const productsService = {
           .ilike('name', product.name.trim())
           .maybeSingle();
         existing = data;
+        checkedCloud = true;
       } catch (err) {
         console.warn('[ProductsService] Supabase duplicate check failed, checking local database:', err);
       }
     }
 
-    if (!existing) {
+    if (!existing && !checkedCloud) {
       // Fallback: Check local IndexedDB database for duplicate name (case-insensitive)
       const localExisting = await localDb.products
         .filter(p => p.name.trim().toLowerCase() === product.name.trim().toLowerCase())
@@ -95,30 +97,33 @@ export const productsService = {
     // reaching the cloud. Guard both remote and local.
     if (product.barcode && product.barcode.trim()) {
       const bc = product.barcode.trim();
+      let checkedCloudBc = false;
       if (navigator.onLine) {
         try {
           const { data: barcodeDup } = await supabase
             .from('products')
-            .select('id, name, barcode')
+            .select('id, name')
             .eq('barcode', bc)
             .maybeSingle();
           if (barcodeDup) {
-            throw new Error(
-              `Barcode "${bc}" already assigned to product "${barcodeDup.name}". Use a unique barcode.`
-            );
+            throw new Error(`Barcode ${bc} is already used by product "${barcodeDup.name}".`);
           }
-        } catch (err: any) {
-          if (err?.message?.includes('already assigned')) throw err;
+          checkedCloudBc = true;
+        } catch (err) {
+          if (err instanceof Error && err.message.includes('already used by')) throw err;
           console.warn('[ProductsService] Barcode duplicate check failed:', err);
         }
       }
-      const localDup = await localDb.products
-        .filter(p => p.barcode && p.barcode.trim().toLowerCase() === bc.toLowerCase())
-        .first();
-      if (localDup) {
-        throw new Error(
-          `Barcode "${bc}" already assigned to product "${localDup.name}". Use a unique barcode.`
-        );
+
+      if (!checkedCloudBc) {
+        const localDup = await localDb.products
+          .filter(p => p.barcode && p.barcode.trim().toLowerCase() === bc.toLowerCase())
+          .first();
+        if (localDup) {
+          throw new Error(
+            `Barcode "${bc}" already assigned to product "${localDup.name}". Use a unique barcode.`
+          );
+        }
       }
     }
 

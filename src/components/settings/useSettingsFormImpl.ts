@@ -86,7 +86,8 @@ export function useSettingsForm() {
       useSettingsStore.getState().setSettings(updatedSettings as any);
       setSyncStatus('success');
 
-      sonner.toast(`Applied ${name.charAt(0).toUpperCase() + name.slice(1)}: ${value} 🌐`, 'success');
+      const displayValue = name === 'storeLogo' ? 'Image Uploaded' : value;
+      sonner.toast(`Applied ${name.charAt(0).toUpperCase() + name.slice(1)}: ${displayValue} 🌐`, 'success');
     } catch (error) {
       console.error('Instant update error:', error);
       setSyncStatus('idle');

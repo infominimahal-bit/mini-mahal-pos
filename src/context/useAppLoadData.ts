@@ -171,22 +171,22 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
 
       // Persist into local display cache so search/loadMore keep working offline-of-cache.
       await Promise.allSettled([
-        localDb.products.bulkPut(products.map(p => ({ ...p }))),
-        localDb.customers.bulkPut(customers),
-        localDb.salesmen.bulkPut(salesmen),
-        localDb.discounts.bulkPut(discounts),
-        localDb.paymentModes.bulkPut(paymentModes),
-        localDb.expenses.bulkPut(expenses),
-        localDb.purchaseRecords.bulkPut(purchaseRecords),
-        localDb.purchaseOrders.bulkPut(purchaseOrders),
-        localDb.suppliers.bulkPut(suppliers),
-        localDb.supplierTransactions.bulkPut(supplierTx),
-        localDb.salesTabs.bulkPut(salesTabs),
-        localDb.categories.bulkPut(categories),
-        localDb.bundles.bulkPut(bundles),
-        localDb.sales.bulkPut(sales),
-        ...(settingsRow ? [localDb.appSettings.put({ ...settingsRow })] : []),
-        ...(users.length ? [localDb.users.bulkPut(users)] : []),
+        localDb.products.clear().then(() => localDb.products.bulkPut(products.map(p => ({ ...p })))),
+        localDb.customers.clear().then(() => localDb.customers.bulkPut(customers)),
+        localDb.salesmen.clear().then(() => localDb.salesmen.bulkPut(salesmen)),
+        localDb.discounts.clear().then(() => localDb.discounts.bulkPut(discounts)),
+        localDb.paymentModes.clear().then(() => localDb.paymentModes.bulkPut(paymentModes)),
+        localDb.expenses.clear().then(() => localDb.expenses.bulkPut(expenses)),
+        localDb.purchaseRecords.clear().then(() => localDb.purchaseRecords.bulkPut(purchaseRecords)),
+        localDb.purchaseOrders.clear().then(() => localDb.purchaseOrders.bulkPut(purchaseOrders)),
+        localDb.suppliers.clear().then(() => localDb.suppliers.bulkPut(suppliers)),
+        localDb.supplierTransactions.clear().then(() => localDb.supplierTransactions.bulkPut(supplierTx)),
+        localDb.salesTabs.clear().then(() => localDb.salesTabs.bulkPut(salesTabs)),
+        localDb.categories.clear().then(() => localDb.categories.bulkPut(categories)),
+        localDb.bundles.clear().then(() => localDb.bundles.bulkPut(bundles)),
+        localDb.sales.clear().then(() => localDb.sales.bulkPut(sales)),
+        localDb.appSettings.clear().then(() => settingsRow ? localDb.appSettings.put({ ...settingsRow }) : Promise.resolve()),
+        localDb.users.clear().then(() => users.length ? localDb.users.bulkPut(users) : Promise.resolve()),
       ]).catch(() => {});
 
       // Populate stores (cloud is source of truth)

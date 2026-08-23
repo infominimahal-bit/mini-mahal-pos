@@ -15,7 +15,8 @@
 ## 🏗️ Architecture
 
 ### Stack
-- React + Vite + TypeScript + Tailwind + Dexie (local cache) + Supabase (cloud truth)
+- React + Vite + TypeScript + Tailwind + Supabase (cloud-direct, single source of truth)
+- Lightweight local cache (Dexie) allowed sirf UI display ke liye — CACHE ≠ SOURCE OF TRUTH
 - State: Zustand stores (`src/stores/`) — one store per domain
 - Services: `src/lib/services/` — one file per entity (barrel export via `index.ts`)
 - UI: Shared components from `src/shared/ui/` and `src/shared/modules/`
@@ -25,7 +26,6 @@
 - Stock changes ONLY via `stock_history` table inserts → DB trigger (`trigger_update_product_stock`) auto-updates `products.stock`
 - Frontend may write local Dexie stock optimistically for display, but cloud is truth
 - Realtime product updates from cloud ALWAYS overwrite local stock (no guards)
-- CloudPull product fetches ALWAYS overwrite local stock
 
 ### Atomic RPCs (ALL stock/sale operations use these)
 | Operation | RPC | What it does atomically |
@@ -38,10 +38,11 @@
 
 > **NEVER write `products.stock` directly from frontend. NEVER.** Only DB triggers write it.
 
-### Offline
-- Queue operations in Dexie `pendingOps` → SyncEngine retries when online
-- RPCs are idempotent (idempotency_key prevents double-execution)
-- Cloud = truth after sync completes
+### Cloud-Direct (NO offline system)
+- Har transaction seedha cloud RPC/DB transaction se confirm hoti hai (Nextera style direct Supabase)
+- Koi background sync queue, pendingOps, reconcile loop, offline-login fallback NAHI
+- Idempotent RPCs (`idempotency_key`) duplicate cloud requests rokne ke liye rehti hain
+- Local cache sirf display — transaction validation hamesha cloud
 
 ---
 
@@ -93,7 +94,8 @@
 ---
 
 ## 🔐 Auth & Security
-- Anon key used (single-tenant, offline-login fallback)
+- **Direct cloud login:** Supabase Auth (`signInWithPassword`) — email/password, session persist
+- Anon key used (single-tenant) sirf public reads ke liye; auth required actions ke liye logged-in user
 - RLS: anon-compatible permissive policies (`USING (true) WITH CHECK (true)`)
 - Role enforcement: via signed action-token RPCs, NOT `auth.uid()` checks
 - 24-hour session expiry. Network errors = DON'T sign out, use cached profile.
@@ -106,9 +108,10 @@
 3. **Idempotent operations.** Every sale has `idempotency_key`. Retry = no-op, not double-execution.
 4. **Delete wins.** A queued delete survives any later update/upsert attempt (F17).
 5. **Tombstones.** Deleted financial records get `row_tombstones` entry — can NEVER be resurrected (F21).
-6. **No silent drops.** Type/constraint errors mark ops as `error` for review — never hard-delete financial ops. Always extract exact `error.code`, `error.message`, and `error.details` from Supabase rejections and store them in `pendingOps.lastError` to display in the UI.
+6. **No silent drops.** Type/constraint errors mark ops as `error` for review — never hard-delete financial ops. Always extract exact `error.code`, `error.message`, and `error.details` from Supabase rejections and surface them in the UI.
 7. **Universal code.** Every fix works across ALL clones. No shop-specific code.
 8. **Time formatting.** Always `formatAppTime/Date/DateTime` from `src/lib/dateUtils.ts`. Never raw `toLocaleTimeString()`.
+9. **Cloud-Direct Local Caching.** Local IndexedDB must NEVER block object creation (duplicate fallback) if the cloud successfully verified it doesn't exist. Always use `.clear()` before `.bulkPut()` on startup to ensure exact parity with cloud and prevent stale UI ghosts (especially for new clone setups or wiped DBs).
 
 ---
 
