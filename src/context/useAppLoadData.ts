@@ -14,6 +14,7 @@ import {
   mapPurchaseRecord,
   mapPaymentMode
 } from '../lib/services';
+import { mapStockHistory } from '../lib/services/stockMappers';
 import { useAuth } from './AuthContext';
 
 /** Fetch a table from Supabase cloud and map each row. */
@@ -107,7 +108,8 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         cloudCategories,
         cloudBundles,
         cloudSettings,
-        cloudSales
+        cloudSales,
+        cloudStockHistory
       ] = await Promise.allSettled([
         cloudFetch('products', mapProduct),
         cloudFetch('customers', mapCustomer),
@@ -128,6 +130,7 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
           return data;
         })(),
         cloudFetch('sales', mapSale, { order: 'created_at', limit: 500 }),
+        cloudFetch('stock_history', mapStockHistory, { order: 'created_at', limit: 2000 }),
       ]);
 
       const ok = (r: PromiseSettledResult<any>) => (r.status === 'fulfilled' ? r.value : null);
@@ -147,6 +150,7 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
       const bundles = ok(cloudBundles) || [];
       const settingsRow = ok(cloudSettings);
       const sales = ok(cloudSales) || [];
+      const stockHistory = ok(cloudStockHistory) || [];
 
       // Persist into local display cache so search/loadMore keep working offline-of-cache.
       await Promise.allSettled([
@@ -163,6 +167,7 @@ export function useAppLoadData(initialized: boolean, setInitialized: React.Dispa
         localDb.categories.clear().then(() => localDb.categories.bulkPut(categories)),
         localDb.bundles.clear().then(() => localDb.bundles.bulkPut(bundles)),
         localDb.sales.clear().then(() => localDb.sales.bulkPut(sales)),
+        localDb.stockHistory.clear().then(() => stockHistory.length ? localDb.stockHistory.bulkPut(stockHistory) : Promise.resolve()),
         localDb.appSettings.clear().then(() => settingsRow ? localDb.appSettings.put({ ...settingsRow }) : Promise.resolve()),
         localDb.users.clear().then(() => users.length ? localDb.users.bulkPut(users) : Promise.resolve()),
       ]).catch(() => {});
