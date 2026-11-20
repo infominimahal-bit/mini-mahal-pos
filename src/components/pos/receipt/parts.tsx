@@ -2,7 +2,7 @@ import React from 'react';
 import { type ReceiptCtx } from './types';
 
 export const RECEIPT_WATERMARK = (
-  <div style={{ textAlign: 'center', marginTop: '16px', borderTop: '1px dashed rgba(0,0,0,0.3)', paddingTop: '8px', marginBottom: '2px', fontSize: '7.5px', letterSpacing: '1px', fontWeight: 600, opacity: 0.8, fontFamily: 'system-ui, sans-serif' }}>POWERED BY ZAYNAHSPOS.COM</div>
+  <div style={{ textAlign: 'center', marginTop: '16px', borderTop: '1px dashed rgba(0,0,0,0.3)', paddingTop: '8px', marginBottom: '2px', fontSize: '7.5px', letterSpacing: '1px', fontWeight: 600, opacity: 0.8, fontFamily: 'system-ui, sans-serif' }}>POWERED BY POS.ZAYNAHS.PK</div>
 );
 
 export function TwoCol(props: any) {

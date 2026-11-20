@@ -55,7 +55,7 @@ export function MobileMenuDrawer({
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-4 bg-primary rounded-full" />
             <h2 className="text-[13px] font-bold text-neutral-900 dark:text-white uppercase tracking-tight">
-              ZAYNAHSPOS.COM
+              POS.ZAYNAHS.PK
             </h2>
           </div>
           <button

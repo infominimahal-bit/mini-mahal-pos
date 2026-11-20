@@ -15,7 +15,7 @@
     "react",
     "typescript"
   ],
-  "author": "Zaynahs POS Team <zaynahspos@gmail.com> (https://zaynahspos.com)",
+  "author": "Zaynahs POS Team <zaynahspos@gmail.com> (https://pos.zaynahs.pk)",
   "main": "dist-electron/main.cjs",
   "scripts": {
     "dev": "vite --host",
